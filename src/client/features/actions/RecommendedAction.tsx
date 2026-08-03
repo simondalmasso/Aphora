@@ -1,0 +1,5 @@
+import type { Snapshot } from '../../../domain/snapshot';
+
+export function RecommendedAction({ snapshot }: { readonly snapshot: Snapshot }) {
+  return <section id="what-to-do" className="v3-card recommended-action" aria-labelledby="recommended-action-title" data-primary-section="true"><header className="v3-card__header"><div><span className="v3-eyebrow">Guía accionable</span><h2 id="recommended-action-title">Qué hacer</h2></div><span className="action-symbol" aria-hidden="true">✓</span></header><p className="recommended-action__lead">{snapshot.recommendedAction}</p><ol className="action-steps">{snapshot.actions.slice(0, 2).map((action, index) => <li key={action}><span>{index + 1}</span><p>{action}</p></li>)}</ol><div className="recommended-action__footer"><a className="ui-button ui-button--primary" href="https://www.santafe.gob.ar/" target="_blank" rel="noreferrer"><span className="ui-button__label">Canales oficiales</span><span aria-hidden="true">↗</span></a><p><strong>Emergencia:</strong> 911 o 103. Este demo no reemplaza avisos oficiales.</p></div></section>;
+}
