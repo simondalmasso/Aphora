@@ -12,6 +12,7 @@ export interface MessageStore {
   markRead(conversationId: string, reader: 'USER' | 'OPERATOR', at: string): Promise<void>;
   countRecentSends(actorId: string, since: string): Promise<number>;
   recordSend(actorId: string, at: string): Promise<void>;
+  consumeRateLimit?(actorId: string, scope: string, windowStart: string, limit: number, at: string): Promise<boolean>;
   purgeExpired(messageExpiresAt: string, historyBefore: string): Promise<void>;
   recordAudit(event: { readonly id: string; readonly actorId: string; readonly action: string; readonly targetId: string; readonly at: string }): Promise<void>;
 }
@@ -62,9 +63,16 @@ export class MessagingService {
     const duplicate = await this.store.findByIdempotency(conversation.id, input.idempotencyKey);
     if (duplicate) return { message: duplicate, duplicate: true };
     const now = this.options.now();
-    const since = new Date(now.getTime() - this.options.rateWindowMinutes * 60_000).toISOString();
+    const windowMs = this.options.rateWindowMinutes * 60_000;
+    const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs).toISOString();
+    const since = new Date(now.getTime() - windowMs).toISOString();
     const rateActors = [principal.sub, ...(networkActorId && networkActorId !== principal.sub ? [networkActorId] : [])];
-    for (const actorId of rateActors) if (await this.store.countRecentSends(actorId, since) >= this.options.rateLimit) throw new Error('RATE_LIMITED');
+    for (const actorId of rateActors) {
+      const allowed = this.store.consumeRateLimit
+        ? await this.store.consumeRateLimit(actorId, 'PRIVATE_MESSAGE', windowStart, this.options.rateLimit, now.toISOString())
+        : await this.store.countRecentSends(actorId, since) < this.options.rateLimit;
+      if (!allowed) throw new Error('RATE_LIMITED');
+    }
     const operator = principal.role === 'VERIFIED_OPERATOR' || principal.role === 'ADMIN';
     if (operator && conversation.userSub === principal.sub) throw new Error('ROLE_CONFLICT');
     const createdAt = now.toISOString();
@@ -86,7 +94,7 @@ export class MessagingService {
       verifiedOperator: operator,
     });
     await this.store.insertMessage(message);
-    for (const actorId of rateActors) await this.store.recordSend(actorId, createdAt);
+    if (!this.store.consumeRateLimit) for (const actorId of rateActors) await this.store.recordSend(actorId, createdAt);
     await this.audit(principal, 'MESSAGE_ACCEPTED', message.id);
     return { message, duplicate: false };
   }
