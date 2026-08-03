@@ -7,6 +7,7 @@ import { MessagesPanel } from './components/MessagesPanel';
 import { useSnapshot } from './pwa/useSnapshot';
 import './styles/app.css';
 import './styles/visual-v3.css';
+import './styles/visual-v3-fixes.css';
 
 export default function App() {
   const { snapshot, online, savedAt, refresh, refreshing, lastSuccessAt, refreshError } = useSnapshot();
