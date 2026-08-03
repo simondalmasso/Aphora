@@ -8,6 +8,9 @@
   "vars": {
     "PRIVATE_MESSAGING_ENABLED": "false"
   },
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
