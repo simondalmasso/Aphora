@@ -1,6 +1,7 @@
 import type { CriticalMessage } from './zungun-compat/types';
 
 export type PublicState = 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION_OFICIAL' | 'UNKNOWN';
+export type DataStatus = 'LIVE' | 'STALE' | 'UNAVAILABLE' | 'OFFLINE';
 export type SourceKind = 'OFFICIAL_OBSERVATION' | 'OFFICIAL_ALERT' | 'FORECAST_MODEL' | 'SATELLITE_OBSERVATION' | 'COMMUNITY_REPORT' | 'INTERNAL_DERIVATION' | 'DEMO_FIXTURE';
 export type SourceStatus = 'FRESH' | 'STALE' | 'UNAVAILABLE' | 'UNKNOWN';
 export type ShelterStatus = 'PREIDENTIFIED' | 'PREPARING' | 'ACTIVE' | 'LIMITED_CAPACITY' | 'FULL' | 'CLOSED' | 'UNKNOWN';
@@ -14,6 +15,9 @@ export interface Source {
   readonly validUntil: string;
   readonly contribution: string;
   readonly official: boolean;
+  readonly url?: string;
+  readonly latencyMinutes?: number;
+  readonly resolution?: string;
 }
 
 export interface RiverPoint {
@@ -33,6 +37,26 @@ export interface RiverThreshold {
   readonly id: 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION';
   readonly label: string;
   readonly metres: number;
+}
+
+export interface HydrologicalSystem {
+  readonly id: string;
+  readonly label: string;
+  readonly watercourse: string;
+  readonly stationName: string;
+  readonly stationCode: string;
+  readonly available: boolean;
+  readonly dataStatus: DataStatus;
+  readonly currentMetres: number | null;
+  readonly observedAt: string | null;
+  readonly sourceId: string;
+  readonly sourceName: string;
+  readonly points: readonly RiverPoint[];
+  readonly thresholds: readonly RiverThreshold[];
+  readonly trend: 'RISING_SLOWLY' | 'RISING' | 'STABLE' | 'FALLING' | 'UNKNOWN';
+  readonly delta1h: number | null;
+  readonly delta6h: number | null;
+  readonly delta24h: number | null;
 }
 
 export interface RainPoint {
@@ -68,7 +92,8 @@ export interface ChangeItem {
 export interface Snapshot {
   readonly schemaVersion: '1.0';
   readonly id: string;
-  readonly mode: 'DEMO';
+  readonly mode: 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' | 'DEMO';
+  readonly dataStatus: DataStatus;
   readonly generatedAt: string;
   readonly previousSnapshotAt: string;
   readonly state: PublicState;
@@ -79,7 +104,11 @@ export interface Snapshot {
   readonly recommendedAction: string;
   readonly emergencyDisclaimer: string;
   readonly changes: readonly ChangeItem[];
+  readonly systems: readonly HydrologicalSystem[];
   readonly river: {
+    readonly systemId: string;
+    readonly available: boolean;
+    readonly dataStatus: DataStatus;
     readonly stationName: string;
     readonly currentMetres: number;
     readonly delta1h: number;
@@ -88,11 +117,14 @@ export interface Snapshot {
     readonly trend: 'RISING_SLOWLY' | 'RISING' | 'STABLE' | 'FALLING' | 'UNKNOWN';
     readonly observedAt: string;
     readonly sourceId: string;
+    readonly sourceName: string;
     readonly points: readonly RiverPoint[];
     readonly forecastPoints: readonly RiverForecastPoint[];
     readonly thresholds: readonly RiverThreshold[];
   };
   readonly rain: {
+    readonly available: boolean;
+    readonly dataStatus: DataStatus;
     readonly accumulated1hMm: number;
     readonly accumulated24hMm: number;
     readonly forecast: string;
@@ -112,6 +144,7 @@ export function compactSnapshot(snapshot: Snapshot) {
     schemaVersion: snapshot.schemaVersion,
     id: snapshot.id,
     mode: snapshot.mode,
+    dataStatus: snapshot.dataStatus,
     generatedAt: snapshot.generatedAt,
     validUntil: snapshot.validUntil,
     state: snapshot.state,
@@ -119,6 +152,7 @@ export function compactSnapshot(snapshot: Snapshot) {
     summary: snapshot.summary,
     recommendedAction: snapshot.recommendedAction,
     changes: snapshot.changes,
+    systems: snapshot.systems,
     river: snapshot.river,
     rain: snapshot.rain,
     contradictions: snapshot.contradictions,
