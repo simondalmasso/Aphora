@@ -7,54 +7,79 @@ if (!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(baseUrl)) {
   process.exit(2);
 }
 
-async function fetchCheck(path, expectedType) {
-  const response = await fetch(`${baseUrl}${path}`, { redirect: 'error', signal: AbortSignal.timeout(25_000), cache: 'no-store' });
-  const body = await response.text();
-  const contentType = response.headers.get('content-type') ?? '';
-  const headersOk = response.headers.get('x-content-type-options') === 'nosniff' && response.headers.get('content-security-policy')?.includes("default-src 'self'");
-  return { path, status: response.status, contentType, headersOk, body, basePass: response.ok && contentType.includes(expectedType) && headersOk };
+async function request(path, options = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, { redirect: 'error', signal: AbortSignal.timeout(25_000), cache: 'no-store', ...options });
+      const body = await response.text();
+      return { path, status: response.status, contentType: response.headers.get('content-type') ?? '', cacheControl: response.headers.get('cache-control') ?? '', permissionsPolicy: response.headers.get('permissions-policy') ?? '', csp: response.headers.get('content-security-policy') ?? '', nosniff: response.headers.get('x-content-type-options') === 'nosniff', body };
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    }
+  }
+  throw lastError;
 }
 
-const raw = await Promise.all([
-  fetchCheck('/api/health', 'application/json'),
-  fetchCheck('/', 'text/html'),
-  fetchCheck('/lite', 'text/html'),
-  fetchCheck('/api/snapshot', 'application/json'),
-  fetchCheck('/api/sources', 'application/json'),
-  fetchCheck('/api/auth/config', 'application/json'),
-  fetchCheck('/api/essential-contacts', 'application/json'),
-  fetchCheck('/manifest.webmanifest', 'application/manifest+json'),
+const checks = await Promise.all([
+  request('/'), request('/lite'), request('/api/health'), request('/api/snapshot'), request('/api/sources'), request('/api/auth/config'), request('/api/essential-contacts'), request('/api/session'), request('/api/private/reports'), request('/manifest.webmanifest'), request('/service-worker.js'),
 ]);
 
-const results = raw.map((item) => {
-  let semantic = true;
-  try {
-    if (item.path === '/api/health') {
-      const data = JSON.parse(item.body).data;
-      semantic = data?.status === 'healthy' && data?.dataMode === 'LIVE_AGGREGATION' && data?.privateMessaging === 'ENABLED' && data?.reporting === 'ENABLED';
-    } else if (item.path === '/api/snapshot') {
-      const data = JSON.parse(item.body).data;
-      semantic = ['LIVE', 'UNAVAILABLE'].includes(data?.mode) && data?.mode !== 'DEMO' && Array.isArray(data?.systems) && data.systems.length >= 2 && !item.body.includes('DEMO / NO OFICIAL');
-    } else if (item.path === '/api/sources') {
-      const data = JSON.parse(item.body).data;
-      semantic = Array.isArray(data?.systems) && data.systems.some((system) => system.id === 'parana-santa-fe') && data.systems.some((system) => system.id === 'salado-santo-tome');
-    } else if (item.path === '/api/auth/config') {
-      const data = JSON.parse(item.body).data;
-      semantic = data?.enabled === true && data?.reportingEnabled === true && typeof data?.googleClientId === 'string' && data.googleClientId.length > 10;
-    } else if (item.path === '/api/essential-contacts') {
-      const data = JSON.parse(item.body).data;
-      semantic = Array.isArray(data?.contacts) && ['911','103','107','100','106','0800-777-5000'].every((number) => data.contacts.some((contact) => contact.number === number && String(contact.href).startsWith('tel:')));
-    } else if (item.path === '/') {
-      semantic = item.body.includes('<title>SOS Santa Fe') && !item.body.includes('DEMO / NO OFICIAL');
-    } else if (item.path === '/lite') {
-      semantic = item.body.includes('Estado hídrico de Santa Fe') && item.body.includes('Teléfonos esenciales') && !item.body.includes('DEMO / NO OFICIAL');
-    } else if (item.path === '/manifest.webmanifest') semantic = item.body.includes('"name": "SOS Santa Fe');
-  } catch { semantic = false; }
-  return { path: item.path, status: item.status, contentType: item.contentType, headersOk: item.headersOk, semantic, pass: item.basePass && semantic };
+function json(item) { try { return JSON.parse(item.body).data; } catch { return null; } }
+const results = checks.map((item) => {
+  const security = item.nosniff && item.csp.includes("default-src 'self'");
+  let semantic = false;
+  let detail = '';
+  if (item.path === '/') {
+    semantic = item.status === 200 && item.contentType.includes('text/html') && item.permissionsPolicy.includes('geolocation=(self)') && item.permissionsPolicy.includes('camera=()') && item.body.includes('<title>SOS Santa Fe') && !item.body.includes('DEMO / NO OFICIAL');
+    detail = 'shell + same-origin geolocation policy';
+  } else if (item.path === '/lite') {
+    semantic = item.status === 200 && item.contentType.includes('text/html') && item.body.includes('Estado hídrico de Santa Fe') && item.body.includes('Teléfonos esenciales') && item.body.includes('no constituye una orden oficial');
+    detail = 'lite + quality/threshold disclaimer';
+  } else if (item.path === '/api/health') {
+    const data = json(item);
+    semantic = item.status === 200 && data?.status === 'healthy' && data?.dataMode === 'LIVE_AGGREGATION' && data?.privateMessaging === 'ENABLED' && data?.reporting === 'ENABLED' && Array.isArray(data?.providers) && data.providers.length >= 3 && data.providers.every((provider) => typeof provider.id === 'string' && ['FRESH', 'STALE', 'UNAVAILABLE'].includes(provider.status) && 'lastSuccessAt' in provider && 'errorClass' in provider && 'circuitOpenUntil' in provider);
+    detail = 'provider health + private activation';
+  } else if (item.path === '/api/snapshot') {
+    const data = json(item);
+    semantic = item.status === 200 && data?.mode === 'LIVE' && ['LIVE', 'STALE'].includes(data?.dataStatus) && Array.isArray(data?.systems) && data.systems.length >= 2 && data.systems.some((system) => system.available === true && Number.isFinite(system.currentMetres) && typeof system.observedAt === 'string') && data?.state !== 'EVACUACION_OFICIAL' && !item.body.includes('DEMO_FIXTURE');
+    detail = 'usable non-synthetic live/stale snapshot';
+  } else if (item.path === '/api/sources') {
+    const data = json(item);
+    semantic = item.status === 200 && Array.isArray(data?.systems) && data.systems.some((system) => system.id === 'parana-santa-fe') && data.systems.some((system) => system.id === 'salado-santo-tome') && Array.isArray(data?.sources) && data.sources.some((source) => source.connected === true && ['FRESH', 'STALE'].includes(source.status) && typeof source.observedAt === 'string' && typeof source.qualityNote === 'string');
+    detail = 'station separation + connected provenance';
+  } else if (item.path === '/api/auth/config') {
+    const data = json(item);
+    semantic = item.status === 200 && data?.enabled === true && data?.reportingEnabled === true && typeof data?.googleClientId === 'string' && data.googleClientId.length > 10;
+    detail = 'protected auth/report configuration';
+  } else if (item.path === '/api/essential-contacts') {
+    const data = json(item);
+    semantic = item.status === 200 && Array.isArray(data?.contacts) && ['911','103','107','100','106','0800-777-5000'].every((number) => data.contacts.some((contact) => contact.number === number && String(contact.href).startsWith('tel:')));
+    detail = 'essential contacts';
+  } else if (item.path === '/api/session') {
+    const data = json(item);
+    semantic = item.status === 200 && data?.enabled === true && data?.authenticated === false && item.cacheControl.includes('private') && item.cacheControl.includes('no-store');
+    detail = 'anonymous private session negative';
+  } else if (item.path === '/api/private/reports') {
+    semantic = item.status === 401 && item.cacheControl.includes('private') && item.cacheControl.includes('no-store');
+    detail = 'private report authorization negative';
+  } else if (item.path === '/manifest.webmanifest') {
+    semantic = item.status === 200 && item.contentType.includes('application/manifest+json') && item.body.includes('"name": "SOS Santa Fe');
+    detail = 'PWA manifest';
+  } else if (item.path === '/service-worker.js') {
+    semantic = item.status === 200 && item.body.includes('PUBLIC_API_ALLOWLIST') && item.body.includes('privateApiNetworkOnly') && item.body.includes("directive.includes('private')") && item.body.includes("directive.includes('no-store')") && !item.body.includes("pathname.startsWith('/api/') { event.respondWith(apiNetworkFirst");
+    detail = 'private-cache prohibition';
+  }
+  return { path: item.path, status: item.status, contentType: item.contentType, cacheControl: item.cacheControl, security, semantic, detail, pass: security && semantic };
 });
 
 const pass = results.every((result) => result.pass);
 const proof = { schemaVersion: '1.0', worker_name: 'sos-sf', workers_dev_url: baseUrl, deployed_at_utc: new Date().toISOString(), remote_status: pass ? 'PASS' : 'FAIL', verified_paths: results, source_commit: process.env.GITHUB_SHA ?? 'unknown', cloudflare_account_identity: 'GitHub Actions protected configuration; no secret readback' };
-if (process.env.WRITE_PROOF === '1') { const artifactDir = join(process.cwd(), 'artifacts', 'v1'); await mkdir(artifactDir, { recursive: true }); await writeFile(join(artifactDir, 'deployment-proof.json'), `${JSON.stringify(proof, null, 2)}\n`); }
+if (process.env.WRITE_PROOF === '1') {
+  const artifactDir = join(process.cwd(), 'artifacts', 'v1');
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(join(artifactDir, 'deployment-proof.json'), `${JSON.stringify(proof, null, 2)}\n`);
+}
 console.log(JSON.stringify(proof));
 if (!pass) process.exitCode = 1;
