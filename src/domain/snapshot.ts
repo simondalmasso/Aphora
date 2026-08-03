@@ -20,24 +20,9 @@ export interface Source {
   readonly resolution?: string;
 }
 
-export interface RiverPoint {
-  readonly at: string;
-  readonly metres: number;
-  readonly measured: boolean;
-}
-
-export interface RiverForecastPoint {
-  readonly at: string;
-  readonly metres: number;
-  readonly lowMetres: number;
-  readonly highMetres: number;
-}
-
-export interface RiverThreshold {
-  readonly id: 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION';
-  readonly label: string;
-  readonly metres: number;
-}
+export interface RiverPoint { readonly at: string; readonly metres: number; readonly measured: boolean }
+export interface RiverForecastPoint { readonly at: string; readonly metres: number; readonly lowMetres: number; readonly highMetres: number }
+export interface RiverThreshold { readonly id: 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION'; readonly label: string; readonly metres: number }
 
 export interface HydrologicalSystem {
   readonly id: string;
@@ -59,41 +44,16 @@ export interface HydrologicalSystem {
   readonly delta24h: number | null;
 }
 
-export interface RainPoint {
-  readonly at: string;
-  readonly millimetres: number;
-}
-
-export interface Shelter {
-  readonly id: string;
-  readonly name: string;
-  readonly area: string;
-  readonly address: string;
-  readonly status: ShelterStatus;
-  readonly sourceId: string;
-  readonly updatedAt: string;
-}
-
-export interface Contradiction {
-  readonly id: string;
-  readonly title: string;
-  readonly signals: readonly string[];
-  readonly result: PublicState;
-  readonly explanation: string;
-}
-
-export interface ChangeItem {
-  readonly id: string;
-  readonly label: string;
-  readonly direction: 'UP' | 'DOWN' | 'NEW' | 'SAME' | 'UNKNOWN';
-  readonly detail: string;
-}
+export interface RainPoint { readonly at: string; readonly millimetres: number }
+export interface Shelter { readonly id: string; readonly name: string; readonly area: string; readonly address: string; readonly status: ShelterStatus; readonly sourceId: string; readonly updatedAt: string }
+export interface Contradiction { readonly id: string; readonly title: string; readonly signals: readonly string[]; readonly result: PublicState; readonly explanation: string }
+export interface ChangeItem { readonly id: string; readonly label: string; readonly direction: 'UP' | 'DOWN' | 'NEW' | 'SAME' | 'UNKNOWN'; readonly detail: string }
 
 export interface Snapshot {
   readonly schemaVersion: '1.0';
   readonly id: string;
   readonly mode: 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' | 'DEMO';
-  readonly dataStatus: DataStatus;
+  readonly dataStatus?: DataStatus;
   readonly generatedAt: string;
   readonly previousSnapshotAt: string;
   readonly state: PublicState;
@@ -104,11 +64,11 @@ export interface Snapshot {
   readonly recommendedAction: string;
   readonly emergencyDisclaimer: string;
   readonly changes: readonly ChangeItem[];
-  readonly systems: readonly HydrologicalSystem[];
+  readonly systems?: readonly HydrologicalSystem[];
   readonly river: {
-    readonly systemId: string;
-    readonly available: boolean;
-    readonly dataStatus: DataStatus;
+    readonly systemId?: string;
+    readonly available?: boolean;
+    readonly dataStatus?: DataStatus;
     readonly stationName: string;
     readonly currentMetres: number;
     readonly delta1h: number;
@@ -117,14 +77,14 @@ export interface Snapshot {
     readonly trend: 'RISING_SLOWLY' | 'RISING' | 'STABLE' | 'FALLING' | 'UNKNOWN';
     readonly observedAt: string;
     readonly sourceId: string;
-    readonly sourceName: string;
+    readonly sourceName?: string;
     readonly points: readonly RiverPoint[];
     readonly forecastPoints: readonly RiverForecastPoint[];
     readonly thresholds: readonly RiverThreshold[];
   };
   readonly rain: {
-    readonly available: boolean;
-    readonly dataStatus: DataStatus;
+    readonly available?: boolean;
+    readonly dataStatus?: DataStatus;
     readonly accumulated1hMm: number;
     readonly accumulated24hMm: number;
     readonly forecast: string;
