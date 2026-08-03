@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'sos-sf-v1-20260802c';
+const CACHE_VERSION = 'sos-sf-v1-20260802d';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css'];
@@ -33,6 +33,17 @@ async function networkFirst(request, cacheName, fallback) {
   }
 }
 
+async function navigationNetworkFirst(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch {
+    return (await caches.match('/offline.html', { ignoreVary: true })) || new Response('Snapshot offline. No es el estado actual.', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
@@ -43,7 +54,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, STATIC_CACHE, '/offline.html'));
+    event.respondWith(navigationNetworkFirst(request));
     return;
   }
   event.respondWith(caches.match(request, { ignoreVary: true }).then((cached) => cached || fetch(request).then((response) => {

@@ -1,14 +1,14 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T02:38:49.649Z",
+  "generatedAt": "2026-08-03T02:44:03.268Z",
   "budgets": {
     "initialJsGzipBytes": 122880,
     "initialCssGzipBytes": 25600
   },
   "actual": {
-    "jsGzipBytes": 70481,
+    "jsGzipBytes": 70585,
     "cssGzipBytes": 5650,
-    "totalDistBytes": 1180699
+    "totalDistBytes": 1181836
   },
   "files": [
     {
@@ -48,13 +48,13 @@
     },
     {
       "path": "offline.html",
-      "bytes": 830,
-      "gzipBytes": 529
+      "bytes": 1539,
+      "gzipBytes": 830
     },
     {
       "path": "service-worker.js",
-      "bytes": 2233,
-      "gzipBytes": 878
+      "bytes": 2661,
+      "gzipBytes": 982
     }
   ],
   "externalFonts": false,
