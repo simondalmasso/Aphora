@@ -4,9 +4,9 @@ import { MessagingService } from '../../src/domain/private-messaging/service';
 import { normalizeSendMessage } from '../../src/domain/private-messaging/validation';
 import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
 
-const user: SessionPrincipal = { sub: 'user:10001', role: 'AUTHENTICATED_USER', expiresAt: '2026-08-03T00:00:00.000Z' };
-const otherUser: SessionPrincipal = { ...user, sub: 'user:20002' };
-const operator: SessionPrincipal = { ...user, sub: 'operator:30003', role: 'VERIFIED_OPERATOR' };
+const user: SessionPrincipal = { sessionId: 'session:user-10001', sub: 'user:10001', email: 'user10001@example.org', role: 'AUTHENTICATED_USER', expiresAt: '2026-08-03T00:00:00.000Z' };
+const otherUser: SessionPrincipal = { ...user, sessionId: 'session:user-20002', sub: 'user:20002', email: 'user20002@example.org' };
+const operator: SessionPrincipal = { ...user, sessionId: 'session:operator-30003', sub: 'operator:30003', email: 'operator30003@example.org', role: 'VERIFIED_OPERATOR' };
 
 function fixture(rateLimit = 10, blockedTerms = '') {
   const store = new MemoryMessageStore();
