@@ -32,6 +32,19 @@ function offlineSnapshot(stored: StoredSnapshot): Snapshot {
   };
 }
 
+function backendFailureSnapshot(stored: StoredSnapshot): Snapshot {
+  return {
+    ...stored.snapshot,
+    mode: 'LIVE',
+    dataStatus: 'STALE',
+    stateLabel: 'Datos desactualizados',
+    summary: `${stored.snapshot.summary} El servicio no pudo actualizarse; no es información actual.`,
+    systems: stored.snapshot.systems?.map((system) => ({ ...system, dataStatus: system.available ? 'STALE' : 'UNAVAILABLE' })),
+    river: { ...stored.snapshot.river, dataStatus: stored.snapshot.river.available ? 'STALE' : 'UNAVAILABLE' },
+    rain: { ...stored.snapshot.rain, dataStatus: stored.snapshot.rain.available ? 'STALE' : 'UNAVAILABLE' },
+  };
+}
+
 async function fetchEnvelope(path: string): Promise<unknown> {
   const response = await fetch(path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
   if (!response.ok) throw new Error(`No se pudo actualizar ${path}`);
@@ -47,8 +60,9 @@ export function useSnapshot() {
   const [initialStored] = useState<StoredSnapshot | null>(loadStored);
   const [snapshot, setSnapshot] = useState<Snapshot>(() => navigator.onLine ? unavailableSnapshot : initialStored ? offlineSnapshot(initialStored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(() => initialStored?.savedAt ?? null);
-  const [source, setSource] = useState<'NETWORK' | 'OFFLINE_CACHE' | 'UNAVAILABLE'>(() => navigator.onLine ? 'UNAVAILABLE' : initialStored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
+  const [source, setSource] = useState<'NETWORK' | 'OFFLINE_CACHE' | 'STALE_CACHE' | 'UNAVAILABLE'>(() => navigator.onLine ? 'UNAVAILABLE' : initialStored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
   const [refreshing, setRefreshing] = useState(false);
   const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(() => initialStored?.savedAt ?? null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -58,17 +72,19 @@ export function useSnapshot() {
   const refresh = useCallback((): Promise<boolean> => {
     if (refreshInFlight.current) return refreshInFlight.current;
     const operation = (async () => {
-      if (!navigator.onLine) {
+      const browserOnline = navigator.onLine;
+      if (!browserOnline) {
         const stored = loadStored();
         if (mounted.current) {
           setOnline(false);
+          setBackendAvailable(null);
           setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
           setSnapshot(stored ? offlineSnapshot(stored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
           setRefreshError('Modo sin conexión. No es información actual.');
         }
         return false;
       }
-      if (mounted.current) { setRefreshing(true); setRefreshError(null); }
+      if (mounted.current) { setOnline(true); setRefreshing(true); setRefreshError(null); }
       try {
         const [snapshotData, sourcesData, messagesData] = await Promise.all([fetchEnvelope('/api/snapshot'), fetchEnvelope('/api/sources'), fetchEnvelope('/api/messages')]);
         const sources = objectValue(sourcesData).sources;
@@ -80,19 +96,22 @@ export function useSnapshot() {
         if (validated.mode !== 'DEMO' && validated.dataStatus !== 'UNAVAILABLE') localStorage.setItem(STORAGE_KEY, JSON.stringify({ snapshot: validated, savedAt: now } satisfies StoredSnapshot));
         if (mounted.current) {
           setOnline(true);
+          setBackendAvailable(true);
           setSnapshot(validated);
           setSavedAt(validated.dataStatus === 'UNAVAILABLE' ? initialStored?.savedAt ?? null : now);
           setLastSuccessAt(now);
           setSource(validated.dataStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NETWORK');
+          setRefreshError(validated.dataStatus === 'UNAVAILABLE' ? 'El servicio responde, pero no hay datos en vivo disponibles.' : null);
         }
         return true;
       } catch {
         const stored = loadStored();
         if (mounted.current) {
-          setOnline(false);
-          setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
-          setSnapshot(stored ? offlineSnapshot(stored) : unavailableSnapshot);
-          setRefreshError(stored ? 'La actualización falló. Se conserva un snapshot anterior; no es información actual.' : 'La actualización falló y no existe información anterior validada.');
+          setOnline(true);
+          setBackendAvailable(false);
+          setSource(stored ? 'STALE_CACHE' : 'UNAVAILABLE');
+          setSnapshot(stored ? backendFailureSnapshot(stored) : unavailableSnapshot);
+          setRefreshError(stored ? 'Servicio temporalmente no disponible. Se conserva una lectura anterior; no es información actual.' : 'Servicio temporalmente no disponible y sin lectura anterior.');
         }
         return false;
       } finally {
@@ -107,12 +126,12 @@ export function useSnapshot() {
   useEffect(() => {
     mounted.current = true;
     const onOnline = () => { setOnline(true); void refresh(); };
-    const onOffline = () => { setOnline(false); void refresh(); };
+    const onOffline = () => { setOnline(false); setBackendAvailable(null); void refresh(); };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     void refresh();
     return () => { mounted.current = false; window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, [refresh]);
 
-  return { snapshot, online, savedAt, source, refresh, refreshing, lastSuccessAt, refreshError } as const;
+  return { snapshot, online, backendAvailable, savedAt, source, refresh, refreshing, lastSuccessAt, refreshError } as const;
 }
