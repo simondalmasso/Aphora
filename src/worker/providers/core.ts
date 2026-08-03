@@ -1,11 +1,7 @@
 export type ProviderStatus = 'FRESH' | 'STALE' | 'UNAVAILABLE';
 export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'CIRCUIT_OPEN' | 'NETWORK' | null;
 
-export interface ParsedProvider<T> {
-  readonly value: T;
-  readonly observedAt: string;
-}
-
+export interface ParsedProvider<T> { readonly value: T; readonly observedAt: string }
 export interface ProviderPolicy {
   readonly id: string;
   readonly hosts: readonly string[];
@@ -16,7 +12,6 @@ export interface ProviderPolicy {
   readonly freshMs?: number;
   readonly staleMs?: number;
 }
-
 export interface ProviderResult<T> {
   readonly value: T | null;
   readonly status: ProviderStatus;
@@ -25,7 +20,6 @@ export interface ProviderResult<T> {
   readonly errorClass: ProviderErrorClass;
   readonly fromCache: boolean;
 }
-
 export interface ProviderHealth {
   readonly id: string;
   readonly status: ProviderStatus;
@@ -34,20 +28,9 @@ export interface ProviderHealth {
   readonly errorClass: ProviderErrorClass;
   readonly circuitOpenUntil: string | null;
 }
-
-interface CachedProvider<T> {
-  readonly value: T;
-  readonly fetchedAt: string;
-  readonly observedAt: string;
-}
-
-interface CircuitState {
-  readonly failures: number;
-  readonly lastSuccessAt: string | null;
-  readonly lastObservedAt: string | null;
-  readonly errorClass: ProviderErrorClass;
-  readonly openUntil: string | null;
-}
+interface CachedProvider<T> { readonly value: T; readonly fetchedAt: string; readonly observedAt: string }
+interface CircuitState { readonly failures: number; readonly lastSuccessAt: string | null; readonly lastObservedAt: string | null; readonly errorClass: ProviderErrorClass; readonly openUntil: string | null }
+interface CloudflareCacheStorage extends CacheStorage { readonly default: Cache }
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_BYTES = 1_000_000;
@@ -57,14 +40,11 @@ const CIRCUIT_FAILURES = 3;
 const CIRCUIT_OPEN_MS = 5 * 60_000;
 const health = new Map<string, ProviderHealth>();
 
-function defaultCircuit(): CircuitState {
-  return { failures: 0, lastSuccessAt: null, lastObservedAt: null, errorClass: null, openUntil: null };
-}
-
+function defaultCircuit(): CircuitState { return { failures: 0, lastSuccessAt: null, lastObservedAt: null, errorClass: null, openUntil: null }; }
 function cacheApi(): Cache | null {
-  return typeof caches === 'undefined' ? null : caches.default;
+  if (typeof caches === 'undefined') return null;
+  return (caches as CloudflareCacheStorage).default ?? null;
 }
-
 function classify(error: unknown): ProviderErrorClass {
   const message = error instanceof Error ? error.message : '';
   if (message.includes('ALLOWLIST')) return 'ALLOWLIST';
@@ -76,18 +56,15 @@ function classify(error: unknown): ProviderErrorClass {
   if (message.includes('CIRCUIT_OPEN')) return 'CIRCUIT_OPEN';
   return 'NETWORK';
 }
-
 function allowedUrl(raw: string, policy: ProviderPolicy): URL {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || !policy.hosts.includes(url.hostname) || !policy.paths.some((path) => path.test(url.pathname))) throw new Error('PROVIDER_ALLOWLIST_REJECTED');
   return url;
 }
-
 async function fingerprint(policy: ProviderPolicy, url: URL): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${policy.id}\n${url.toString()}`)));
   return Array.from(bytes.slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
-
 async function cacheRead<T>(key: URL): Promise<T | null> {
   const cache = cacheApi();
   if (!cache) return null;
@@ -95,13 +72,11 @@ async function cacheRead<T>(key: URL): Promise<T | null> {
   if (!response) return null;
   try { return await response.json() as T; } catch { return null; }
 }
-
 async function cacheWrite(key: URL, value: unknown, maxAgeSeconds: number): Promise<void> {
   const cache = cacheApi();
   if (!cache) return;
   await cache.put(new Request(key), new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': `public, max-age=${maxAgeSeconds}` } }));
 }
-
 async function boundedText(response: Response, maximum: number): Promise<string> {
   const declared = Number(response.headers.get('Content-Length') ?? '0');
   if (Number.isFinite(declared) && declared > maximum) throw new Error('PROVIDER_BODY_TOO_LARGE');
@@ -121,21 +96,10 @@ async function boundedText(response: Response, maximum: number): Promise<string>
   for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.byteLength; }
   return new TextDecoder().decode(merged);
 }
-
 function publishHealth(policy: ProviderPolicy, result: ProviderResult<unknown>, circuit: CircuitState): void {
-  health.set(policy.id, Object.freeze({
-    id: policy.id,
-    status: result.status,
-    lastSuccessAt: circuit.lastSuccessAt,
-    lastObservedAt: circuit.lastObservedAt,
-    errorClass: result.errorClass,
-    circuitOpenUntil: circuit.openUntil,
-  }));
+  health.set(policy.id, Object.freeze({ id: policy.id, status: result.status, lastSuccessAt: circuit.lastSuccessAt, lastObservedAt: circuit.lastObservedAt, errorClass: result.errorClass, circuitOpenUntil: circuit.openUntil }));
 }
-
-export function providerHealth(): readonly ProviderHealth[] {
-  return Object.freeze([...health.values()].sort((a, b) => a.id.localeCompare(b.id)));
-}
+export function providerHealth(): readonly ProviderHealth[] { return Object.freeze([...health.values()].sort((a, b) => a.id.localeCompare(b.id))); }
 
 export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, parse: (body: string, contentType: string) => ParsedProvider<T>): Promise<ProviderResult<T>> {
   const now = new Date();
@@ -166,11 +130,10 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
     publishHealth(policy, result, circuit);
     return result;
   }
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error('PROVIDER_TIMEOUT')), policy.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal, headers: { Accept: policy.contentTypes.join(', ') }, cf: { cacheTtl: 0, cacheEverything: false } });
+    const response = await fetch(url, { signal: controller.signal, headers: { Accept: policy.contentTypes.join(', ') } });
     if (!response.ok) throw new Error(`PROVIDER_HTTP_${response.status}`);
     const contentType = (response.headers.get('Content-Type') ?? '').toLowerCase();
     if (!policy.contentTypes.some((item) => contentType.includes(item.toLowerCase().split(';')[0]!))) throw new Error('PROVIDER_CONTENT_TYPE_REJECTED');
@@ -189,20 +152,12 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
   } catch (error) {
     const errorClass = classify(error);
     const failures = circuit.failures + 1;
-    circuit = {
-      failures,
-      lastSuccessAt: circuit.lastSuccessAt,
-      lastObservedAt: circuit.lastObservedAt,
-      errorClass,
-      openUntil: failures >= CIRCUIT_FAILURES ? new Date(now.getTime() + CIRCUIT_OPEN_MS).toISOString() : null,
-    };
+    circuit = { failures, lastSuccessAt: circuit.lastSuccessAt, lastObservedAt: circuit.lastObservedAt, errorClass, openUntil: failures >= CIRCUIT_FAILURES ? new Date(now.getTime() + CIRCUIT_OPEN_MS).toISOString() : null };
     await cacheWrite(circuitKey, circuit, Math.ceil(staleMs / 1000));
     const result: ProviderResult<T> = cached && cachedAge <= staleMs
       ? { value: cached.value, status: 'STALE', fetchedAt: cached.fetchedAt, observedAt: cached.observedAt, errorClass, fromCache: true }
       : { value: null, status: 'UNAVAILABLE', fetchedAt: now.toISOString(), observedAt: null, errorClass, fromCache: false };
     publishHealth(policy, result, circuit);
     return result;
-  } finally {
-    clearTimeout(timer);
-  }
+  } finally { clearTimeout(timer); }
 }
