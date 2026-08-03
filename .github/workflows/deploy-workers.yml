@@ -2,13 +2,9 @@ name: Deploy Workers
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - arq/ui-simplification-v2
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: sos-sf-workers-production
@@ -78,7 +74,6 @@ jobs:
           node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,conclusion:"see-workflow-conclusion",generatedAt:new Date().toISOString()},null,2)+"\n")'
 
       - name: Upload V1 evidence
-        id: evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -89,34 +84,3 @@ jobs:
             wrangler-deploy.log
           if-no-files-found: error
           retention-days: 30
-
-      - name: Publish UI simplification run report
-        if: ${{ always() && github.ref == 'refs/heads/arq/ui-simplification-v2' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CHECKPOINT_BODY: ${{ runner.temp }}/ui-simplification-checkpoint.md
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          JOB_STATUS: ${{ job.status }}
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
-          ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
-          ARTIFACT_URL: ${{ steps.evidence.outputs.artifact-url }}
-          ARTIFACT_DIGEST: ${{ steps.evidence.outputs.artifact-digest }}
-        run: |
-          node - <<'NODE'
-          const fs = require('node:fs');
-          const lines = [
-            '# SOS-SF UI simplification checkpoint',
-            '',
-            '- Order: `SOS-SF-OWNER-UI-SIMPLIFICATION-002`',
-            `- Deployment source: \`${process.env.GITHUB_SHA}\``,
-            `- Actions run: ${process.env.RUN_URL}`,
-            `- Combined job status: \`${process.env.JOB_STATUS}\``,
-            `- Deployment: ${process.env.DEPLOYMENT_URL}`,
-            `- Artifact: [${process.env.ARTIFACT_ID}](${process.env.ARTIFACT_URL})`,
-            `- Artifact digest: \`${process.env.ARTIFACT_DIGEST}\``,
-            '- Consult the linked run for the exact completed and failing steps.',
-            '- Final trigger cleanup and remote-head reconciliation: pending ARQ terminal step.',
-          ];
-          fs.writeFileSync(process.env.CHECKPOINT_BODY, `${lines.join('\n')}\n`);
-          NODE
-          gh issue edit 7 --title "UI simplification run — one-shot" --body-file "$CHECKPOINT_BODY"
