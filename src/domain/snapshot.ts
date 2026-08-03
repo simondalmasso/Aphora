@@ -1,6 +1,6 @@
 import type { CriticalMessage } from './zungun-compat/types';
 
-export type PublicState = 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION_OFICIAL' | 'UNKNOWN';
+export type PublicState = 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'UMBRAL_EVACUACION_ALCANZADO' | 'EVACUACION_OFICIAL' | 'UNKNOWN';
 export type DataStatus = 'LIVE' | 'STALE' | 'UNAVAILABLE' | 'OFFLINE';
 export type SourceKind = 'OFFICIAL_OBSERVATION' | 'OFFICIAL_ALERT' | 'FORECAST_MODEL' | 'SATELLITE_OBSERVATION' | 'COMMUNITY_REPORT' | 'INTERNAL_DERIVATION' | 'DEMO_FIXTURE';
 export type SourceStatus = 'FRESH' | 'STALE' | 'UNAVAILABLE' | 'UNKNOWN';
@@ -18,9 +18,17 @@ export interface Source {
   readonly url?: string;
   readonly latencyMinutes?: number;
   readonly resolution?: string;
+  readonly uncertainty?: string;
+  readonly qualityNote?: string;
+  readonly connected?: boolean;
 }
 
-export interface RiverPoint { readonly at: string; readonly metres: number; readonly measured: boolean }
+export interface RiverPoint {
+  readonly at: string;
+  readonly metres: number;
+  readonly measured: boolean;
+  readonly quality?: 'PUBLISHED_OPERATIONAL' | 'PROVIDER_VALIDATED' | 'UNKNOWN';
+}
 export interface RiverForecastPoint { readonly at: string; readonly metres: number; readonly lowMetres: number; readonly highMetres: number }
 export interface RiverThreshold { readonly id: 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION'; readonly label: string; readonly metres: number }
 
