@@ -2,10 +2,12 @@ import type { SessionPrincipal, UserRole } from '../domain/private-messaging/typ
 
 const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
 const SESSION_COOKIE = '__Host-sos_sf_session';
+const SESSION_MS = 8 * 60 * 60 * 1000;
 
 export interface GoogleClaims {
   readonly iss: string;
   readonly aud: string | readonly string[];
+  readonly azp?: string;
   readonly sub: string;
   readonly exp: number;
   readonly iat?: number;
@@ -41,8 +43,9 @@ export function validateGoogleClaims(value: unknown, clientId: string, nowMs: nu
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('GOOGLE_CLAIMS_INVALID');
   const claims = value as Record<string, unknown>;
   if (typeof claims.iss !== 'string' || !GOOGLE_ISSUERS.has(claims.iss)) throw new Error('GOOGLE_ISSUER_INVALID');
-  const audienceValid = claims.aud === clientId || (Array.isArray(claims.aud) && claims.aud.includes(clientId));
-  if (!audienceValid) throw new Error('GOOGLE_AUDIENCE_INVALID');
+  const audiences = typeof claims.aud === 'string' ? [claims.aud] : Array.isArray(claims.aud) && claims.aud.every((item) => typeof item === 'string') ? claims.aud as string[] : [];
+  if (!audiences.includes(clientId)) throw new Error('GOOGLE_AUDIENCE_INVALID');
+  if ((audiences.length > 1 || claims.azp !== undefined) && claims.azp !== clientId) throw new Error('GOOGLE_AUTHORIZED_PARTY_INVALID');
   if (!Number.isSafeInteger(claims.exp) || (claims.exp as number) * 1000 <= nowMs) throw new Error('GOOGLE_TOKEN_EXPIRED');
   if (claims.iat !== undefined && (!Number.isSafeInteger(claims.iat) || (claims.iat as number) * 1000 > nowMs + 120_000)) throw new Error('GOOGLE_ISSUED_AT_INVALID');
   if (typeof claims.sub !== 'string' || !/^[0-9]{5,64}$/.test(claims.sub)) throw new Error('GOOGLE_SUB_INVALID');
@@ -73,13 +76,34 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-export async function createSessionCookie(claims: GoogleClaims, secret: string, operatorEmails: string, nowMs = Date.now()): Promise<string> {
-  const allowlist = new Set(operatorEmails.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
-  const role: Exclude<UserRole, 'PUBLIC_ANONYMOUS'> = allowlist.has(claims.email.toLowerCase()) ? 'VERIFIED_OPERATOR' : 'AUTHENTICATED_USER';
-  const payload: SessionPrincipal = { sub: claims.sub, role, expiresAt: new Date(nowMs + 8 * 60 * 60 * 1000).toISOString() };
-  const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
+function operatorAllowlist(value: string): ReadonlySet<string> {
+  return new Set(value.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
+}
+
+export function roleForEmail(email: string, operatorEmails: string): Exclude<UserRole, 'PUBLIC_ANONYMOUS'> {
+  return operatorAllowlist(operatorEmails).has(email.toLowerCase()) ? 'VERIFIED_OPERATOR' : 'AUTHENTICATED_USER';
+}
+
+export function createSessionPrincipal(claims: GoogleClaims, operatorEmails: string, nowMs = Date.now(), sessionId = crypto.randomUUID()): SessionPrincipal {
+  return Object.freeze({
+    sessionId: `session:${sessionId}`,
+    sub: claims.sub,
+    email: claims.email.toLowerCase(),
+    role: roleForEmail(claims.email, operatorEmails),
+    expiresAt: new Date(nowMs + SESSION_MS).toISOString(),
+  });
+}
+
+export async function createSessionCookieForPrincipal(principal: SessionPrincipal, secret: string, nowMs = Date.now()): Promise<string> {
+  if (Date.parse(principal.expiresAt) <= nowMs) throw new Error('SESSION_EXPIRED');
+  const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(principal)));
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', await hmacKey(secret), new TextEncoder().encode(encoded)));
-  return `${SESSION_COOKIE}=${encoded}.${bytesToBase64Url(signature)}; Path=/; Max-Age=28800; HttpOnly; Secure; SameSite=Lax`;
+  const maxAge = Math.max(0, Math.floor((Date.parse(principal.expiresAt) - nowMs) / 1000));
+  return `${SESSION_COOKIE}=${encoded}.${bytesToBase64Url(signature)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export async function createSessionCookie(claims: GoogleClaims, secret: string, operatorEmails: string, nowMs = Date.now(), sessionId = crypto.randomUUID()): Promise<string> {
+  return createSessionCookieForPrincipal(createSessionPrincipal(claims, operatorEmails, nowMs, sessionId), secret, nowMs);
 }
 
 export async function readSession(request: Request, secret: string, nowMs = Date.now()): Promise<SessionPrincipal | null> {
@@ -90,8 +114,11 @@ export async function readSession(request: Request, secret: string, nowMs = Date
   if (!payload || !signature || extra) return null;
   const valid = await crypto.subtle.verify('HMAC', await hmacKey(secret), base64UrlToBytes(signature), new TextEncoder().encode(payload));
   if (!valid) return null;
-  const session = parsePart<SessionPrincipal>(payload);
-  if (typeof session.sub !== 'string' || !['AUTHENTICATED_USER', 'VERIFIED_OPERATOR', 'ADMIN'].includes(session.role) || !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= nowMs) return null;
+  let session: SessionPrincipal;
+  try { session = parsePart<SessionPrincipal>(payload); } catch { return null; }
+  if (typeof session.sessionId !== 'string' || !/^session:[a-zA-Z0-9-]{8,128}$/.test(session.sessionId)) return null;
+  if (typeof session.sub !== 'string' || typeof session.email !== 'string' || !session.email.includes('@')) return null;
+  if (!['AUTHENTICATED_USER', 'VERIFIED_OPERATOR', 'ADMIN'].includes(session.role) || !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= nowMs) return null;
   return Object.freeze(session);
 }
 
