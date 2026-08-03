@@ -4,52 +4,27 @@ import { AppShell } from './app/AppShell';
 import { DashboardPage } from './app/DashboardPage';
 import { DetailsDialog } from './components/DetailsDialog';
 import { MessagesPanel } from './components/MessagesPanel';
+import { ReportDialog } from './features/reports/ReportDialog';
 import { useSnapshot } from './pwa/useSnapshot';
 import './styles/app.css';
 import './styles/visual-v3.css';
-import './styles/visual-v3-fixes.css';
 
 export default function App() {
-  const { snapshot, online, savedAt, refresh, refreshing, lastSuccessAt, refreshError } = useSnapshot();
+  const { snapshot, online, refresh, refreshing, refreshError } = useSnapshot();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [messagesSeen, setMessagesSeen] = useState(false);
-  const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const detailsButtonRef = useRef<HTMLButtonElement>(null);
+  const evidenceOpenerRef = useRef<HTMLButtonElement>(null);
+  const reportOpenerRef = useRef<HTMLButtonElement>(null);
   const messagesButtonRef = useRef<HTMLButtonElement>(null);
   const messages = useMemo(() => visibleMessages(snapshot.messages, new Date(snapshot.generatedAt)), [snapshot]);
   const unread = messagesSeen ? 0 : messages.length;
 
-  function openMessages() {
-    setMessagesSeen(true);
-    setMessagesOpen(true);
-  }
+  const openEvidence = (opener?: HTMLButtonElement | null) => { if (opener) evidenceOpenerRef.current = opener; setDetailsOpen(true); };
+  const closeEvidence = () => { setDetailsOpen(false); requestAnimationFrame(() => evidenceOpenerRef.current?.focus()); };
+  const openReport = (opener?: HTMLButtonElement | null) => { if (opener) reportOpenerRef.current = opener; setReportOpen(true); };
+  const openMessages = () => { setMessagesSeen(true); setMessagesOpen(true); };
 
-  function closeDetails() {
-    setDetailsOpen(false);
-    requestAnimationFrame(() => detailsButtonRef.current?.focus());
-  }
-
-  async function shareStatusSnapshot() {
-    const deltaCentimetres = Math.round(snapshot.river.delta24h * 100);
-    const text = `${snapshot.stateLabel}: ${snapshot.river.currentMetres.toFixed(2)} m, ${deltaCentimetres >= 0 ? '+' : ''}${deltaCentimetres} cm en 24 h. DEMO / NO OFICIAL.`;
-    try {
-      if (navigator.share) await navigator.share({ title: 'Pulso del Paraná · SOS Santa Fe', text, url: window.location.href });
-      else {
-        await navigator.clipboard.writeText(`${text} ${window.location.href}`);
-        setShareStatus('Enlace copiado');
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      setShareStatus('No se pudo compartir');
-    }
-  }
-
-  return (
-    <AppShell online={online} refreshing={refreshing} unread={unread} messagesButtonRef={messagesButtonRef} onRefresh={() => void refresh()} onMessages={openMessages} disclaimer={snapshot.emergencyDisclaimer}>
-      <DashboardPage snapshot={snapshot} online={online} savedAt={savedAt} refreshing={refreshing} lastSuccessAt={lastSuccessAt} refreshError={refreshError} evidenceButtonRef={detailsButtonRef} onEvidence={() => setDetailsOpen(true)} onShare={() => void shareStatusSnapshot()} shareStatus={shareStatus} />
-      <DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={closeDetails} />
-      <MessagesPanel publicMessages={messages} open={messagesOpen} onClose={() => setMessagesOpen(false)} openerRef={messagesButtonRef} />
-    </AppShell>
-  );
+  return <AppShell online={online} refreshing={refreshing} unread={unread} messagesButtonRef={messagesButtonRef} informButtonRef={reportOpenerRef} onRefresh={() => void refresh()} onMessages={openMessages} onInform={openReport} disclaimer={snapshot.emergencyDisclaimer}><DashboardPage snapshot={snapshot} refreshing={refreshing} refreshError={refreshError} evidenceButtonRef={evidenceOpenerRef} informButtonRef={reportOpenerRef} onEvidence={openEvidence} onInform={openReport}/><DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={closeEvidence}/><ReportDialog snapshot={snapshot} online={online} open={reportOpen} openerRef={reportOpenerRef} onClose={() => setReportOpen(false)}/><MessagesPanel publicMessages={messages} open={messagesOpen} onClose={() => setMessagesOpen(false)} openerRef={messagesButtonRef}/></AppShell>;
 }
