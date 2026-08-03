@@ -1,0 +1,34 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "sos-sf-test",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-08-02",
+  "vars": {
+    "PRIVATE_MESSAGING_ENABLED": "true",
+    "GOOGLE_CLIENT_ID": "test-client.apps.googleusercontent.com",
+    "SESSION_SIGNING_KEY": "test-session-signing-key-with-more-than-thirty-two-bytes",
+    "SOS_SF_OPERATOR_EMAILS": "operator@example.org",
+    "MESSAGE_BLOCKLIST": "frase bloqueada",
+    "REPORT_RETENTION_DAYS": "1"
+  },
+  "d1_databases": [
+    {
+      "binding": "MESSAGES_DB",
+      "database_name": "sos-sf-test-private",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "REPORTS_BUCKET",
+      "bucket_name": "sos-sf-test-reports"
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  }
+}
