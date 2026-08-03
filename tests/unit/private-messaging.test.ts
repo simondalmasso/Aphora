@@ -8,16 +8,10 @@ const user: SessionPrincipal = { sub: 'user:10001', role: 'AUTHENTICATED_USER', 
 const otherUser: SessionPrincipal = { ...user, sub: 'user:20002' };
 const operator: SessionPrincipal = { ...user, sub: 'operator:30003', role: 'VERIFIED_OPERATOR' };
 
-function fixture(rateLimit = 10) {
+function fixture(rateLimit = 10, blockedTerms = '') {
   const store = new MemoryMessageStore();
   let sequence = 0;
-  const service = new MessagingService(store, {
-    now: () => new Date('2026-08-02T15:00:00.000Z'),
-    id: () => `id-${++sequence}`,
-    retentionDays: 30,
-    rateLimit,
-    rateWindowMinutes: 10,
-  });
+  const service = new MessagingService(store, { now: () => new Date('2026-08-02T15:00:00.000Z'), id: () => `id-${++sequence}`, retentionDays: 30, rateLimit, rateWindowMinutes: 10, blockedTerms });
   return { store, service };
 }
 
@@ -62,9 +56,17 @@ describe('private messaging service', () => {
     expect(store.messages).toHaveLength(0);
   });
 
-  it('rejects overlong, unsafe, malformed and extra fields', () => {
-    expect(() => normalizeSendMessage({ conversationId: 'conv:100', body: 'x'.repeat(801), idempotencyKey: 'key:100' })).toThrow('INVALID_MESSAGE_LENGTH');
-    expect(() => normalizeSendMessage({ conversationId: 'conv:100', body: 'hola\u0000', idempotencyKey: 'key:100' })).toThrow('INVALID_MESSAGE_CHARACTERS');
+  it('rejects overlong, emoji, invisible, malformed and extra fields', () => {
+    expect(() => normalizeSendMessage({ conversationId: 'conv:100', body: 'x'.repeat(281), idempotencyKey: 'key:100' })).toThrow('INVALID_MESSAGE_LENGTH');
+    expect(() => normalizeSendMessage({ conversationId: 'conv:100', body: 'hola😀', idempotencyKey: 'key:100' })).toThrow('INVALID_MESSAGE_CHARACTERS');
+    expect(() => normalizeSendMessage({ conversationId: 'conv:100', body: 'hola\u200b', idempotencyKey: 'key:100' })).toThrow('INVALID_MESSAGE_CHARACTERS');
     expect(() => normalizeSendMessage({ conversationId: '../wrong', body: 'hola', idempotencyKey: 'key:100' })).toThrow('INVALID_CONVERSATION_ID');
+  });
+
+  it('applies configurable moderation before persistence with a generic service error', async () => {
+    const { service, store } = fixture(10, 'frase bloqueada');
+    const conversation = await service.getOrCreateConversation(user);
+    await expect(service.send(user, { conversationId: conversation.id, body: 'Incluye FRASE BLOQUEADA en contexto.', idempotencyKey: 'moderation:100' })).rejects.toThrow('CONTENT_REJECTED');
+    expect(store.messages).toHaveLength(0);
   });
 });
