@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Snapshot } from '../../../domain/snapshot';
+import { prepareReportPhoto } from './image-processing';
+import { clearReportDraft, loadReportDraft, restoredFiles, saveReportDraft, storedPhotos, type StoredLocationReading, type StoredReportDraft } from './report-draft-store';
 
-const DRAFT_KEY = 'sos-sf:report-draft:v1';
 const CONTACTS = Object.freeze([
   { number: '911', label: 'Central de Emergencias', href: 'tel:911' },
   { number: '103', label: 'COBEM', href: 'tel:103' },
@@ -12,13 +13,10 @@ const CONTACTS = Object.freeze([
 ]);
 
 interface Draft { category: string; description: string; locationLabel: string; trustedContact: string }
-interface LocationReading { latitude: number; longitude: number; accuracy: number; capturedAt: string }
 interface Props { readonly open: boolean; readonly online: boolean; readonly snapshot: Snapshot; readonly openerRef: RefObject<HTMLButtonElement | null>; readonly onClose: () => void }
 
-function loadDraft(): Draft {
-  try { return { category: 'ANEGAMIENTO', description: '', locationLabel: '', trustedContact: '', ...JSON.parse(localStorage.getItem(DRAFT_KEY) ?? '{}') as Partial<Draft> }; }
-  catch { return { category: 'ANEGAMIENTO', description: '', locationLabel: '', trustedContact: '' }; }
-}
+function emptyDraft(trustedContact = ''): Draft { return { category: 'ANEGAMIENTO', description: '', locationLabel: '', trustedContact }; }
+function newIdempotencyKey(): string { return `report-${crypto.randomUUID()}`; }
 
 function trustedNumber(value: string): string | null {
   const digits = value.replace(/[^0-9+]/g, '');
@@ -28,10 +26,13 @@ function trustedNumber(value: string): string | null {
 
 export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [draft, setDraft] = useState<Draft>(loadDraft);
-  const [location, setLocation] = useState<LocationReading | null>(null);
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft());
+  const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
+  const [location, setLocation] = useState<StoredLocationReading | null>(null);
   const [exactConsent, setExactConsent] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
+  const [queueState, setQueueState] = useState<StoredReportDraft['queueState']>('SAVED_LOCAL');
+  const [hydrated, setHydrated] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,7 +43,42 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  useEffect(() => { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); }, [draft]);
+  useEffect(() => {
+    let active = true;
+    void loadReportDraft().then((stored) => {
+      if (!active) return;
+      if (stored) {
+        setDraft({ category: stored.category, description: stored.description, locationLabel: stored.locationLabel, trustedContact: stored.trustedContact });
+        setIdempotencyKey(stored.idempotencyKey);
+        setLocation(stored.location);
+        setExactConsent(stored.exactConsent);
+        setPhotos(restoredFiles(stored));
+        setQueueState(stored.queueState);
+        if (stored.queueState === 'PENDING_SEND') setStatus('Pendiente de envío. Revisá el contenido y reintentá cuando haya conexión.');
+      }
+      setHydrated(true);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const stored: StoredReportDraft = {
+      version: 2,
+      idempotencyKey,
+      category: draft.category,
+      description: draft.description,
+      locationLabel: draft.locationLabel,
+      trustedContact: draft.trustedContact,
+      location,
+      exactConsent,
+      photos: storedPhotos(photos),
+      queueState,
+      updatedAt: new Date().toISOString(),
+    };
+    const timer = window.setTimeout(() => { void saveReportDraft(stored).catch(() => setStatus('No se pudo guardar el borrador en este dispositivo.')); }, 120);
+    return () => window.clearTimeout(timer);
+  }, [draft, exactConsent, hydrated, idempotencyKey, location, photos, queueState]);
 
   const close = () => { onClose(); requestAnimationFrame(() => openerRef.current?.focus()); };
   const smsHref = useMemo(() => {
@@ -55,25 +91,49 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
 
   const locate = () => {
     setStatus(null);
-    if (!navigator.geolocation) return setStatus('Este dispositivo no ofrece ubicación. Podés escribir barrio o dirección.');
+    if (!navigator.geolocation) { setStatus('Ubicación no disponible. Podés escribir barrio o dirección.'); return; }
     setBusy(true);
-    const timeout = window.setTimeout(() => { setBusy(false); setStatus('La ubicación demoró demasiado. Podés escribir barrio o dirección.'); }, 10_500);
+    let settled = false;
+    const finish = (message: string) => { if (settled) return; settled = true; setBusy(false); setStatus(message); };
+    const timeout = window.setTimeout(() => finish('La ubicación demoró demasiado. Podés escribir barrio o dirección.'), 10_500);
     navigator.geolocation.getCurrentPosition((position) => {
+      if (settled) return;
       window.clearTimeout(timeout);
       setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, capturedAt: new Date(position.timestamp).toISOString() });
-      setBusy(false);
-      setStatus('Ubicación obtenida. Las coordenadas exactas sólo se incluirán si das consentimiento al enviar.');
+      finish('Ubicación obtenida. Las coordenadas exactas sólo se incluirán si das consentimiento al enviar.');
     }, (error) => {
       window.clearTimeout(timeout);
-      setBusy(false);
-      setStatus(error.code === error.PERMISSION_DENIED ? 'Permiso denegado. Podés continuar con barrio o dirección.' : 'No se pudo obtener la ubicación. Podés continuar manualmente.');
+      finish(error.code === error.PERMISSION_DENIED ? 'Permiso denegado. Podés continuar con barrio o dirección.' : error.code === error.POSITION_UNAVAILABLE ? 'Ubicación no disponible. Podés continuar manualmente.' : 'La ubicación agotó el tiempo de espera. Podés continuar manualmente.');
     }, { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60_000 });
   };
 
+  const selectPhotos = async (files: FileList | null) => {
+    const selected = Array.from(files ?? []).slice(0, 2);
+    if ((files?.length ?? 0) > 2) setStatus('Se procesarán sólo las primeras dos fotos.');
+    setBusy(true);
+    try {
+      const prepared = await Promise.all(selected.map(prepareReportPhoto));
+      setPhotos(prepared);
+      setQueueState('SAVED_LOCAL');
+      setStatus(prepared.length ? 'Fotos optimizadas y guardadas en este dispositivo.' : null);
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'No se pudieron preparar las fotos.'); }
+    finally { setBusy(false); }
+  };
+
+  const persistPending = async () => {
+    setQueueState('PENDING_SEND');
+    await saveReportDraft({ version: 2, idempotencyKey, category: draft.category, description: draft.description, locationLabel: draft.locationLabel, trustedContact: draft.trustedContact, location, exactConsent, photos: storedPhotos(photos), queueState: 'PENDING_SEND', updatedAt: new Date().toISOString() });
+  };
+
   const submit = async () => {
-    if (!online) { setStatus('Borrador guardado en este dispositivo. Reintentá al recuperar conexión o prepará un SMS para un contacto de confianza.'); return; }
     if (!draft.description.trim() || draft.description.trim().length > 500) { setStatus('La descripción debe tener entre 1 y 500 caracteres.'); return; }
+    if (!online) {
+      await persistPending().catch(() => undefined);
+      setStatus('Guardado en este dispositivo. Pendiente de envío; no fue remitido a SOS-SF.');
+      return;
+    }
     setBusy(true); setStatus(null);
+    await persistPending();
     const metadata = {
       category: draft.category,
       description: draft.description.trim(),
@@ -83,22 +143,28 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
       longitude: exactConsent ? location?.longitude : null,
       accuracyM: exactConsent ? location?.accuracy : null,
       locationCapturedAt: exactConsent ? location?.capturedAt : null,
-      idempotencyKey: `report-${crypto.randomUUID()}`,
+      idempotencyKey,
     };
     const form = new FormData();
     form.set('metadata', JSON.stringify(metadata));
-    photos.slice(0, 2).forEach((file) => form.append('photos', file));
+    photos.forEach((file) => form.append('photos', file));
     try {
       const response = await fetch('/api/private/reports', { method: 'POST', credentials: 'same-origin', body: form });
-      const payload = await response.json() as { data?: { report?: { id?: string } }; error?: { message?: string } };
-      if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión desde Mensajes para enviar el reporte.' : payload.error?.message ?? 'El reporte no pudo enviarse.');
-      localStorage.removeItem(DRAFT_KEY);
-      setDraft({ category: 'ANEGAMIENTO', description: '', locationLabel: '', trustedContact: draft.trustedContact });
+      const payload = await response.json() as { data?: { report?: { id?: string }; duplicate?: boolean }; error?: { message?: string } };
+      if (!response.ok) throw new Error(response.status === 401 ? 'Iniciá sesión desde Comunicaciones para enviar el reporte.' : payload.error?.message ?? 'El reporte no pudo enviarse.');
+      setQueueState('ACKNOWLEDGED');
+      await clearReportDraft();
+      const trusted = draft.trustedContact;
+      setDraft(emptyDraft(trusted));
+      setIdempotencyKey(newIdempotencyKey());
       setPhotos([]); setLocation(null); setExactConsent(false);
-      setStatus(`Reporte recibido por el servicio${payload.data?.report?.id ? `: ${payload.data.report.id}` : ''}. No implica despacho ni atención en tiempo real.`);
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'El reporte no pudo enviarse. El borrador se conserva.'); }
-    finally { setBusy(false); }
+      setQueueState('SAVED_LOCAL');
+      setStatus(`Recibido para revisión${payload.data?.report?.id ? `: ${payload.data.report.id}` : ''}. No implica despacho ni atención en tiempo real.${payload.data?.duplicate ? ' Se reconoció un reintento previo sin duplicarlo.' : ''}`);
+    } catch (error) {
+      setQueueState('PENDING_SEND');
+      setStatus(`${error instanceof Error ? error.message : 'El reporte no pudo enviarse.'} El mismo intento quedó pendiente y conservará su clave para evitar duplicados.`);
+    } finally { setBusy(false); }
   };
 
-  return <dialog ref={dialogRef} className="report-dialog" aria-labelledby="report-title" onClose={close} onClick={(event) => { if (event.target === event.currentTarget) close(); }}><div className="report-surface"><header><div><span className="v3-eyebrow">Canal no urgente</span><h2 id="report-title">Informar una situación</h2></div><button type="button" className="ui-icon-button" aria-label="Cerrar formulario" onClick={close}>×</button></header><p className="report-warning">No es un canal de emergencias ni garantiza atención. Ante peligro inmediato llamá a los servicios esenciales.</p><section aria-labelledby="essential-title"><h3 id="essential-title">Teléfonos esenciales</h3><div className="essential-grid">{CONTACTS.map((contact) => <a href={contact.href} key={contact.number}><strong>{contact.number}</strong><span>{contact.label}</span></a>)}</div></section><form onSubmit={(event) => { event.preventDefault(); void submit(); }}><label>Categoría<select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}><option value="ANEGAMIENTO">Anegamiento</option><option value="RIO">Río o costa</option><option value="LLUVIA">Lluvia</option><option value="SERVICIO">Servicio afectado</option><option value="OTRO">Otro</option></select></label><label>Descripción<textarea maxLength={500} rows={5} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Qué ocurre, desde cuándo y qué referencia permite ubicarlo"/><small>{draft.description.length}/500</small></label><fieldset><legend>Ubicación</legend><button className="ui-button ui-button--secondary" type="button" disabled={busy} onClick={locate}>Usar mi ubicación</button><label>Barrio, calle o referencia<input value={draft.locationLabel} onChange={(event) => setDraft({ ...draft, locationLabel: event.target.value })} maxLength={160}/></label>{location && <label className="consent-row"><input type="checkbox" checked={exactConsent} onChange={(event) => setExactConsent(event.target.checked)}/>Incluir coordenadas exactas en este reporte ({Math.round(location.accuracy)} m de precisión)</label>}</fieldset><label>Fotos opcionales (máximo 2, JPEG/PNG/WebP, 4 MiB cada una)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => { const selected = Array.from(event.target.files ?? []).slice(0, 2); setPhotos(selected); if ((event.target.files?.length ?? 0) > 2) setStatus('Se conservaron sólo las primeras dos fotos.'); }}/></label><button className="ui-button ui-button--primary" type="submit" disabled={busy}>{busy ? 'Procesando…' : online ? 'Enviar informe' : 'Guardar borrador'}</button></form>{!online && <section className="sms-fallback"><h3>Preparar SMS</h3><p>Elegí un contacto personal de confianza. La aplicación sólo abre el compositor; nunca envía automáticamente.</p><label>Teléfono de confianza<input inputMode="tel" value={draft.trustedContact} onChange={(event) => setDraft({ ...draft, trustedContact: event.target.value })} placeholder="Ej. +54 342 ..."/></label>{smsHref ? <a className="ui-button ui-button--secondary" href={smsHref}>Abrir compositor de SMS</a> : <p>Ingresá un número personal válido. Los números 911, 103, 107, 100 y 106 no se usan como destino SMS.</p>}</section>}{status && <p className="report-status" role="status">{status}</p>}</div></dialog>;
+  return <dialog ref={dialogRef} className="report-dialog" aria-labelledby="report-title" onClose={close} onClick={(event) => { if (event.target === event.currentTarget) close(); }}><div className="report-surface"><header><div><span className="v3-eyebrow">Canal no urgente</span><h2 id="report-title">Informar una situación</h2></div><button type="button" className="ui-icon-button" aria-label="Cerrar formulario" onClick={close}>×</button></header><p className="report-warning">No es un canal de emergencias ni garantiza atención. Ante peligro inmediato llamá a los servicios esenciales.</p><section aria-labelledby="essential-title"><h3 id="essential-title">Teléfonos esenciales</h3><div className="essential-grid">{CONTACTS.map((contact) => <a href={contact.href} key={contact.number}><strong>{contact.number}</strong><span>{contact.label}</span></a>)}</div></section><form onSubmit={(event) => { event.preventDefault(); void submit(); }}><label>Categoría<select value={draft.category} onChange={(event) => { setDraft({ ...draft, category: event.target.value }); setQueueState('SAVED_LOCAL'); }}><option value="ANEGAMIENTO">Anegamiento</option><option value="RIO">Río o costa</option><option value="LLUVIA">Lluvia</option><option value="SERVICIO">Servicio afectado</option><option value="OTRO">Otro</option></select></label><label>Descripción<textarea maxLength={500} rows={5} value={draft.description} onChange={(event) => { setDraft({ ...draft, description: event.target.value }); setQueueState('SAVED_LOCAL'); }} placeholder="Qué ocurre, desde cuándo y qué referencia permite ubicarlo"/><small>{draft.description.length}/500</small></label><fieldset><legend>Ubicación</legend><button className="ui-button ui-button--secondary" type="button" disabled={busy} onClick={locate}>Usar mi ubicación</button><label>Barrio, calle o referencia<input value={draft.locationLabel} onChange={(event) => { setDraft({ ...draft, locationLabel: event.target.value }); setQueueState('SAVED_LOCAL'); }} maxLength={160}/></label>{location && <label className="consent-row"><input type="checkbox" checked={exactConsent} onChange={(event) => { setExactConsent(event.target.checked); setQueueState('SAVED_LOCAL'); }}/>Incluir coordenadas exactas en este reporte ({Math.round(location.accuracy)} m de precisión)</label>}</fieldset><label>Fotos opcionales (máximo 2; se reducen antes de subir)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void selectPhotos(event.target.files)}/></label>{photos.length > 0 && <p>{photos.length} foto{photos.length === 1 ? '' : 's'} guardada{photos.length === 1 ? '' : 's'} localmente · {Math.round(photos.reduce((sum, file) => sum + file.size, 0) / 1024)} KiB</p>}<button className="ui-button ui-button--primary" type="submit" disabled={busy || !hydrated}>{busy ? 'Procesando…' : queueState === 'PENDING_SEND' && online ? 'Reintentar envío' : online ? 'Enviar informe' : 'Guardar borrador'}</button></form>{!online && <section className="sms-fallback"><h3>Preparar SMS</h3><p>Elegí un contacto personal de confianza. La aplicación sólo abre el compositor; nunca envía automáticamente.</p><label>Teléfono de confianza<input inputMode="tel" value={draft.trustedContact} onChange={(event) => setDraft({ ...draft, trustedContact: event.target.value })} placeholder="Ej. +54 342 ..."/></label>{smsHref ? <a className="ui-button ui-button--secondary" href={smsHref}>Abrir compositor de SMS</a> : <p>Ingresá un número personal válido. Los números 911, 103, 107, 100 y 106 no se usan como destino SMS.</p>}</section>}{status && <p className="report-status" role="status">{status}</p>}</div></dialog>;
 }
