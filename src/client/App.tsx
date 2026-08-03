@@ -3,7 +3,7 @@ import { visibleMessages } from '../domain/messages';
 import { AppShell } from './app/AppShell';
 import { DashboardPage } from './app/DashboardPage';
 import { DetailsDialog } from './components/DetailsDialog';
-import { IntegratedMessagesPanel } from './features/messages/IntegratedMessagesPanel';
+import { SecureMessagesPanel } from './features/messages/SecureMessagesPanel';
 import { ReportDialog } from './features/reports/ReportDialog';
 import { useSnapshot } from './pwa/useSnapshot';
 import './styles/app.css';
@@ -25,5 +25,5 @@ export default function App() {
   const openReport = (opener?: HTMLButtonElement | null) => { if (opener) reportOpenerRef.current = opener; setReportOpen(true); };
   const openMessages = () => { setMessagesSeen(true); setMessagesOpen(true); };
 
-  return <AppShell online={online} refreshing={refreshing} unread={unread} messagesButtonRef={messagesButtonRef} informButtonRef={reportOpenerRef} onRefresh={() => void refresh()} onMessages={openMessages} onInform={openReport} disclaimer={snapshot.emergencyDisclaimer}><DashboardPage snapshot={snapshot} refreshing={refreshing} refreshError={refreshError} evidenceButtonRef={evidenceOpenerRef} informButtonRef={reportOpenerRef} onEvidence={openEvidence} onInform={openReport}/><DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={closeEvidence}/><ReportDialog snapshot={snapshot} online={online} open={reportOpen} openerRef={reportOpenerRef} onClose={() => setReportOpen(false)}/><IntegratedMessagesPanel publicMessages={messages} open={messagesOpen} onClose={() => setMessagesOpen(false)} openerRef={messagesButtonRef}/></AppShell>;
+  return <AppShell online={online} refreshing={refreshing} unread={unread} messagesButtonRef={messagesButtonRef} informButtonRef={reportOpenerRef} onRefresh={() => void refresh()} onMessages={openMessages} onInform={openReport} disclaimer={snapshot.emergencyDisclaimer}><DashboardPage snapshot={snapshot} refreshing={refreshing} refreshError={refreshError} evidenceButtonRef={evidenceOpenerRef} informButtonRef={reportOpenerRef} onEvidence={openEvidence} onInform={openReport}/><DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={closeEvidence}/><ReportDialog snapshot={snapshot} online={online} open={reportOpen} openerRef={reportOpenerRef} onClose={() => setReportOpen(false)}/><SecureMessagesPanel publicMessages={messages} open={messagesOpen} onClose={() => setMessagesOpen(false)} openerRef={messagesButtonRef}/></AppShell>;
 }
