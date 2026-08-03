@@ -54,8 +54,12 @@ function quality(record: Record<string, unknown>): RiverPoint['quality'] {
   return 'PUBLISHED_OPERATIONAL';
 }
 
+function normalizedInaUrl(value: string): string {
+  return value.replace('/pub/datos/datos&', '/pub/datos/datos?');
+}
+
 export async function fetchInaSeries(url: string, providerId: string): Promise<ProviderResult<readonly RiverPoint[]>> {
-  return fetchProvider(url, { ...INA_REST_POLICY, id: providerId }, (body) => {
+  return fetchProvider(normalizedInaUrl(url), { ...INA_REST_POLICY, id: providerId }, (body) => {
     const payload = JSON.parse(body) as unknown;
     const unique = new Map<string, RiverPoint>();
     for (const record of records(payload)) {
@@ -87,11 +91,12 @@ function xmlValues(body: string): readonly RiverPoint[] {
 
 export async function fetchInaWaterMl(url: string, providerId: string): Promise<ProviderResult<readonly RiverPoint[]>> {
   return fetchProvider(url, { ...INA_WATERML_POLICY, id: providerId }, (body, contentType) => {
-    const points = contentType.includes('json')
-      ? records(JSON.parse(body) as unknown).map((record) => {
-          const metres = numberValue(record); const at = timeValue(record);
-          return metres === null || at === null ? null : Object.freeze({ at, metres, measured: true, quality: quality(record) } satisfies RiverPoint);
-        }).filter((point): point is RiverPoint => point !== null).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    const points: RiverPoint[] = contentType.includes('json')
+      ? records(JSON.parse(body) as unknown).flatMap((record) => {
+          const metres = numberValue(record);
+          const at = timeValue(record);
+          return metres === null || at === null ? [] : [Object.freeze({ at, metres, measured: true, quality: quality(record) } satisfies RiverPoint)];
+        }).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
       : [...xmlValues(body)];
     const observedAt = points.at(-1)?.at;
     if (!observedAt) throw new Error('INA_WATERML_EMPTY');
