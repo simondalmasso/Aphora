@@ -1,4 +1,3 @@
-import { File } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
 import { createReport, listReports, purgeExpiredReports, reportPhoto, updatePhotoReview, updateReport, type R2BucketLike } from '../../src/worker/reports';
@@ -59,7 +58,10 @@ class FakeStatement implements D1Statement {
     }
     if (this.query.startsWith('DELETE FROM reports WHERE expires_at')) {
       const cutoff = String(this.values[0]);
-      for (const [id, row] of this.db.reports) if (String(row.expires_at) <= cutoff) { this.db.reports.delete(id); for (const [photoId, photoRow] of this.db.photos) if (photoRow.report_id === id) this.db.photos.delete(photoId); }
+      for (const [id, row] of this.db.reports) if (String(row.expires_at) <= cutoff) {
+        this.db.reports.delete(id);
+        for (const [photoId, photoRow] of this.db.photos) if (photoRow.report_id === id) this.db.photos.delete(photoId);
+      }
     }
     if (this.query.startsWith('INSERT INTO report_events')) this.db.eventCount += 1;
     if (this.query.startsWith('INSERT INTO report_redactions')) this.db.redactionCount += 1;
@@ -76,25 +78,34 @@ class FakeDb implements D1DatabaseLike {
 }
 class FakeBucket implements R2BucketLike {
   objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
-  async put(key: string, value: ArrayBuffer | Uint8Array, options?: { httpMetadata?: { contentType?: string } }) { this.objects.set(key, { bytes: value instanceof Uint8Array ? value : new Uint8Array(value), contentType: options?.httpMetadata?.contentType ?? 'application/octet-stream' }); }
-  async get(key: string) { const item = this.objects.get(key); return item ? { body: new Blob([item.bytes]).stream(), size: item.bytes.length, httpMetadata: { contentType: item.contentType } } : null; }
+  async put(key: string, value: ArrayBuffer | Uint8Array, options?: { httpMetadata?: { contentType?: string } }) {
+    this.objects.set(key, { bytes: value instanceof Uint8Array ? value : new Uint8Array(value), contentType: options?.httpMetadata?.contentType ?? 'application/octet-stream' });
+  }
+  async get(key: string) {
+    const item = this.objects.get(key);
+    if (!item) return null;
+    const copy = Uint8Array.from(item.bytes).buffer;
+    return { body: new Blob([copy]).stream(), size: item.bytes.length, httpMetadata: { contentType: item.contentType } };
+  }
   async delete(key: string) { this.objects.delete(key); }
 }
 const user: SessionPrincipal = { sessionId: 'session:user-one', sub: 'user:one', email: 'one@example.org', role: 'AUTHENTICATED_USER', expiresAt: '2026-08-04T00:00:00.000Z' };
 const other: SessionPrincipal = { ...user, sessionId: 'session:user-two', sub: 'user:two', email: 'two@example.org' };
 const operator: SessionPrincipal = { sessionId: 'session:operator-one', sub: 'operator:one', email: 'operator@example.org', role: 'VERIFIED_OPERATOR', expiresAt: user.expiresAt };
+const jpegBytes = () => Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9]).buffer;
+const invalidBytes = () => Uint8Array.from([1, 2, 3]).buffer;
 
 function request(idempotencyKey = 'report:key-1', files: File[] = [], extra?: Record<string, unknown>) {
   const form = new FormData();
   form.set('metadata', JSON.stringify({ category: 'ANEGAMIENTO', description: 'Agua acumulada en la esquina desde hace una hora.', locationLabel: 'Barrio Centro', exactLocationConsent: false, idempotencyKey, ...extra }));
-  files.forEach((file) => form.append('photos', file));
+  files.forEach((file) => form.append('photos', file, file.name));
   return new Request('https://sos-sf.test/api/private/reports', { method: 'POST', body: form });
 }
 
 describe('report workflow', () => {
   it('stores one private report and makes retries idempotent', async () => {
     const db = new FakeDb(); const bucket = new FakeBucket();
-    const jpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9])], 'evidence.jpg', { type: 'image/jpeg' });
+    const jpeg = new File([jpegBytes()], 'evidence.jpg', { type: 'image/jpeg' });
     const first = await createReport(request('report:key-1', [jpeg]), { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one');
     const duplicate = await createReport(request('report:key-1'), { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one');
     expect(first.duplicate).toBe(false);
@@ -106,7 +117,7 @@ describe('report workflow', () => {
 
   it('isolates user listings and exposes private photos to operators', async () => {
     const db = new FakeDb(); const bucket = new FakeBucket();
-    const jpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9])], 'evidence.jpg', { type: 'image/jpeg' });
+    const jpeg = new File([jpegBytes()], 'evidence.jpg', { type: 'image/jpeg' });
     const created = await createReport(request('report:photo', [jpeg]), { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one');
     expect((await listReports({ MESSAGES_DB: db, REPORTS_BUCKET: bucket }, other, null)).reports).toHaveLength(0);
     const listed = (await listReports({ MESSAGES_DB: db, REPORTS_BUCKET: bucket }, operator, null)).reports as Array<{ photos: Array<{ id: string }> }>;
@@ -135,9 +146,9 @@ describe('report workflow', () => {
 
   it('rejects too many photos, MIME mismatches and oversized multipart bodies', async () => {
     const db = new FakeDb(); const bucket = new FakeBucket();
-    const invalid = new File([new Uint8Array([1, 2, 3])], 'fake.jpg', { type: 'image/jpeg' });
+    const invalid = new File([invalidBytes()], 'fake.jpg', { type: 'image/jpeg' });
     await expect(createReport(request('report:bad', [invalid]), { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one')).rejects.toThrow('INVALID_PHOTO_TYPE');
-    const jpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9])], 'ok.jpg', { type: 'image/jpeg' });
+    const jpeg = new File([jpegBytes()], 'ok.jpg', { type: 'image/jpeg' });
     await expect(createReport(request('report:many', [jpeg, jpeg, jpeg]), { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one')).rejects.toThrow('TOO_MANY_PHOTOS');
     const huge = new Request('https://sos-sf.test/api/private/reports', { method: 'POST', headers: { 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': String(10 * 1024 * 1024) }, body: '--x--' });
     await expect(createReport(huge, { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one')).rejects.toThrow('BODY_TOO_LARGE');
@@ -145,7 +156,7 @@ describe('report workflow', () => {
 
   it('purges expired report rows and R2 objects', async () => {
     const db = new FakeDb(); const bucket = new FakeBucket();
-    const jpeg = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9])], 'evidence.jpg', { type: 'image/jpeg' });
+    const jpeg = new File([jpegBytes()], 'evidence.jpg', { type: 'image/jpeg' });
     await createReport(request('report:purge', [jpeg]), { MESSAGES_DB: db, REPORTS_BUCKET: bucket, REPORT_RETENTION_DAYS: '1' }, user, 'network:one');
     expect(bucket.objects.size).toBe(1);
     await purgeExpiredReports({ MESSAGES_DB: db, REPORTS_BUCKET: bucket }, new Date(Date.now() + 3 * 86_400_000));
