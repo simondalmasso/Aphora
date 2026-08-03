@@ -2,7 +2,7 @@
 
 SOS Santa Fe es una PWA React/Vite servida por un Cloudflare Worker con Static Assets sobre `workers.dev`, sin Pages, dominio propio ni Workers Routes. El Worker intercepta `/api/*` y `/lite`, aplica headers de seguridad también a los assets y mantiene abierta toda la lectura pública.
 
-Los límites son: `data` aporta fixtures demo inmutables; `domain` deriva estado, TTL, contradicciones, mensajería y compatibilidad; `worker` publica contratos, autenticación y autorización; `client` representa una superficie única mobile-first. El service worker conserva shell y último snapshot con timestamp y aviso de que no es información actual.
+Los límites son: `data` aporta fixtures demo inmutables; `domain` deriva estado, TTL, contradicciones, mensajería y compatibilidad; `worker` publica contratos, autenticación y autorización; `client` representa una superficie única mobile-first. El service worker precachea el HTML y descubre/cachea sus assets de build antes de activarse; conserva el shell completo y el último snapshot con timestamp y aviso de que no es información actual.
 
 ## Centro de mensajes
 

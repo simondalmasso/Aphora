@@ -1,14 +1,14 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T02:27:16.623Z",
+  "generatedAt": "2026-08-03T02:33:52.861Z",
   "budgets": {
     "initialJsGzipBytes": 122880,
     "initialCssGzipBytes": 25600
   },
   "actual": {
-    "jsGzipBytes": 70266,
+    "jsGzipBytes": 70463,
     "cssGzipBytes": 5650,
-    "totalDistBytes": 1180150
+    "totalDistBytes": 1180633
   },
   "files": [
     {
@@ -53,8 +53,8 @@
     },
     {
       "path": "service-worker.js",
-      "bytes": 1684,
-      "gzipBytes": 663
+      "bytes": 2167,
+      "gzipBytes": 860
     }
   ],
   "externalFonts": false,

@@ -1,10 +1,21 @@
-const CACHE_VERSION = 'sos-sf-v1-20260802';
+const CACHE_VERSION = 'sos-sf-v1-20260802b';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css'];
 
+async function precacheCompleteShell() {
+  const cache = await caches.open(STATIC_CACHE);
+  await cache.addAll(SHELL);
+  const documentResponse = await cache.match('/');
+  if (!documentResponse) throw new Error('SHELL_DOCUMENT_MISSING');
+  const html = await documentResponse.text();
+  const buildAssets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"?#]+)"/g)].map((match) => match[1]);
+  if (buildAssets.length === 0) throw new Error('SHELL_BUILD_ASSETS_MISSING');
+  await cache.addAll([...new Set(buildAssets)]);
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+  event.waitUntil(precacheCompleteShell().then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
