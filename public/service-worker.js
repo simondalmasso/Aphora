@@ -1,7 +1,14 @@
-const CACHE_VERSION = 'sos-sf-v3-live-20260803a';
+const CACHE_VERSION = 'sos-sf-v3-live-20260803b';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const DATA_CACHE = `${CACHE_VERSION}-data`;
+const PUBLIC_DATA_CACHE = `${CACHE_VERSION}-public-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css', '/essential-contacts.json', '/offline-guidance.json'];
+const PUBLIC_API_ALLOWLIST = new Set(['/api/snapshot', '/api/sources', '/api/messages', '/api/essential-contacts']);
+
+function mayStore(response) {
+  if (!response.ok) return false;
+  const directive = (response.headers.get('Cache-Control') || '').toLowerCase();
+  return !directive.includes('private') && !directive.includes('no-store');
+}
 
 async function precacheCompleteShell() {
   const cache = await caches.open(STATIC_CACHE);
@@ -14,19 +21,41 @@ async function precacheCompleteShell() {
   await cache.addAll([...new Set(buildAssets)]);
 }
 
-self.addEventListener('install', (event) => { event.waitUntil(precacheCompleteShell().then(() => self.skipWaiting())); });
-self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => !key.startsWith(CACHE_VERSION)).map((key) => caches.delete(key)))).then(() => self.clients.claim())); });
+self.addEventListener('install', (event) => {
+  event.waitUntil(precacheCompleteShell().then(() => self.skipWaiting()));
+});
 
-async function apiNetworkFirst(request) {
-  const cache = await caches.open(DATA_CACHE);
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.keys()
+    .then((keys) => Promise.all(keys.filter((key) => key !== STATIC_CACHE && key !== PUBLIC_DATA_CACHE).map((key) => caches.delete(key))))
+    .then(() => self.clients.claim()));
+});
+
+function offlineJson(message) {
+  return new Response(JSON.stringify({ ok: false, data: { error: { code: 'OFFLINE', message } } }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store' },
+  });
+}
+
+async function publicApiNetworkFirst(request) {
+  const cache = await caches.open(PUBLIC_DATA_CACHE);
   try {
     const response = await fetch(request);
-    if (response.ok) await cache.put(request, response.clone());
+    if (mayStore(response)) await cache.put(request, response.clone());
+    else await cache.delete(request);
     return response;
   } catch {
-    const cached = await cache.match(request, { ignoreVary: true });
-    if (cached) return cached;
-    return new Response(JSON.stringify({ ok: false, error: { code: 'OFFLINE', message: 'Sin conexión y sin respuesta previa guardada.' } }), { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    const cached = await cache.match(request, { ignoreVary: false });
+    return cached || offlineJson('Sin conexión y sin una lectura pública previa guardada.');
+  }
+}
+
+async function privateApiNetworkOnly(request) {
+  try {
+    return await fetch(request);
+  } catch {
+    return offlineJson('Las funciones privadas no están disponibles sin conexión.');
   }
 }
 
@@ -34,10 +63,13 @@ async function navigationNetworkFirst(request) {
   const cache = await caches.open(STATIC_CACHE);
   try {
     const response = await fetch(request);
-    if (response.ok) await cache.put(request, response.clone());
+    if (mayStore(response)) await cache.put(request, response.clone());
     return response;
   } catch {
-    return (await cache.match(request, { ignoreVary: true })) || (await cache.match('/', { ignoreVary: true })) || (await cache.match('/offline.html', { ignoreVary: true })) || new Response('Modo sin conexión. No es información actual.', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    return (await cache.match(request, { ignoreVary: true }))
+      || (await cache.match('/', { ignoreVary: true }))
+      || (await cache.match('/offline.html', { ignoreVary: true }))
+      || new Response('Modo sin conexión. No es información actual.', { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
   }
 }
 
@@ -46,10 +78,19 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) { event.respondWith(apiNetworkFirst(request)); return; }
-  if (request.mode === 'navigate') { event.respondWith(navigationNetworkFirst(request)); return; }
-  event.respondWith(caches.match(request, { ignoreVary: true }).then((cached) => cached || fetch(request).then((response) => {
-    if (response.ok) void caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
+
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(PUBLIC_API_ALLOWLIST.has(url.pathname) ? publicApiNetworkFirst(request) : privateApiNetworkOnly(request));
+    return;
+  }
+  if (request.mode === 'navigate') {
+    event.respondWith(navigationNetworkFirst(request));
+    return;
+  }
+  event.respondWith(caches.match(request, { ignoreVary: false }).then(async (cached) => {
+    if (cached) return cached;
+    const response = await fetch(request);
+    if (mayStore(response)) void caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
     return response;
-  })));
+  }));
 });
