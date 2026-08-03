@@ -27,9 +27,11 @@ beforeAll(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('direct Google identity and own sessions', () => {
-  it('rejects invalid issuer, audience, expiry and unverified email', () => {
+  it('rejects invalid issuer, audience, authorized party, expiry and unverified email', () => {
     expect(() => validateGoogleClaims({ ...claims, iss: 'https://attacker.test' }, clientId, now)).toThrow('GOOGLE_ISSUER_INVALID');
     expect(() => validateGoogleClaims({ ...claims, aud: 'other-client' }, clientId, now)).toThrow('GOOGLE_AUDIENCE_INVALID');
+    expect(() => validateGoogleClaims({ ...claims, aud: [clientId, 'other-client'], azp: 'other-client' }, clientId, now)).toThrow('GOOGLE_AUTHORIZED_PARTY_INVALID');
+    expect(() => validateGoogleClaims({ ...claims, aud: [clientId, 'other-client'], azp: clientId }, clientId, now)).not.toThrow();
     expect(() => validateGoogleClaims({ ...claims, exp: Math.floor(now / 1000) - 1 }, clientId, now)).toThrow('GOOGLE_TOKEN_EXPIRED');
     expect(() => validateGoogleClaims({ ...claims, email_verified: false }, clientId, now)).toThrow('GOOGLE_EMAIL_UNVERIFIED');
   });
@@ -43,12 +45,12 @@ describe('direct Google identity and own sessions', () => {
     await expect(verifyGoogleIdToken(tampered, clientId, now)).rejects.toThrow('GOOGLE_SIGNATURE_INVALID');
   });
 
-  it('creates signed finite HttpOnly sessions, derives operator role server-side and revokes', async () => {
+  it('creates signed finite HttpOnly sessions with unique identity and server-side role', async () => {
     const secret = 'test-session-key-with-at-least-thirty-two-bytes';
-    const cookie = await createSessionCookie(claims, secret, 'operator@example.org', now);
+    const cookie = await createSessionCookie(claims, secret, 'operator@example.org', now, 'fixed-session-id');
     expect(cookie).toContain('HttpOnly; Secure; SameSite=Lax');
     const request = new Request('https://sos-sf.test', { headers: { Cookie: cookie.split(';')[0]! } });
-    await expect(readSession(request, secret, now + 1)).resolves.toMatchObject({ sub: claims.sub, role: 'VERIFIED_OPERATOR' });
+    await expect(readSession(request, secret, now + 1)).resolves.toMatchObject({ sessionId: 'session:fixed-session-id', sub: claims.sub, email: claims.email, role: 'VERIFIED_OPERATOR' });
     const rawCookie = cookie.split(';')[0]!;
     const separator = rawCookie.lastIndexOf('.');
     const signature = rawCookie.slice(separator + 1);
