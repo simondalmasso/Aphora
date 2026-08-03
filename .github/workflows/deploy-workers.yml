@@ -2,13 +2,9 @@ name: Deploy Workers
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - arq/visual-dashboard-v3
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: sos-sf-workers-production
@@ -104,7 +100,6 @@ jobs:
         run: rm -f .worker-secrets.json wrangler.generated.jsonc
 
       - name: Upload V3 evidence
-        id: evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -116,31 +111,3 @@ jobs:
             d1-migrations.log
           if-no-files-found: warn
           retention-days: 30
-
-      - name: Update issue 8 run status
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          JOB_STATUS: ${{ job.status }}
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
-          ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
-          ARTIFACT_URL: ${{ steps.evidence.outputs.artifact-url }}
-          ARTIFACT_DIGEST: ${{ steps.evidence.outputs.artifact-digest }}
-        run: |
-          cat > "$RUNNER_TEMP/v3-run.md" <<EOF
-          # ARQ V3 integrated execution — run status
-
-          \`ORDER_ID=SOS-SF-AUD-V3-INTEGRATED-004\`
-          \`STATUS=${JOB_STATUS}\`
-          \`SOURCE_SHA=${GITHUB_SHA}\`
-
-          - Actions run: ${RUN_URL}
-          - Deployment: ${DEPLOYMENT_URL:-not reached}
-          - Artifact: ${ARTIFACT_URL:-not available} (${ARTIFACT_ID:-n/a})
-          - Artifact digest: \`${ARTIFACT_DIGEST:-n/a}\`
-          - Exact failing/passing steps are preserved in the linked run.
-
-          This comment is an execution checkpoint, not AUD acceptance. Issue remains open.
-          EOF
-          gh api repos/${GITHUB_REPOSITORY}/issues/comments/5172387484 --method PATCH -f body="$(cat "$RUNNER_TEMP/v3-run.md")"
