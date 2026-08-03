@@ -1,0 +1,78 @@
+import type { HydrologicalSystem, Snapshot } from '../domain/snapshot';
+
+const REFERENCE_AT = '1970-01-01T00:00:00.000Z';
+
+function unavailableSystem(id: string, label: string, watercourse: string, stationName: string, stationCode: string): HydrologicalSystem {
+  return Object.freeze({
+    id,
+    label,
+    watercourse,
+    stationName,
+    stationCode,
+    available: false,
+    dataStatus: 'UNAVAILABLE',
+    currentMetres: null,
+    observedAt: null,
+    sourceId: `ina:${stationCode}`,
+    sourceName: 'Instituto Nacional del Agua',
+    points: Object.freeze([]),
+    thresholds: Object.freeze([]),
+    trend: 'UNKNOWN',
+    delta1h: null,
+    delta6h: null,
+    delta24h: null,
+  });
+}
+
+export const unavailableSnapshot: Snapshot = Object.freeze({
+  schemaVersion: '1.0',
+  id: 'unavailable-live-snapshot',
+  mode: 'UNAVAILABLE',
+  dataStatus: 'UNAVAILABLE',
+  generatedAt: REFERENCE_AT,
+  previousSnapshotAt: REFERENCE_AT,
+  state: 'UNKNOWN',
+  stateLabel: 'Sin datos en vivo',
+  summary: 'No hay una lectura hídrica validada disponible en este momento.',
+  dominantSourceId: 'live-data-unavailable',
+  validUntil: REFERENCE_AT,
+  recommendedAction: 'Consultá fuentes oficiales y los teléfonos esenciales ante una situación urgente.',
+  emergencyDisclaimer: 'SOS Santa Fe no reemplaza al 911, 103 ni a los organismos oficiales.',
+  changes: Object.freeze([]),
+  systems: Object.freeze([
+    unavailableSystem('parana-santa-fe', 'Sistema Paraná', 'Río Paraná', 'Santa Fe', '30'),
+    unavailableSystem('salado-santo-tome', 'Sistema Salado', 'Río Salado', 'Santo Tomé', '3044'),
+  ]),
+  river: Object.freeze({
+    systemId: 'parana-santa-fe',
+    available: false,
+    dataStatus: 'UNAVAILABLE',
+    stationName: 'Santa Fe',
+    currentMetres: 0,
+    delta1h: 0,
+    delta6h: 0,
+    delta24h: 0,
+    trend: 'UNKNOWN',
+    observedAt: REFERENCE_AT,
+    sourceId: 'ina:30',
+    sourceName: 'Instituto Nacional del Agua',
+    points: Object.freeze([]),
+    forecastPoints: Object.freeze([]),
+    thresholds: Object.freeze([]),
+  }),
+  rain: Object.freeze({
+    available: false,
+    dataStatus: 'UNAVAILABLE',
+    accumulated1hMm: 0,
+    accumulated24hMm: 0,
+    forecast: 'Sin estimación de lluvia validada.',
+    observedAt: REFERENCE_AT,
+    sourceId: 'rain-unavailable',
+    points: Object.freeze([]),
+  }),
+  sources: Object.freeze([]),
+  contradictions: Object.freeze([]),
+  shelters: Object.freeze([]),
+  actions: Object.freeze(['Llamá a emergencias si existe peligro inmediato.', 'Consultá información oficial antes de tomar decisiones.']),
+  messages: Object.freeze([]),
+});
