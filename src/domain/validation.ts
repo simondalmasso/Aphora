@@ -1,4 +1,4 @@
-import type { DataStatus, HydrologicalSystem, RiverPoint, RiverThreshold, Snapshot, Source } from './snapshot';
+import type { HydrologicalSystem, RiverForecastPoint, RiverPoint, RiverThreshold, Snapshot, Source } from './snapshot';
 import { validateCriticalMessage } from './zungun-compat/validation';
 
 function plainRecord(value: unknown, label: string): Record<string, unknown> {
@@ -7,23 +7,19 @@ function plainRecord(value: unknown, label: string): Record<string, unknown> {
   if (prototype !== Object.prototype && prototype !== null) throw new TypeError(`${label} debe ser un objeto plano`);
   return value as Record<string, unknown>;
 }
-
 function text(value: unknown, label: string, maximum = 1000): string {
   if (typeof value !== 'string' || value.length < 1 || value.length > maximum) throw new TypeError(`${label} inválido`);
   return value;
 }
-
 function iso(value: unknown, label: string): string {
   const parsed = text(value, label, 80);
   if (!Number.isFinite(Date.parse(parsed))) throw new TypeError(`${label} debe ser una fecha válida`);
   return parsed;
 }
-
 function finite(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) throw new TypeError(`${label} debe ser finito`);
   return value;
 }
-
 function validatePoints(value: unknown, label: string): readonly RiverPoint[] {
   if (!Array.isArray(value)) throw new TypeError(`${label} debe ser un arreglo`);
   let previous = -Infinity;
@@ -40,7 +36,24 @@ function validatePoints(value: unknown, label: string): readonly RiverPoint[] {
     return item as RiverPoint;
   });
 }
-
+function validateForecasts(value: unknown, label: string): readonly RiverForecastPoint[] {
+  if (!Array.isArray(value)) throw new TypeError(`${label} debe ser un arreglo`);
+  let previous = -Infinity;
+  const forecasts = value.map((item, index) => {
+    const point = plainRecord(item, `${label}[${index}]`);
+    const at = iso(point.at, `${label}[${index}].at`);
+    const time = Date.parse(at);
+    if (time <= previous) throw new TypeError(`${label} debe estar ordenado sin duplicados`);
+    previous = time;
+    const metres = finite(point.metres, `${label}[${index}].metres`);
+    const lowMetres = finite(point.lowMetres, `${label}[${index}].lowMetres`);
+    const highMetres = finite(point.highMetres, `${label}[${index}].highMetres`);
+    if (lowMetres > metres || metres > highMetres) throw new TypeError('la proyección debe quedar dentro de su intervalo de incertidumbre');
+    return item as RiverForecastPoint;
+  });
+  if (forecasts.length > 1 && Date.parse(forecasts.at(-1)!.at) - Date.parse(forecasts[0]!.at) > 24 * 60 * 60 * 1000) throw new TypeError('la superficie proyectada no puede exceder 24 horas');
+  return forecasts;
+}
 function validateThresholds(value: unknown, label: string): readonly RiverThreshold[] {
   if (!Array.isArray(value)) throw new TypeError(`${label} debe ser un arreglo`);
   const ids = new Set<string>();
@@ -57,7 +70,6 @@ function validateThresholds(value: unknown, label: string): readonly RiverThresh
     return item as RiverThreshold;
   });
 }
-
 function validateSource(value: unknown, index: number): Source {
   const source = plainRecord(value, `snapshot.sources[${index}]`);
   text(source.id, `snapshot.sources[${index}].id`, 160);
@@ -71,7 +83,6 @@ function validateSource(value: unknown, index: number): Source {
   if (source.connected !== undefined && typeof source.connected !== 'boolean') throw new TypeError(`snapshot.sources[${index}].connected inválido`);
   return value as Source;
 }
-
 function validateSystem(value: unknown, index: number, sourceIds: ReadonlySet<string>): HydrologicalSystem {
   const system = plainRecord(value, `snapshot.systems[${index}]`);
   text(system.id, `snapshot.systems[${index}].id`, 160);
@@ -120,6 +131,8 @@ export function validateSnapshot(value: unknown): Snapshot {
   const sources = record.sources.map(validateSource);
   const sourceIds = new Set(sources.map((source) => source.id));
   if (sourceIds.size !== sources.length) throw new TypeError('snapshot.sources contiene IDs duplicados');
+  const hasDemoSource = sources.some((source) => source.kind === 'DEMO_FIXTURE');
+  if ((record.mode === 'DEMO') !== hasDemoSource) throw new TypeError('snapshot usa un modo incompatible con sus fuentes demo');
 
   const systemsValue = record.systems ?? [];
   if (!Array.isArray(systemsValue)) throw new TypeError('snapshot.systems debe ser un arreglo');
@@ -135,9 +148,10 @@ export function validateSnapshot(value: unknown): Snapshot {
   if (!['RISING_SLOWLY', 'RISING', 'STABLE', 'FALLING', 'UNKNOWN'].includes(String(river.trend))) throw new TypeError('snapshot.river.trend inválido');
   iso(river.observedAt, 'snapshot.river.observedAt');
   text(river.sourceId, 'snapshot.river.sourceId', 160);
-  validatePoints(river.points, 'snapshot.river.points');
+  const riverPoints = validatePoints(river.points, 'snapshot.river.points');
+  if (riverPoints.length > 1 && Date.parse(riverPoints.at(-1)!.at) - Date.parse(riverPoints[0]!.at) > 48 * 60 * 60 * 1000) throw new TypeError('la superficie observada no puede exceder 48 horas');
   validateThresholds(river.thresholds, 'snapshot.river.thresholds');
-  if (!Array.isArray(river.forecastPoints)) throw new TypeError('snapshot.river.forecastPoints debe ser un arreglo');
+  validateForecasts(river.forecastPoints, 'snapshot.river.forecastPoints');
   if (river.systemId !== undefined && systems.length && !systemIds.has(String(river.systemId))) throw new TypeError('snapshot.river.systemId no corresponde a un sistema');
   if (river.available === true && !sourceIds.has(String(river.sourceId))) throw new TypeError('snapshot.river.sourceId no corresponde a una fuente');
 
