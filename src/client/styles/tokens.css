@@ -1,0 +1,7 @@
+:root {
+  --v3-bg:#f4f3ef;--v3-surface:#fffefa;--v3-surface-soft:#f0efeb;--v3-ink:#111318;--v3-muted:#626873;--v3-border:rgba(18,24,35,.09);--v3-border-strong:rgba(18,24,35,.16);
+  --v3-hero:#071019;--v3-hero-soft:#0b1824;--v3-hero-ink:#f6fbff;--v3-hero-muted:#9eafbd;--v3-accent:#5c54ea;--v3-accent-strong:#4138cc;--v3-observed:#65d7ff;--v3-projected:#f1b65d;--v3-violet:#a97bef;
+  --v3-normal:#2d966d;--v3-watch:#d78c22;--v3-alert:#d9633d;--v3-danger:#bb3c4f;--v3-radius-sm:12px;--v3-radius-md:18px;--v3-radius-lg:26px;--v3-radius-xl:32px;
+  --v3-shadow-sm:0 1px 2px rgba(10,16,24,.04),0 10px 32px rgba(10,16,24,.05);--v3-shadow-lg:0 24px 70px rgba(7,16,25,.17);--v3-ease:cubic-bezier(.2,.8,.2,1);--v3-spring:cubic-bezier(.22,1,.36,1);
+  --v3-header:60px;--v3-content:1280px;--v3-z-header:20;--v3-z-dock:18;--v3-z-dialog:50;
+}
