@@ -1,5 +1,5 @@
 import { unavailableSnapshot } from '../data/unavailable-snapshot';
-import type { DataStatus, HydrologicalSystem, PublicState, RiverPoint, RiverThreshold, Snapshot, Source } from '../domain/snapshot';
+import type { ChangeItem, DataStatus, HydrologicalSystem, PublicState, RiverPoint, RiverThreshold, Snapshot, Source } from '../domain/snapshot';
 import { providerHealth, type ProviderResult } from './providers/core';
 import { fetchInaSeries, fetchInaWaterMl } from './providers/ina';
 import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa';
@@ -22,9 +22,13 @@ const STATIONS = Object.freeze([
 ]);
 
 interface CachedSnapshot { readonly cachedAt: string; readonly snapshot: Snapshot }
+interface CloudflareCacheStorage extends CacheStorage { readonly default: Cache }
 const inFlight = new Map<string, Promise<Snapshot>>();
 
-function cacheApi(): Cache | null { return typeof caches === 'undefined' ? null : caches.default; }
+function cacheApi(): Cache | null {
+  if (typeof caches === 'undefined') return null;
+  return (caches as CloudflareCacheStorage).default ?? null;
+}
 
 async function configKey(env: LiveDataEnv): Promise<string> {
   const config = JSON.stringify({
@@ -238,6 +242,7 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
   const status: DataStatus = primary.dataStatus === 'STALE' || systems.some((item) => item.available && item.dataStatus === 'STALE') ? 'STALE' : 'LIVE';
   const state = highestState(systems);
   const delta24h = primary.delta24h ?? 0;
+  const direction: ChangeItem['direction'] = delta24h > 0.01 ? 'UP' : delta24h < -0.01 ? 'DOWN' : 'SAME';
   const action = ['EVACUACION_OFICIAL', 'UMBRAL_EVACUACION_ALCANZADO', 'ALERTA'].includes(state) ? 'Seguí únicamente instrucciones oficiales y evitá zonas ribereñas o anegadas.' : 'Mantenete informado mediante fuentes oficiales y revisá tu plan familiar.';
   const nasa = sources.find((source) => source.id === 'nasa-gpm-imerg-early');
   return Object.freeze({
@@ -246,7 +251,7 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
     summary: `${primary.watercourse}, estación ${primary.stationName}: ${primary.currentMetres?.toFixed(2)} m. Cada sistema se presenta en su propia escala; son datos operativos sin validación definitiva salvo marca expresa.`,
     dominantSourceId: primary.sourceId, validUntil: new Date(now.getTime() + 15 * 60_000).toISOString(), recommendedAction: action,
     emergencyDisclaimer: 'SOS Santa Fe agrega fuentes públicas y no reemplaza al 911, 103 ni a los organismos oficiales. Un umbral numérico no constituye una orden de evacuación.',
-    changes: Object.freeze([{ id: 'primary-24h', label: `${primary.watercourse} · ${primary.stationName}`, direction: delta24h > 0.01 ? 'UP' : delta24h < -0.01 ? 'DOWN' : 'SAME', detail: primary.delta24h === null ? 'Sin comparación de 24 horas' : `${delta24h >= 0 ? '+' : ''}${Math.round(delta24h * 100)} cm en 24 horas` }]),
+    changes: Object.freeze([{ id: 'primary-24h', label: `${primary.watercourse} · ${primary.stationName}`, direction, detail: primary.delta24h === null ? 'Sin comparación de 24 horas' : `${delta24h >= 0 ? '+' : ''}${Math.round(delta24h * 100)} cm en 24 horas` }]),
     systems,
     river: Object.freeze({ systemId: primary.id, available: true, dataStatus: primary.dataStatus, stationName: primary.stationName, currentMetres: primary.currentMetres ?? 0, delta1h: primary.delta1h ?? 0, delta6h: primary.delta6h ?? 0, delta24h, trend: primary.trend, observedAt: primary.observedAt ?? now.toISOString(), sourceId: primary.sourceId, sourceName: primary.sourceName, points: primary.points, forecastPoints: Object.freeze([]), thresholds: primary.thresholds }),
     rain: Object.freeze({ available: false, dataStatus: nasa?.status === 'STALE' ? 'STALE' : 'UNAVAILABLE', accumulated1hMm: 0, accumulated24hMm: 0, forecast: nasa?.connected ? 'NASA GPM IMERG Early está disponible sólo como estimación satelital suplementaria; no se convierte en acumulado local.' : 'Sin estimación suplementaria disponible.', observedAt: nasa?.observedAt ?? now.toISOString(), sourceId: 'nasa-gpm-imerg-early', points: Object.freeze([]) }),
