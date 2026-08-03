@@ -45,11 +45,16 @@ export class D1MessageStore implements MessageStore {
     await this.db.prepare(`UPDATE conversations SET ${counter} = 0, updated_at = ? WHERE id = ?`).bind(at, conversationId).run();
     if (reader === 'OPERATOR') await this.db.prepare("UPDATE messages SET status = 'READ_BY_OPERATOR' WHERE conversation_id = ? AND verified_operator = 0 AND status = 'DELIVERED_TO_SERVICE'").bind(conversationId).run();
   }
+  async consumeRateLimit(actorId: string, scope: string, windowStart: string, limit: number, at: string): Promise<boolean> {
+    const row = await this.db.prepare('INSERT INTO rate_windows (actor_id,scope,window_start,count,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(actor_id,scope,window_start) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at RETURNING count').bind(actorId, scope, windowStart, 1, at).first<{ count: number }>();
+    return Boolean(row && row.count <= limit);
+  }
   async countRecentSends(actorId: string, since: string) { const row = await this.db.prepare('SELECT COUNT(*) AS count FROM rate_events WHERE actor_id = ? AND at >= ?').bind(actorId, since).first<{ count: number }>(); return row?.count ?? 0; }
   async recordSend(actorId: string, at: string) { await this.db.prepare('INSERT INTO rate_events (actor_id,at) VALUES (?,?)').bind(actorId, at).run(); }
   async purgeExpired(messageExpiresAt: string, historyBefore: string) {
     await this.db.prepare('DELETE FROM messages WHERE expires_at <= ?').bind(messageExpiresAt).run();
     await this.db.prepare('DELETE FROM rate_events WHERE at < ?').bind(historyBefore).run();
+    await this.db.prepare('DELETE FROM rate_windows WHERE updated_at < ?').bind(historyBefore).run();
     await this.db.prepare('DELETE FROM audit_events WHERE at < ?').bind(historyBefore).run();
     await this.db.prepare('DELETE FROM conversations WHERE updated_at < ? AND NOT EXISTS (SELECT 1 FROM messages WHERE messages.conversation_id = conversations.id)').bind(historyBefore).run();
   }
