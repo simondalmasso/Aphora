@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'sos-sf-v1-20260802b';
+const CACHE_VERSION = 'sos-sf-v1-20260802c';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css'];
@@ -29,7 +29,7 @@ async function networkFirst(request, cacheName, fallback) {
     if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch {
-    return (await cache.match(request)) || (await caches.match(fallback));
+    return (await cache.match(request, { ignoreVary: true })) || (await caches.match(fallback, { ignoreVary: true }));
   }
 }
 
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(networkFirst(request, STATIC_CACHE, '/offline.html'));
     return;
   }
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+  event.respondWith(caches.match(request, { ignoreVary: true }).then((cached) => cached || fetch(request).then((response) => {
     if (response.ok) caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
     return response;
   })));
