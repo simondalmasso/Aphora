@@ -3,18 +3,18 @@ import { withSecurityHeaders } from './security';
 export interface ApiMeta {
   readonly schemaVersion: '1.0';
   readonly generatedAt: string;
-  readonly mode: 'DEMO';
+  readonly mode: 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' | 'SERVICE';
   readonly official: false;
 }
 
-export function jsonResponse(data: unknown, options: { status?: number; cacheControl?: string; generatedAt?: string } = {}): Response {
+export function jsonResponse(data: unknown, options: { status?: number; cacheControl?: string; generatedAt?: string; mode?: ApiMeta['mode'] } = {}): Response {
   const body = JSON.stringify({
     ok: (options.status ?? 200) < 400,
     data,
     meta: {
       schemaVersion: '1.0',
       generatedAt: options.generatedAt ?? new Date().toISOString(),
-      mode: 'DEMO',
+      mode: options.mode ?? 'SERVICE',
       official: false,
     } satisfies ApiMeta,
   });
@@ -29,11 +29,11 @@ export function jsonResponse(data: unknown, options: { status?: number; cacheCon
 }
 
 export function errorResponse(code: string, message: string, status: number): Response {
-  return jsonResponse({ error: { code, message } }, { status, cacheControl: 'no-store' });
+  return jsonResponse({ error: { code, message } }, { status, cacheControl: 'no-store', mode: 'SERVICE' });
 }
 
 export function privateJsonResponse(data: unknown, options: { status?: number; headers?: Readonly<Record<string, string>> } = {}): Response {
-  const response = withSecurityHeaders(new Response(JSON.stringify({ ok: (options.status ?? 200) < 400, data }), {
+  return withSecurityHeaders(new Response(JSON.stringify({ ok: (options.status ?? 200) < 400, data }), {
     status: options.status ?? 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
@@ -43,7 +43,6 @@ export function privateJsonResponse(data: unknown, options: { status?: number; h
       ...options.headers,
     },
   }));
-  return response;
 }
 
 export function privateErrorResponse(code: string, message: string, status: number): Response {
