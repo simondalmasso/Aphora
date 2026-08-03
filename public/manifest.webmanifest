@@ -1,16 +1,16 @@
 {
   "id": "/",
-  "name": "SOS Santa Fe — Demo",
+  "name": "SOS Santa Fe — Estado hídrico",
   "short_name": "SOS SF",
-  "description": "Panel demostrativo y no oficial para comprender un escenario hídrico ficticio de Santa Fe.",
+  "description": "Estado hídrico, fuentes públicas, recomendaciones y canales de información para Santa Fe.",
   "lang": "es-AR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#f5f5f3",
-  "theme_color": "#f5f5f3",
-  "categories": ["utilities", "weather"],
+  "orientation": "any",
+  "background_color": "#f4f6f8",
+  "theme_color": "#f4f6f8",
+  "categories": ["utilities", "weather", "government"],
   "icons": [
     {
       "src": "/icons/icon.svg",
