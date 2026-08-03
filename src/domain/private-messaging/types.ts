@@ -2,9 +2,9 @@ export type UserRole = 'PUBLIC_ANONYMOUS' | 'AUTHENTICATED_USER' | 'VERIFIED_OPE
 export type PrivateMessageStatus = 'SENT' | 'DELIVERED_TO_SERVICE' | 'READ_BY_OPERATOR' | 'FAILED' | 'UNKNOWN';
 
 export interface SessionPrincipal {
-  readonly sessionId?: string;
+  readonly sessionId: string;
   readonly sub: string;
-  readonly email?: string;
+  readonly email: string;
   readonly role: Exclude<UserRole, 'PUBLIC_ANONYMOUS'>;
   readonly expiresAt: string;
 }
