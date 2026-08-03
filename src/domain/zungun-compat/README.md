@@ -4,4 +4,4 @@ Este módulo adopta sólo semántica: IDs estables, prioridad 0–3, TTL, `UNKNO
 
 Fuente leída en modo read-only: `simonkey888/Zungun`, rama predeterminada `recovery/remote-toolchain-v1`, SHA `13d6745217672da16985d815c427aa4c953de227`.
 
-No copia el runtime, no usa submodule ni crea dependencia de release. `mapToZungunEnvelope` es una representación local y no afirma transporte, entrega, recepción persistente, firma criptográfica, delivery garantizado ni exactly-once. Un estado de transporte tampoco prueba un efecto de negocio.
+No copia el runtime, no usa submodule ni crea dependencia de release. `mapToZungunEnvelope` y `mapPrivateMessageToZungun` son representaciones locales. La segunda conserva conversation ID, actores, TTL, idempotencia, failure reason y provenance. Ninguna afirma transporte, entrega, recepción persistente, firma criptográfica, delivery garantizado ni exactly-once. Un estado de transporte tampoco prueba un efecto de negocio.

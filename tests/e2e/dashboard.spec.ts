@@ -45,6 +45,27 @@ test('source details use an accessible modal and keyboard close', async ({ page 
   await expect(dialog).toBeHidden();
 });
 
+test('header actions refresh concurrently and open the public message center without login', async ({ page }) => {
+  await page.goto('/');
+  const update = page.getByRole('button', { name: 'Actualizar datos' });
+  await update.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/Última actualización correcta:/)).toBeVisible();
+
+  const messagesButton = page.getByRole('button', { name: /Abrir comunicaciones/ });
+  await messagesButton.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Comunicaciones' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Comunicaciones públicas' })).toBeVisible();
+  await expect(dialog.getByText('Disponible cuando se configure.')).toBeVisible();
+  await expect(dialog.getByText('No reemplaza al 911', { exact: false })).toBeVisible();
+  await expect(dialog.locator('textarea, script[src*="accounts.google.com"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(messagesButton).toBeFocused();
+});
+
 test('lite is textual, read-only and script-free', async ({ page }) => {
   await page.goto('/lite');
   await expect(page.getByRole('heading', { name: 'Vigilancia demostrativa' })).toBeVisible();

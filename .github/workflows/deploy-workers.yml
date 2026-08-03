@@ -2,9 +2,8 @@ name: Deploy Workers
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - arq/one-shot-deploy
+  schedule:
+    - cron: '*/5 * * * *'
 
 permissions:
   contents: read
@@ -17,6 +16,8 @@ jobs:
   quality-build-deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -99,4 +100,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           JOB_RESULT: ${{ needs.quality-build-deploy.result }}
-        run: gh issue create --repo "$GITHUB_REPOSITORY" --title "V1 checkpoint — Workers-first public demo (run $GITHUB_RUN_ID)" --body "ORDER_ID=SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001%0ARUN_ID=$GITHUB_RUN_ID%0ASOURCE_SHA=$GITHUB_SHA%0ARESULT=$JOB_RESULT%0ARUN_URL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          DEPLOYMENT_URL: ${{ needs.quality-build-deploy.outputs.deployment_url }}
+        run: |
+          {
+            echo "ORDER_ID=SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001"
+            echo "RUN_ID=$GITHUB_RUN_ID"
+            echo "SOURCE_SHA=$GITHUB_SHA"
+            echo "RESULT=$JOB_RESULT"
+            echo "DEPLOYMENT_URL=$DEPLOYMENT_URL"
+            echo "RUN_URL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > run-report.txt
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "V1 checkpoint run $GITHUB_RUN_ID" --body-file run-report.txt

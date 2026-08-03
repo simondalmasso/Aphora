@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { visibleMessages } from '../domain/messages';
 import { sourceAgeLabel } from '../domain/sources';
 import { RainChart, RiverChart } from './components/Charts';
 import { DetailsDialog } from './components/DetailsDialog';
+import { MessagesPanel } from './components/MessagesPanel';
 import { useSnapshot } from './pwa/useSnapshot';
 import './styles/app.css';
 
@@ -15,9 +16,18 @@ function DirectionIcon({ direction }: { readonly direction: 'UP' | 'DOWN' | 'NEW
 }
 
 export default function App() {
-  const { snapshot, online, savedAt, source } = useSnapshot();
+  const { snapshot, online, savedAt, source, refresh, refreshing, lastSuccessAt, refreshError } = useSnapshot();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [messagesSeen, setMessagesSeen] = useState(false);
+  const messagesButtonRef = useRef<HTMLButtonElement>(null);
   const messages = useMemo(() => visibleMessages(snapshot.messages, new Date(snapshot.generatedAt)), [snapshot]);
+  const unread = messagesSeen ? 0 : messages.length;
+
+  function openMessages() {
+    setMessagesSeen(true);
+    setMessagesOpen(true);
+  }
 
   return (
     <>
@@ -28,12 +38,22 @@ export default function App() {
           <div className="header-meta">
             <span className={`connection ${online ? 'connection--online' : 'connection--offline'}`}><span aria-hidden="true" />{online ? 'En línea' : 'Sin conexión'}</span>
             <a href="/lite" className="lite-link">Modo lite</a>
+            <button className="header-icon-button" type="button" onClick={() => void refresh()} disabled={refreshing} aria-label={refreshing ? 'Actualizando datos' : 'Actualizar datos'} title="Actualizar datos">
+              <svg className={refreshing ? 'is-spinning' : ''} viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9A7 7 0 0 1 18.4 6.6L20 9M4 15l1.6 2.4A7 7 0 0 0 17.9 15" /></svg>
+            </button>
+            <button ref={messagesButtonRef} className="header-icon-button" type="button" onClick={openMessages} aria-label={unread > 0 ? `Abrir comunicaciones, ${unread} sin leer` : 'Abrir comunicaciones'} aria-haspopup="dialog" title="Comunicaciones">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v11H9l-4 3V5Z" /><path d="M8 9h8M8 12h5" /></svg>
+              {unread > 0 && <span className="unread-badge" aria-hidden="true">{Math.min(unread, 9)}</span>}
+            </button>
           </div>
         </div>
       </header>
 
       <main id="main" className="dashboard">
         <div className="demo-banner" role="note"><strong>DEMO / NO OFICIAL</strong><span>Datos, cifras y lugares ficticios</span></div>
+        <div className={`refresh-status ${refreshError ? 'refresh-status--error' : ''}`} role="status" aria-live="polite">
+          {refreshing ? 'Actualizando snapshot, fuentes y mensajes…' : refreshError ?? (lastSuccessAt ? `Última actualización correcta: ${formatDate(lastSuccessAt)}` : 'Snapshot demostrativo incluido en la app')}
+        </div>
         {!online && (
           <div className="offline-banner" role="status">
             <strong>Snapshot offline</strong> · guardado {savedAt ? formatDate(savedAt) : 'sin timestamp de red'}. No es el estado actual.
@@ -104,6 +124,7 @@ export default function App() {
 
       <footer className="app-footer"><p>{snapshot.emergencyDisclaimer}</p><p><a href="/api/health">API</a><span>·</span><a href="/lite">Lite</a><span>·</span>Sin trackers ni fuentes externas</p></footer>
       <DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={() => setDetailsOpen(false)} />
+      <MessagesPanel publicMessages={messages} open={messagesOpen} onClose={() => setMessagesOpen(false)} openerRef={messagesButtonRef} />
     </>
   );
 }

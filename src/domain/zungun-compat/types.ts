@@ -30,3 +30,12 @@ export interface ZungunEnvelopeSubset {
   readonly messageCommitment: string;
   readonly status: 'QUEUED' | 'ELIGIBLE' | 'SENDING' | 'ACCEPTED' | 'TEMPORARILY_UNAVAILABLE' | 'UNKNOWN' | 'ACKNOWLEDGED' | 'PERMANENTLY_REJECTED' | 'EXPIRED' | 'FAILED';
 }
+
+export interface PrivateZungunEnvelopeSubset extends ZungunEnvelopeSubset {
+  readonly conversationId: string;
+  readonly senderId: string;
+  readonly recipientIds: readonly string[];
+  readonly idempotencyKey: string;
+  readonly failureReason: string | null;
+  readonly provenance: string;
+}

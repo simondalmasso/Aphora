@@ -46,12 +46,21 @@ button { color: inherit; }
 .connection > span { width: 7px; height: 7px; border-radius: 999px; background: var(--safe); box-shadow: 0 0 0 4px var(--safe-soft); }
 .connection--offline > span { background: var(--watch); box-shadow: 0 0 0 4px var(--watch-soft); }
 .lite-link { font-weight: 650; text-decoration: none; padding: .44rem .58rem; border-radius: 9px; background: var(--surface); border: 1px solid var(--line); }
+.header-icon-button { position: relative; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 13px; background: transparent; color: var(--text-2); cursor: pointer; transition: background 160ms ease, color 160ms ease; }
+.header-icon-button:hover { background: var(--surface); color: var(--text); }
+.header-icon-button:disabled { cursor: wait; opacity: .68; }
+.header-icon-button svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.header-icon-button svg.is-spinning { animation: icon-spin 750ms linear infinite; }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
+.unread-badge { position: absolute; top: 5px; right: 4px; min-width: 16px; height: 16px; display: grid; place-items: center; padding: 0 4px; border: 2px solid var(--bg); border-radius: 999px; background: var(--critical); color: white; font-size: .55rem; font-weight: 800; line-height: 1; }
 
 .dashboard { width: min(100%, 1424px); margin: 0 auto; padding: 12px 10px 16px; display: grid; gap: 10px; }
 .demo-banner, .offline-banner { min-height: 36px; padding: .55rem .75rem; display: flex; align-items: center; justify-content: space-between; gap: .6rem; border-radius: 12px; background: var(--watch-soft); color: #6f490d; font-size: .72rem; letter-spacing: .01em; }
 .demo-banner strong { letter-spacing: .08em; }
 .demo-banner span { color: #86652e; }
 .offline-banner { display: block; background: #fff0dc; border: 1px solid rgba(154, 100, 16, .14); }
+.refresh-status { min-height: 20px; margin: -4px .2rem 0; color: var(--text-3); font-size: .61rem; font-variant-numeric: tabular-nums; }
+.refresh-status--error { color: var(--critical); }
 .card { min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); animation: card-in 380ms cubic-bezier(.2,.8,.2,1) both; }
 .card:nth-of-type(3) { animation-delay: 35ms; }
 .card:nth-of-type(4) { animation-delay: 70ms; }
@@ -184,15 +193,56 @@ h2 { margin-bottom: 0; font-size: 1rem; line-height: 1.15; letter-spacing: -.02e
 .source-detail p { margin: .35rem 0; color: var(--text-2); font-size: .7rem; }
 .source-detail small { color: var(--text-3); font-size: .62rem; line-height: 1.35; }
 .details-dialog .primary-button { width: calc(100% - 40px); margin-top: 1rem; margin-bottom: 20px; }
+.messages-panel { width: min(100%, 480px); height: auto; max-height: calc(100dvh - 72px); margin: 64px 12px auto auto; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 24px; background: transparent; color: var(--text); box-shadow: 0 28px 90px rgba(15, 22, 18, .22); }
+.messages-panel::backdrop { background: rgba(20, 26, 23, .24); backdrop-filter: blur(3px); }
+.messages-surface { max-height: calc(100dvh - 72px); overflow: auto; overscroll-behavior: contain; border-radius: inherit; background: var(--surface); }
+.messages-head { position: sticky; z-index: 3; top: 0; min-height: 68px; padding: 15px 17px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .96); backdrop-filter: blur(12px); }
+.messages-head h2 { font-size: 1.25rem; }
+.messages-head .icon-button { flex: 0 0 auto; }
+.public-inbox, .private-inbox { padding: 17px; }
+.private-inbox { border-top: 8px solid var(--surface-muted); }
+.inbox-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.inbox-title h3 { margin: 0; font-size: .93rem; letter-spacing: -.018em; }
+.panel-message-list { margin-top: .8rem; display: grid; gap: .7rem; }
+.panel-message { display: grid; grid-template-columns: 5px 1fr; gap: .6rem; min-width: 0; padding-bottom: .66rem; border-bottom: 1px solid var(--line); }
+.panel-message:last-child { padding-bottom: 0; border-bottom: 0; }
+.panel-message > div { min-width: 0; }
+.panel-message p { margin: .18rem 0 .28rem; color: var(--text-2); font-size: .72rem; line-height: 1.42; }
+.panel-message small { color: var(--text-3); font-size: .57rem; line-height: 1.45; }
+.private-warning { margin: .72rem 0; padding: .62rem .68rem; border-radius: 10px; background: var(--critical-soft); color: #873a32; font-size: .64rem; line-height: 1.42; }
+.inbox-state, .inbox-status { margin: .6rem 0 0; padding: .72rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); color: var(--text-2); font-size: .69rem; line-height: 1.45; }
+.inbox-status { border-color: rgba(8, 122, 184, .16); background: var(--water-soft); color: #245f7c; }
+.google-login { display: grid; justify-items: start; gap: .65rem; }
+.google-login p { margin: 0; color: var(--text-2); font-size: .67rem; line-height: 1.42; }
+.google-login > span { color: var(--text-3); font-size: .64rem; }
+.private-session { display: grid; gap: .65rem; }
+.session-label { margin: 0; color: var(--safe); font-size: .63rem; font-weight: 700; }
+.conversation-picker { display: grid; gap: .3rem; color: var(--text-2); font-size: .65rem; }
+.conversation-picker select { max-width: 100%; min-height: 40px; padding: .5rem; border: 1px solid var(--line-strong); border-radius: 9px; background: white; color: var(--text); }
+.private-message-list { max-height: 250px; display: flex; flex-direction: column-reverse; gap: .45rem; overflow: auto; }
+.private-message-list > p { margin: 0; color: var(--text-3); font-size: .68rem; }
+.private-message-list article { width: min(88%, 350px); padding: .62rem .7rem; border-radius: 13px 13px 4px 13px; align-self: flex-end; background: var(--water-soft); }
+.private-message-list .operator-message { align-self: flex-start; border-radius: 13px 13px 13px 4px; background: var(--safe-soft); }
+.private-message-list article > div { display: flex; justify-content: space-between; gap: .5rem; }
+.private-message-list strong { font-size: .62rem; }
+.private-message-list time, .private-message-list small { color: var(--text-3); font-size: .53rem; }
+.private-message-list p { margin: .25rem 0; font-size: .69rem; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message-composer { display: grid; gap: .3rem; color: var(--text-2); font-size: .65rem; }
+.message-composer textarea { width: 100%; resize: vertical; min-height: 76px; max-height: 150px; padding: .65rem; border: 1px solid var(--line-strong); border-radius: 11px; background: white; color: var(--text); font: inherit; line-height: 1.4; }
+.message-composer small { justify-self: end; color: var(--text-3); }
+.send-button { width: 100%; min-height: 44px; }
+.send-button:disabled { cursor: not-allowed; opacity: .5; }
 .noscript { max-width: 40rem; margin: 2rem auto; padding: 1rem; }
 
 @media (min-width: 720px) {
   .dashboard { padding: 14px 16px 20px; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-areas:
     "banner banner banner banner banner banner banner banner banner banner banner banner"
+    "refresh refresh refresh refresh refresh refresh refresh refresh refresh refresh refresh refresh"
     "hero hero hero hero hero hero hero river river river river river"
     "change change change change rain rain rain rain sources sources sources sources"
     "communications communications communications communications communications contradiction contradiction contradiction contradiction places places places"; }
   .demo-banner { grid-area: banner; }
+  .refresh-status { grid-area: refresh; }
   .offline-banner { grid-column: 1 / -1; }
   .hero-card { grid-area: hero; }
   .change-card { grid-area: change; }
@@ -216,6 +266,14 @@ h2 { margin-bottom: 0; font-size: 1rem; line-height: 1.15; letter-spacing: -.02e
 }
 
 @media (max-width: 480px) {
+  .header-inner { min-height: 60px; padding-inline: 9px; gap: .35rem; }
+  .brand { gap: .45rem; font-size: .85rem; }
+  .brand-mark { width: 29px; height: 29px; }
+  .header-meta { gap: .12rem; }
+  .connection { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .lite-link { padding: .42rem .48rem; font-size: .67rem; }
+  .messages-panel { width: 100%; max-height: 88dvh; margin: auto 0 0; border-width: 1px 0 0; border-radius: 24px 24px 0 0; }
+  .messages-surface { max-height: 88dvh; }
   .hero-main { grid-template-columns: 1fr; }
   .state-time { display: grid; grid-template-columns: auto auto; align-items: baseline; justify-content: start; column-gap: .4rem; }
   .state-time small { grid-column: 1 / -1; }

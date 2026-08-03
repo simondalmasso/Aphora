@@ -50,4 +50,29 @@ describe('public read-only API contract', () => {
     expect(html).toContain('Esta pantalla no necesita JavaScript');
     expect(html).not.toContain('<script');
   });
+
+  it('keeps the dashboard public and reports private messaging truthfully disabled', async () => {
+    const dashboard = await request('/');
+    expect(dashboard.status).toBe(200);
+    expect(dashboard.headers.get('content-security-policy')).toContain('accounts.google.com/gsi/client');
+    expect(await dashboard.text()).toContain('<title>asset</title>');
+
+    const config = await request('/api/auth/config');
+    const configBody = await config.json() as { data: { enabled: boolean; googleClientId: string | null; activationState: string } };
+    expect(configBody.data).toEqual({ enabled: false, provider: 'GOOGLE_IDENTITY_SERVICES_DIRECT', googleClientId: null, oneTap: false, scopes: 'openid email profile', activationState: 'REQUIRES_GOOGLE_AND_D1_CONFIGURATION' });
+    expect(config.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('isolates private endpoints with no-store/noindex and no login wall', async () => {
+    const session = await request('/api/session');
+    expect(session.status).toBe(200);
+    expect(session.headers.get('cache-control')).toBe('private, no-store');
+    expect(session.headers.get('x-robots-tag')).toContain('noindex');
+    expect(await session.json()).toMatchObject({ data: { enabled: false, authenticated: false, principal: null } });
+
+    const privateResponse = await request('/api/private/conversations');
+    expect(privateResponse.status).toBe(503);
+    expect(privateResponse.headers.get('cache-control')).toBe('private, no-store');
+    expect((await request('/api/logout', { method: 'POST' })).status).toBe(400);
+  });
 });

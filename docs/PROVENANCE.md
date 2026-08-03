@@ -5,5 +5,6 @@
 - Fuente semántica Zungun: `13d6745217672da16985d815c427aa4c953de227`
 - Modo de datos: `DEMO_FIXTURES`
 - Deployment: GitHub Actions con secretos consumidos sin readback
+- Override UI/mensajería: `OWNER_UI_MESSAGING_OVERRIDE_001.md`, incorporado íntegramente
 
 Los artefactos en `artifacts/v1` se generan desde los scripts de build, Playwright y verificación remota. No contienen cookies, tokens, account IDs ni datos personales.

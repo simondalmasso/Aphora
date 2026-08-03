@@ -1,4 +1,5 @@
-import type { CriticalMessage, ZungunEnvelopeSubset } from './types';
+import type { PrivateMessage } from '../private-messaging/types';
+import type { CriticalMessage, PrivateZungunEnvelopeSubset, ZungunEnvelopeSubset } from './types';
 import { validateCriticalMessage } from './validation';
 
 export function mapToZungunEnvelope(message: CriticalMessage, now: Date): ZungunEnvelopeSubset {
@@ -19,5 +20,30 @@ export function mapToZungunEnvelope(message: CriticalMessage, now: Date): Zungun
     contentType: 'application/vnd.sos-sf.critical-message+json',
     messageCommitment: message.commitment ?? `uncommitted:${message.id}`,
     status,
+  });
+}
+
+export function mapPrivateMessageToZungun(message: PrivateMessage): PrivateZungunEnvelopeSubset {
+  const status: ZungunEnvelopeSubset['status'] = message.status === 'UNKNOWN'
+    ? 'UNKNOWN'
+    : message.status === 'FAILED'
+      ? 'FAILED'
+      : message.status === 'READ_BY_OPERATOR'
+        ? 'ACKNOWLEDGED'
+        : 'ACCEPTED';
+  return Object.freeze({
+    messageId: message.id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    recipientIds: Object.freeze([message.recipientId]),
+    createdAtMs: Date.parse(message.createdAt),
+    expiresAtMs: Date.parse(message.expiresAt),
+    priority: message.priority,
+    contentType: 'application/vnd.sos-sf.critical-message+json',
+    messageCommitment: message.commitment ?? `uncommitted:${message.id}`,
+    status,
+    idempotencyKey: message.idempotencyKey,
+    failureReason: message.failureReason,
+    provenance: message.provenance,
   });
 }

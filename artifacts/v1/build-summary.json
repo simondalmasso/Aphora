@@ -1,10 +1,10 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T01:44:09.886Z",
+  "generatedAt": "2026-08-03T02:17:28.895Z",
   "build": "PASS",
   "fileCount": 9,
-  "totalDistBytes": 1135300,
-  "jsGzipBytes": 67155,
-  "cssGzipBytes": 4552,
+  "totalDistBytes": 1180025,
+  "jsGzipBytes": 70260,
+  "cssGzipBytes": 5650,
   "performanceBudgets": "PASS"
 }

@@ -1,0 +1,100 @@
+import type { SessionPrincipal, UserRole } from '../domain/private-messaging/types';
+
+const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
+const SESSION_COOKIE = '__Host-sos_sf_session';
+
+export interface GoogleClaims {
+  readonly iss: string;
+  readonly aud: string | readonly string[];
+  readonly sub: string;
+  readonly exp: number;
+  readonly iat?: number;
+  readonly email: string;
+  readonly email_verified: boolean;
+  readonly name?: string;
+}
+
+interface GoogleJwk extends JsonWebKey {
+  readonly kid?: string;
+  readonly use?: string;
+}
+
+function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
+  const base64 = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function bytesToBase64Url(value: Uint8Array): string {
+  let binary = '';
+  for (const byte of value) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+function parsePart<T>(value: string): T {
+  return JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as T;
+}
+
+export function validateGoogleClaims(value: unknown, clientId: string, nowMs: number): GoogleClaims {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('GOOGLE_CLAIMS_INVALID');
+  const claims = value as Record<string, unknown>;
+  if (typeof claims.iss !== 'string' || !GOOGLE_ISSUERS.has(claims.iss)) throw new Error('GOOGLE_ISSUER_INVALID');
+  const audienceValid = claims.aud === clientId || (Array.isArray(claims.aud) && claims.aud.includes(clientId));
+  if (!audienceValid) throw new Error('GOOGLE_AUDIENCE_INVALID');
+  if (!Number.isSafeInteger(claims.exp) || (claims.exp as number) * 1000 <= nowMs) throw new Error('GOOGLE_TOKEN_EXPIRED');
+  if (claims.iat !== undefined && (!Number.isSafeInteger(claims.iat) || (claims.iat as number) * 1000 > nowMs + 120_000)) throw new Error('GOOGLE_ISSUED_AT_INVALID');
+  if (typeof claims.sub !== 'string' || !/^[0-9]{5,64}$/.test(claims.sub)) throw new Error('GOOGLE_SUB_INVALID');
+  if (claims.email_verified !== true) throw new Error('GOOGLE_EMAIL_UNVERIFIED');
+  if (typeof claims.email !== 'string' || claims.email.length > 320 || !claims.email.includes('@')) throw new Error('GOOGLE_EMAIL_INVALID');
+  return claims as unknown as GoogleClaims;
+}
+
+export async function verifyGoogleIdToken(token: string, clientId: string, nowMs = Date.now()): Promise<GoogleClaims> {
+  if (token.length > 16_000) throw new Error('GOOGLE_TOKEN_TOO_LARGE');
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('GOOGLE_TOKEN_INVALID');
+  const header = parsePart<{ alg?: unknown; kid?: unknown }>(parts[0]!);
+  if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new Error('GOOGLE_TOKEN_ALGORITHM_INVALID');
+  const jwksResponse = await fetch('https://www.googleapis.com/oauth2/v3/certs', { headers: { Accept: 'application/json' } });
+  if (!jwksResponse.ok) throw new Error('GOOGLE_JWKS_UNAVAILABLE');
+  const jwks = await jwksResponse.json() as { keys?: GoogleJwk[] };
+  const jwk = jwks.keys?.find((key) => key.kid === header.kid && key.kty === 'RSA' && key.use === 'sig');
+  if (!jwk) throw new Error('GOOGLE_SIGNING_KEY_UNKNOWN');
+  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, base64UrlToBytes(parts[2]!), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+  if (!valid) throw new Error('GOOGLE_SIGNATURE_INVALID');
+  return validateGoogleClaims(parsePart(parts[1]!), clientId, nowMs);
+}
+
+async function hmacKey(secret: string): Promise<CryptoKey> {
+  if (secret.length < 32) throw new Error('SESSION_KEY_INVALID');
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+
+export async function createSessionCookie(claims: GoogleClaims, secret: string, operatorEmails: string, nowMs = Date.now()): Promise<string> {
+  const allowlist = new Set(operatorEmails.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
+  const role: Exclude<UserRole, 'PUBLIC_ANONYMOUS'> = allowlist.has(claims.email.toLowerCase()) ? 'VERIFIED_OPERATOR' : 'AUTHENTICATED_USER';
+  const payload: SessionPrincipal = { sub: claims.sub, role, expiresAt: new Date(nowMs + 8 * 60 * 60 * 1000).toISOString() };
+  const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
+  const signature = new Uint8Array(await crypto.subtle.sign('HMAC', await hmacKey(secret), new TextEncoder().encode(encoded)));
+  return `${SESSION_COOKIE}=${encoded}.${bytesToBase64Url(signature)}; Path=/; Max-Age=28800; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export async function readSession(request: Request, secret: string, nowMs = Date.now()): Promise<SessionPrincipal | null> {
+  const cookies = request.headers.get('Cookie') ?? '';
+  const raw = cookies.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
+  if (!raw) return null;
+  const [payload, signature, extra] = raw.split('.');
+  if (!payload || !signature || extra) return null;
+  const valid = await crypto.subtle.verify('HMAC', await hmacKey(secret), base64UrlToBytes(signature), new TextEncoder().encode(payload));
+  if (!valid) return null;
+  const session = parsePart<SessionPrincipal>(payload);
+  if (typeof session.sub !== 'string' || !['AUTHENTICATED_USER', 'VERIFIED_OPERATOR', 'ADMIN'].includes(session.role) || !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= nowMs) return null;
+  return Object.freeze(session);
+}
+
+export function clearSessionCookie(): string {
+  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+}

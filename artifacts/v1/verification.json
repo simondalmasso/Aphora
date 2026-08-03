@@ -1,14 +1,14 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T01:50:00.000Z",
+  "generatedAt": "2026-08-03T02:13:55.000Z",
   "orderId": "SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001",
   "sosBaseSha": "61b5474dd8e94baf496804638f1cffc6b8a0ed7a",
   "zungunSourceSha": "13d6745217672da16985d815c427aa4c953de227",
   "local": {
     "typecheck": "PASS",
     "lint": "PASS",
-    "unitTests": { "status": "PASS", "count": 15 },
-    "contractTests": { "status": "PASS", "count": 7 },
+    "unitTests": { "status": "PASS", "count": 23 },
+    "contractTests": { "status": "PASS", "count": 9 },
     "build": "PASS",
     "e2e": "PLATFORM_LIMITATION_BROWSER_DOWNLOAD_CERTIFICATE_TIME_ERROR",
     "wranglerDryRun": "PLATFORM_COMMAND_APPROVAL_BLOCKED"

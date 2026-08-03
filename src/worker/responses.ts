@@ -31,3 +31,21 @@ export function jsonResponse(data: unknown, options: { status?: number; cacheCon
 export function errorResponse(code: string, message: string, status: number): Response {
   return jsonResponse({ error: { code, message } }, { status, cacheControl: 'no-store' });
 }
+
+export function privateJsonResponse(data: unknown, options: { status?: number; headers?: Readonly<Record<string, string>> } = {}): Response {
+  const response = withSecurityHeaders(new Response(JSON.stringify({ ok: (options.status ?? 200) < 400, data }), {
+    status: options.status ?? 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'private, no-store',
+      'Pragma': 'no-cache',
+      'X-Robots-Tag': 'noindex, nofollow, noarchive',
+      ...options.headers,
+    },
+  }));
+  return response;
+}
+
+export function privateErrorResponse(code: string, message: string, status: number): Response {
+  return privateJsonResponse({ error: { code, message } }, { status });
+}

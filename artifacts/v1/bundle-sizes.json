@@ -1,30 +1,30 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T01:44:09.886Z",
+  "generatedAt": "2026-08-03T02:17:28.895Z",
   "budgets": {
     "initialJsGzipBytes": 122880,
     "initialCssGzipBytes": 25600
   },
   "actual": {
-    "jsGzipBytes": 67155,
-    "cssGzipBytes": 4552,
-    "totalDistBytes": 1135300
+    "jsGzipBytes": 70260,
+    "cssGzipBytes": 5650,
+    "totalDistBytes": 1180025
   },
   "files": [
     {
-      "path": "assets/index-BOkCrjSK.js",
-      "bytes": 215932,
-      "gzipBytes": 66492
+      "path": "assets/index-BLSyCqK3.js",
+      "bytes": 226876,
+      "gzipBytes": 69597
     },
     {
-      "path": "assets/index-BOkCrjSK.js.map",
-      "bytes": 898579,
-      "gzipBytes": 178402
+      "path": "assets/index-BLSyCqK3.js.map",
+      "bytes": 926980,
+      "gzipBytes": 185435
     },
     {
-      "path": "assets/index-D6v87dSJ.css",
-      "bytes": 15534,
-      "gzipBytes": 4155
+      "path": "assets/index-BV0u3-en.css",
+      "bytes": 20914,
+      "gzipBytes": 5253
     },
     {
       "path": "icons/icon.svg",
