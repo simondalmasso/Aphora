@@ -1,5 +1,5 @@
 import type { MessagePage, PrivateConversation, PrivateMessage, SendMessageInput, SessionPrincipal } from './types';
-import { PRIVATE_PAGE_LIMIT, normalizeSendMessage } from './validation';
+import { PRIVATE_PAGE_LIMIT, messagePassesModeration, normalizeSendMessage } from './validation';
 
 export interface MessageStore {
   findConversation(id: string): Promise<PrivateConversation | null>;
@@ -22,6 +22,7 @@ export interface MessageServiceOptions {
   readonly retentionDays: number;
   readonly rateLimit: number;
   readonly rateWindowMinutes: number;
+  readonly blockedTerms?: string;
 }
 
 export class MessagingService {
@@ -55,6 +56,7 @@ export class MessagingService {
 
   async send(principal: SessionPrincipal, rawInput: SendMessageInput | unknown, networkActorId?: string): Promise<{ readonly message: PrivateMessage; readonly duplicate: boolean }> {
     const input = normalizeSendMessage(rawInput);
+    if (!messagePassesModeration(input.body, this.options.blockedTerms ?? '')) throw new Error('CONTENT_REJECTED');
     await this.maintenance();
     const conversation = await this.authorizeConversation(principal, input.conversationId);
     const duplicate = await this.store.findByIdempotency(conversation.id, input.idempotencyKey);
@@ -62,9 +64,7 @@ export class MessagingService {
     const now = this.options.now();
     const since = new Date(now.getTime() - this.options.rateWindowMinutes * 60_000).toISOString();
     const rateActors = [principal.sub, ...(networkActorId && networkActorId !== principal.sub ? [networkActorId] : [])];
-    for (const actorId of rateActors) {
-      if (await this.store.countRecentSends(actorId, since) >= this.options.rateLimit) throw new Error('RATE_LIMITED');
-    }
+    for (const actorId of rateActors) if (await this.store.countRecentSends(actorId, since) >= this.options.rateLimit) throw new Error('RATE_LIMITED');
     const operator = principal.role === 'VERIFIED_OPERATOR' || principal.role === 'ADMIN';
     if (operator && conversation.userSub === principal.sub) throw new Error('ROLE_CONFLICT');
     const createdAt = now.toISOString();
