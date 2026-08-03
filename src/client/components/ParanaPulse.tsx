@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import type { BufferGeometry, Material, Object3D, WebGLRenderer } from 'three';
 import type { Snapshot } from '../../domain/snapshot';
 
@@ -37,8 +37,8 @@ function areaPath(top: readonly { readonly x: number; readonly y: number }[], bo
   return `${linePath(top)} ${[...bottom].reverse().map((point) => `L ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ')} Z`;
 }
 
-function formatClock(iso: string) {
-  return new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Cordoba' }).format(new Date(iso));
+function formatDateTime(iso: string) {
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Cordoba' }).format(new Date(iso));
 }
 
 function staticChartData(snapshot: Snapshot) {
@@ -112,7 +112,20 @@ function disposeObject(object: Object3D) {
   });
 }
 
-export function ParanaPulse({ snapshot, refreshToken }: { readonly snapshot: Snapshot; readonly refreshToken: string | null }) {
+interface ParanaPulseProps {
+  readonly snapshot: Snapshot;
+  readonly refreshToken: string | null;
+  readonly online: boolean;
+  readonly savedAt: string | null;
+  readonly refreshing: boolean;
+  readonly refreshError: string | null;
+  readonly evidenceButtonRef: RefObject<HTMLButtonElement | null>;
+  readonly onEvidence: () => void;
+  readonly onShare: () => void;
+  readonly shareStatus: string | null;
+}
+
+export function ParanaPulse({ snapshot, refreshToken, online, savedAt, refreshing, refreshError, evidenceButtonRef, onEvidence, onShare, shareStatus }: ParanaPulseProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [rendererState, setRendererState] = useState<RendererState>('loading');
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -356,18 +369,27 @@ export function ParanaPulse({ snapshot, refreshToken }: { readonly snapshot: Sna
   return (
     <section className="pulse-card card" aria-labelledby="pulse-heading" data-testid="parana-pulse" data-renderer={rendererState} data-render-state={rendererState} data-motion={reducedMotion ? 'reduced' : 'full'} data-grid-observed={`${PULSE_RENDER_BUDGET.observedSegments.x}x${PULSE_RENDER_BUDGET.observedSegments.y}`} data-grid-projection={`${PULSE_RENDER_BUDGET.projectionSegments.x}x${PULSE_RENDER_BUDGET.projectionSegments.y}`} data-fps-cap={PULSE_RENDER_BUDGET.fps} data-dpr-cap={PULSE_RENDER_BUDGET.dpr}>
       <div className="pulse-heading-row">
-        <div><span className="pulse-kicker">Lectura visual del nivel y el riesgo</span><h1 id="pulse-heading">Pulso del Paraná</h1></div>
-        <div className="pulse-demo"><strong>DEMO / NO OFICIAL</strong><span>Escenario ficticio</span></div>
+        <div><h1 id="pulse-heading">Pulso del Paraná</h1><span className="pulse-station">{snapshot.river.stationName}</span></div>
+        <div className="pulse-demo"><strong>DEMO / NO OFICIAL</strong></div>
       </div>
 
       <div className="pulse-primary">
-        <div className="pulse-level"><span>Nivel actual</span><strong>{snapshot.river.currentMetres.toFixed(2)} <small>m</small></strong></div>
-        <div className="pulse-facts">
-          <div><span>24 horas</span><strong>+{Math.round(snapshot.river.delta24h * 100)} cm</strong></div>
-          <div><span>Tendencia</span><strong>↗ Ascenso lento</strong></div>
-          <div><span>Estado</span><strong className="pulse-state" role="heading" aria-level={2}>{snapshot.stateLabel}</strong></div>
+        <div className="pulse-status-row">
+          <strong className="pulse-state" role="heading" aria-level={2}>{snapshot.stateLabel}</strong>
+          <time dateTime={refreshToken ?? snapshot.river.observedAt}>{refreshing ? 'Actualizando…' : `Actualizado ${formatDateTime(refreshToken ?? snapshot.river.observedAt)}`}</time>
         </div>
-        <p className="pulse-action"><span aria-hidden="true">✓</span><strong>Ahora:</strong> {snapshot.recommendedAction}</p>
+        <div className="pulse-reading">
+          <div className="pulse-level"><span>Nivel actual</span><strong>{snapshot.river.currentMetres.toFixed(2)} <small>m</small></strong></div>
+          <div className="pulse-facts">
+            <div><span>24 horas</span><strong>+{Math.round(snapshot.river.delta24h * 100)} cm</strong></div>
+            <div><span>Tendencia</span><strong data-testid="pulse-trend">↗ Ascenso lento</strong></div>
+          </div>
+        </div>
+        {(!online || refreshError) && (
+          <p className="pulse-operational" role="status">
+            <strong>{online ? 'Actualización incompleta' : 'Snapshot offline'}</strong> · {online ? refreshError : `guardado ${savedAt ? formatDateTime(savedAt) : 'sin timestamp de red'}. No es el estado actual.`}
+          </p>
+        )}
       </div>
 
       <div className="pulse-visual-shell">
@@ -383,7 +405,14 @@ export function ParanaPulse({ snapshot, refreshToken }: { readonly snapshot: Sna
         <strong>MÁS ALTO = MÁS RIESGO</strong><span><i className="legend-observed" />CELESTE = OBSERVADO</span><span><i className="legend-forecast" />ÁMBAR = PROYECCIÓN</span>
       </div>
       <PulseMiniChart snapshot={snapshot} />
-      <div className="pulse-meta"><span>{snapshot.river.stationName}</span><time dateTime={snapshot.river.observedAt}>{formatClock(snapshot.river.observedAt)} · 03 AGO 2026</time><span>Próximo umbral demo: {nextThreshold.label} · {nextThreshold.metres.toFixed(2)} m</span></div>
+      <div className="pulse-action-zone">
+        <p className="pulse-action"><span aria-hidden="true">✓</span><strong>Ahora:</strong> Consultá canales oficiales y mantené preparado tu plan familiar.</p>
+        <div className="pulse-actions">
+          <button ref={evidenceButtonRef} className="pulse-button pulse-button--primary" type="button" onClick={onEvidence}>Ver evidencia</button>
+          <button className="pulse-button" type="button" onClick={onShare}>Compartir</button>
+          {shareStatus && <span role="status">{shareStatus}</span>}
+        </div>
+      </div>
     </section>
   );
 }
