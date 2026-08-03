@@ -1,11 +1,22 @@
 {
   "schemaVersion": "1.0",
   "worker_name": "sos-sf",
-  "workers_dev_url": null,
-  "deployed_at_utc": null,
-  "remote_status": "PENDING_GITHUB_ACTIONS",
-  "api_health_status": "PENDING_GITHUB_ACTIONS",
-  "verified_paths": [],
-  "source_commit_or_precommit_tree_reference": "local-prepublish-tree-from-base-61b5474dd8e94baf496804638f1cffc6b8a0ed7a",
+  "workers_dev_url": "https://sos-sf.simondalmasso44.workers.dev",
+  "deployed_at_utc": "2026-08-03T02:46:28.254Z",
+  "independently_verified_at_utc": "2026-08-03T02:49:55.894Z",
+  "remote_status": "PASS",
+  "api_health_status": "PASS",
+  "remote_dashboard_status": "PASS",
+  "remote_lite_status": "PASS",
+  "verified_paths": [
+    { "path": "/api/health", "status": 200, "contentType": "application/json; charset=utf-8", "headersOk": true, "bodyMatch": true, "pass": true },
+    { "path": "/", "status": 200, "contentType": "text/html", "headersOk": true, "bodyMatch": true, "pass": true },
+    { "path": "/lite", "status": 200, "contentType": "text/html; charset=utf-8", "headersOk": true, "bodyMatch": true, "pass": true },
+    { "path": "/api/snapshot", "status": 200, "contentType": "application/json; charset=utf-8", "headersOk": true, "bodyMatch": true, "pass": true },
+    { "path": "/manifest.webmanifest", "status": 200, "contentType": "application/manifest+json", "headersOk": true, "bodyMatch": true, "pass": true },
+    { "path": "/api/auth/config", "status": 200, "privateMessaging": "FEATURE_DISABLED_SECURELY", "pass": true }
+  ],
+  "deployment_source_sha": "b35808aef2b769a8d3324928ef010ebf8452158a",
+  "main_application_sha": "40cddf385cc19e8bdb2864a29bb386b5aec3f93f",
   "cloudflare_account_identity_redacted_or_non_sensitive": "GitHub Actions secret-backed; not read back"
 }

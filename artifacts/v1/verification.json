@@ -1,19 +1,37 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T02:13:55.000Z",
+  "generatedAt": "2026-08-03T02:50:05.766Z",
   "orderId": "SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001",
   "sosBaseSha": "61b5474dd8e94baf496804638f1cffc6b8a0ed7a",
   "zungunSourceSha": "13d6745217672da16985d815c427aa4c953de227",
+  "ownerUiMessagingOverride": "INCORPORATED_IN_FULL",
   "local": {
     "typecheck": "PASS",
     "lint": "PASS",
     "unitTests": { "status": "PASS", "count": 23 },
     "contractTests": { "status": "PASS", "count": 9 },
     "build": "PASS",
-    "e2e": "PLATFORM_LIMITATION_BROWSER_DOWNLOAD_CERTIFICATE_TIME_ERROR",
-    "wranglerDryRun": "PLATFORM_COMMAND_APPROVAL_BLOCKED"
+    "performanceBudgets": "PASS",
+    "e2e": "LOCAL_BROWSER_DOWNLOAD_PLATFORM_LIMITATION; PROVEN_BY_GITHUB_ACTIONS"
   },
-  "ci": "PENDING_INITIAL_DISPATCH",
-  "deployment": "PENDING_INITIAL_DISPATCH",
-  "containsSecrets": false
+  "githubActions": {
+    "status": "COMPLETED_SUCCESS",
+    "runId": "30780029104",
+    "runUrl": "https://github.com/simonkey888/sos-sf/actions/runs/30780029104",
+    "sourceSha": "b35808aef2b769a8d3324928ef010ebf8452158a",
+    "e2e": { "status": "PASS", "passed": 11, "expectedSkipped": 1 },
+    "wranglerDryRun": "PASS",
+    "artifactId": "8843336040",
+    "artifactName": "sos-sf-v1-evidence-b35808aef2b769a8d3324928ef010ebf8452158a"
+  },
+  "deployment": {
+    "status": "VERIFIED",
+    "url": "https://sos-sf.simondalmasso44.workers.dev",
+    "health": "PASS",
+    "dashboard": "PASS",
+    "lite": "PASS"
+  },
+  "screenshots": ["artifacts/v1/screenshots/desktop.png", "artifacts/v1/screenshots/mobile.png"],
+  "containsSecrets": false,
+  "audReady": true
 }
