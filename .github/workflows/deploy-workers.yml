@@ -119,4 +119,4 @@ jobs:
           ];
           fs.writeFileSync(process.env.CHECKPOINT_BODY, `${lines.join('\n')}\n`);
           NODE
-          gh issue create --title "UI simplification run — one-shot #${GITHUB_RUN_ID}" --body-file "$CHECKPOINT_BODY"
+          gh issue edit 7 --title "UI simplification run — one-shot" --body-file "$CHECKPOINT_BODY"

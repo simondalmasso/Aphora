@@ -38,7 +38,9 @@ function areaPath(top: readonly { readonly x: number; readonly y: number }[], bo
 }
 
 function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Cordoba' }).format(new Date(iso));
+  const parts = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Argentina/Cordoba' }).formatToParts(new Date(iso));
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value.replace('.', '') ?? '';
+  return `${value('day')} ${value('month')}, ${value('hour')}:${value('minute')}`;
 }
 
 function staticChartData(snapshot: Snapshot) {

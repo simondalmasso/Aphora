@@ -69,7 +69,6 @@ export default function App() {
 
       <main id="main" className="dashboard">
         <ParanaPulse
-          key={lastSuccessAt ?? 'bundled-pulse'}
           snapshot={snapshot}
           refreshToken={lastSuccessAt}
           online={online}
