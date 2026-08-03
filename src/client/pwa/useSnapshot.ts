@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { demoSnapshot } from '../../data/demo-snapshot';
+import { unavailableSnapshot } from '../../data/unavailable-snapshot';
 import type { Snapshot } from '../../domain/snapshot';
 import { validateSnapshot } from '../../domain/validation';
 
-const STORAGE_KEY = 'sos-sf:last-snapshot:v1';
+const STORAGE_KEY = 'sos-sf:last-live-snapshot:v3';
 
-interface StoredSnapshot {
-  readonly snapshot: Snapshot;
-  readonly savedAt: string;
-}
-
-interface ApiEnvelope {
-  readonly data?: unknown;
-}
+interface StoredSnapshot { readonly snapshot: Snapshot; readonly savedAt: string }
+interface ApiEnvelope { readonly data?: unknown }
 
 function loadStored(): StoredSnapshot | null {
   try {
@@ -20,11 +14,22 @@ function loadStored(): StoredSnapshot | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredSnapshot;
     validateSnapshot(parsed.snapshot);
-    if (!Number.isFinite(Date.parse(parsed.savedAt))) return null;
+    if (!Number.isFinite(Date.parse(parsed.savedAt)) || parsed.snapshot.mode === 'DEMO') return null;
     return parsed;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
+}
+
+function offlineSnapshot(stored: StoredSnapshot): Snapshot {
+  return {
+    ...stored.snapshot,
+    mode: 'OFFLINE',
+    dataStatus: 'OFFLINE',
+    stateLabel: 'Modo sin conexión',
+    summary: `${stored.snapshot.summary} No es información actual.`,
+    systems: stored.snapshot.systems?.map((system) => ({ ...system, dataStatus: 'OFFLINE' })),
+    river: { ...stored.snapshot.river, dataStatus: 'OFFLINE' },
+    rain: { ...stored.snapshot.rain, dataStatus: 'OFFLINE' },
+  };
 }
 
 async function fetchEnvelope(path: string): Promise<unknown> {
@@ -40,10 +45,10 @@ function objectValue(value: unknown): Record<string, unknown> {
 
 export function useSnapshot() {
   const [initialStored] = useState<StoredSnapshot | null>(loadStored);
-  const [snapshot, setSnapshot] = useState<Snapshot>(() => navigator.onLine ? demoSnapshot : initialStored?.snapshot ?? demoSnapshot);
+  const [snapshot, setSnapshot] = useState<Snapshot>(() => navigator.onLine ? unavailableSnapshot : initialStored ? offlineSnapshot(initialStored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
   const [online, setOnline] = useState(() => navigator.onLine);
   const [savedAt, setSavedAt] = useState<string | null>(() => initialStored?.savedAt ?? null);
-  const [source, setSource] = useState<'BUNDLED' | 'NETWORK' | 'OFFLINE_CACHE'>(() => navigator.onLine ? 'BUNDLED' : initialStored ? 'OFFLINE_CACHE' : 'BUNDLED');
+  const [source, setSource] = useState<'NETWORK' | 'OFFLINE_CACHE' | 'UNAVAILABLE'>(() => navigator.onLine ? 'UNAVAILABLE' : initialStored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
   const [refreshing, setRefreshing] = useState(false);
   const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(() => initialStored?.savedAt ?? null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -54,38 +59,40 @@ export function useSnapshot() {
     if (refreshInFlight.current) return refreshInFlight.current;
     const operation = (async () => {
       if (!navigator.onLine) {
-        if (mounted.current) setRefreshError('Sin conexión: se conserva el último snapshot disponible.');
+        const stored = loadStored();
+        if (mounted.current) {
+          setOnline(false);
+          setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
+          setSnapshot(stored ? offlineSnapshot(stored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
+          setRefreshError('Modo sin conexión. No es información actual.');
+        }
         return false;
       }
-      if (mounted.current) {
-        setRefreshing(true);
-        setRefreshError(null);
-      }
+      if (mounted.current) { setRefreshing(true); setRefreshError(null); }
       try {
-        const [snapshotData, sourcesData, messagesData] = await Promise.all([
-          fetchEnvelope('/api/snapshot'),
-          fetchEnvelope('/api/sources'),
-          fetchEnvelope('/api/messages'),
-        ]);
+        const [snapshotData, sourcesData, messagesData] = await Promise.all([fetchEnvelope('/api/snapshot'), fetchEnvelope('/api/sources'), fetchEnvelope('/api/messages')]);
         const sources = objectValue(sourcesData).sources;
+        const systems = objectValue(sourcesData).systems;
         const messages = objectValue(messagesData).messages;
         const base = objectValue(snapshotData);
-        const validated = validateSnapshot({ ...base, sources, messages });
+        const validated = validateSnapshot({ ...base, sources, systems, messages });
         const now = new Date().toISOString();
-        const stored: StoredSnapshot = { snapshot: validated, savedAt: now };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+        if (validated.mode !== 'DEMO' && validated.dataStatus !== 'UNAVAILABLE') localStorage.setItem(STORAGE_KEY, JSON.stringify({ snapshot: validated, savedAt: now } satisfies StoredSnapshot));
         if (mounted.current) {
           setOnline(true);
           setSnapshot(validated);
-          setSavedAt(now);
+          setSavedAt(validated.dataStatus === 'UNAVAILABLE' ? initialStored?.savedAt ?? null : now);
           setLastSuccessAt(now);
-          setSource('NETWORK');
+          setSource(validated.dataStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NETWORK');
         }
         return true;
       } catch {
+        const stored = loadStored();
         if (mounted.current) {
           setOnline(false);
-          setRefreshError('La actualización falló. Se conserva el snapshot anterior.');
+          setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
+          setSnapshot(stored ? offlineSnapshot(stored) : unavailableSnapshot);
+          setRefreshError(stored ? 'La actualización falló. Se conserva un snapshot anterior; no es información actual.' : 'La actualización falló y no existe información anterior validada.');
         }
         return false;
       } finally {
@@ -95,20 +102,16 @@ export function useSnapshot() {
     })();
     refreshInFlight.current = operation;
     return operation;
-  }, []);
+  }, [initialStored]);
 
   useEffect(() => {
     mounted.current = true;
-    const onOnline = () => setOnline(true);
-    const onOffline = () => setOnline(false);
+    const onOnline = () => { setOnline(true); void refresh(); };
+    const onOffline = () => { setOnline(false); void refresh(); };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     void refresh();
-    return () => {
-      mounted.current = false;
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
-    };
+    return () => { mounted.current = false; window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, [refresh]);
 
   return { snapshot, online, savedAt, source, refresh, refreshing, lastSuccessAt, refreshError } as const;
