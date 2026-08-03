@@ -4,40 +4,17 @@ const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.
 const SESSION_COOKIE = '__Host-sos_sf_session';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 
-export interface GoogleClaims {
-  readonly iss: string;
-  readonly aud: string | readonly string[];
-  readonly azp?: string;
-  readonly sub: string;
-  readonly exp: number;
-  readonly iat?: number;
-  readonly email: string;
-  readonly email_verified: boolean;
-  readonly name?: string;
-}
-
-interface GoogleJwk extends JsonWebKey {
-  readonly kid?: string;
-  readonly use?: string;
-}
+export interface GoogleClaims { readonly iss: string; readonly aud: string | readonly string[]; readonly azp?: string; readonly sub: string; readonly exp: number; readonly iat?: number; readonly email: string; readonly email_verified: boolean; readonly name?: string }
+interface GoogleJwk extends JsonWebKey { readonly kid?: string; readonly use?: string }
 
 function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
   const base64 = value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
+  const binary = atob(base64); const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
 }
-
-function bytesToBase64Url(value: Uint8Array): string {
-  let binary = '';
-  for (const byte of value) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
-
-function parsePart<T>(value: string): T {
-  return JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as T;
-}
+function bytesToBase64Url(value: Uint8Array): string { let binary = ''; for (const byte of value) binary += String.fromCharCode(byte); return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, ''); }
+function parsePart<T>(value: string): T { return JSON.parse(new TextDecoder().decode(base64UrlToBytes(value))) as T; }
 
 export function validateGoogleClaims(value: unknown, clientId: string, nowMs: number): GoogleClaims {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('GOOGLE_CLAIMS_INVALID');
@@ -56,8 +33,7 @@ export function validateGoogleClaims(value: unknown, clientId: string, nowMs: nu
 
 export async function verifyGoogleIdToken(token: string, clientId: string, nowMs = Date.now()): Promise<GoogleClaims> {
   if (token.length > 16_000) throw new Error('GOOGLE_TOKEN_TOO_LARGE');
-  const parts = token.split('.');
-  if (parts.length !== 3) throw new Error('GOOGLE_TOKEN_INVALID');
+  const parts = token.split('.'); if (parts.length !== 3) throw new Error('GOOGLE_TOKEN_INVALID');
   const header = parsePart<{ alg?: unknown; kid?: unknown }>(parts[0]!);
   if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new Error('GOOGLE_TOKEN_ALGORITHM_INVALID');
   const jwksResponse = await fetch('https://www.googleapis.com/oauth2/v3/certs', { headers: { Accept: 'application/json' } });
@@ -71,29 +47,13 @@ export async function verifyGoogleIdToken(token: string, clientId: string, nowMs
   return validateGoogleClaims(parsePart(parts[1]!), clientId, nowMs);
 }
 
-async function hmacKey(secret: string): Promise<CryptoKey> {
-  if (secret.length < 32) throw new Error('SESSION_KEY_INVALID');
-  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
-}
+async function hmacKey(secret: string): Promise<CryptoKey> { if (secret.length < 32) throw new Error('SESSION_KEY_INVALID'); return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']); }
+function operatorAllowlist(value: string): ReadonlySet<string> { return new Set(value.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean)); }
+export function roleForEmail(email: string, operatorEmails: string): Exclude<UserRole, 'PUBLIC_ANONYMOUS'> { return operatorAllowlist(operatorEmails).has(email.toLowerCase()) ? 'VERIFIED_OPERATOR' : 'AUTHENTICATED_USER'; }
 
-function operatorAllowlist(value: string): ReadonlySet<string> {
-  return new Set(value.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean));
+export function createSessionPrincipal(claims: GoogleClaims, operatorEmails: string, nowMs = Date.now(), sessionId: string = crypto.randomUUID()): SessionPrincipal {
+  return Object.freeze({ sessionId: `session:${sessionId}`, sub: claims.sub, email: claims.email.toLowerCase(), role: roleForEmail(claims.email, operatorEmails), expiresAt: new Date(nowMs + SESSION_MS).toISOString() });
 }
-
-export function roleForEmail(email: string, operatorEmails: string): Exclude<UserRole, 'PUBLIC_ANONYMOUS'> {
-  return operatorAllowlist(operatorEmails).has(email.toLowerCase()) ? 'VERIFIED_OPERATOR' : 'AUTHENTICATED_USER';
-}
-
-export function createSessionPrincipal(claims: GoogleClaims, operatorEmails: string, nowMs = Date.now(), sessionId = crypto.randomUUID()): SessionPrincipal {
-  return Object.freeze({
-    sessionId: `session:${sessionId}`,
-    sub: claims.sub,
-    email: claims.email.toLowerCase(),
-    role: roleForEmail(claims.email, operatorEmails),
-    expiresAt: new Date(nowMs + SESSION_MS).toISOString(),
-  });
-}
-
 export async function createSessionCookieForPrincipal(principal: SessionPrincipal, secret: string, nowMs = Date.now()): Promise<string> {
   if (Date.parse(principal.expiresAt) <= nowMs) throw new Error('SESSION_EXPIRED');
   const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(principal)));
@@ -101,27 +61,18 @@ export async function createSessionCookieForPrincipal(principal: SessionPrincipa
   const maxAge = Math.max(0, Math.floor((Date.parse(principal.expiresAt) - nowMs) / 1000));
   return `${SESSION_COOKIE}=${encoded}.${bytesToBase64Url(signature)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 }
-
-export async function createSessionCookie(claims: GoogleClaims, secret: string, operatorEmails: string, nowMs = Date.now(), sessionId = crypto.randomUUID()): Promise<string> {
-  return createSessionCookieForPrincipal(createSessionPrincipal(claims, operatorEmails, nowMs, sessionId), secret, nowMs);
-}
+export async function createSessionCookie(claims: GoogleClaims, secret: string, operatorEmails: string, nowMs = Date.now(), sessionId: string = crypto.randomUUID()): Promise<string> { return createSessionCookieForPrincipal(createSessionPrincipal(claims, operatorEmails, nowMs, sessionId), secret, nowMs); }
 
 export async function readSession(request: Request, secret: string, nowMs = Date.now()): Promise<SessionPrincipal | null> {
   const cookies = request.headers.get('Cookie') ?? '';
   const raw = cookies.split(';').map((part) => part.trim()).find((part) => part.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
   if (!raw) return null;
-  const [payload, signature, extra] = raw.split('.');
-  if (!payload || !signature || extra) return null;
-  const valid = await crypto.subtle.verify('HMAC', await hmacKey(secret), base64UrlToBytes(signature), new TextEncoder().encode(payload));
-  if (!valid) return null;
-  let session: SessionPrincipal;
-  try { session = parsePart<SessionPrincipal>(payload); } catch { return null; }
+  const [payload, signature, extra] = raw.split('.'); if (!payload || !signature || extra) return null;
+  const valid = await crypto.subtle.verify('HMAC', await hmacKey(secret), base64UrlToBytes(signature), new TextEncoder().encode(payload)); if (!valid) return null;
+  let session: SessionPrincipal; try { session = parsePart<SessionPrincipal>(payload); } catch { return null; }
   if (typeof session.sessionId !== 'string' || !/^session:[a-zA-Z0-9-]{8,128}$/.test(session.sessionId)) return null;
   if (typeof session.sub !== 'string' || typeof session.email !== 'string' || !session.email.includes('@')) return null;
   if (!['AUTHENTICATED_USER', 'VERIFIED_OPERATOR', 'ADMIN'].includes(session.role) || !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= nowMs) return null;
   return Object.freeze(session);
 }
-
-export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
-}
+export function clearSessionCookie(): string { return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`; }
