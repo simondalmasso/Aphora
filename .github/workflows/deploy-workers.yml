@@ -69,7 +69,7 @@ jobs:
         id: provision
         run: |
           node scripts/provision-cloudflare.mjs
-          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/cloudflare-resources.json",JSON.stringify({schemaVersion:"1.0",worker:"sos-sf",d1Database:"sos-sf-private",r2Bucket:"sos-sf-private-reports",d1DatabaseId:process.env.D1_ID??"see-step-output",generatedAt:new Date().toISOString()},null,2)+"\n")'
+          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/cloudflare-resources.json",JSON.stringify({schemaVersion:"1.0",worker:"sos-sf",d1Database:"sos-sf-private",r2Bucket:"sos-sf-private-reports",generatedAt:new Date().toISOString()},null,2)+"\n")'
 
       - name: Wrangler dry run
         run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc
@@ -143,4 +143,4 @@ jobs:
 
           This comment is an execution checkpoint, not AUD acceptance. Issue remains open.
           EOF
-          gh api repos/${GITHUB_REPOSITORY}/issues/comments/5172387484 --method PATCH --input "$RUNNER_TEMP/v3-run.md"
+          gh api repos/${GITHUB_REPOSITORY}/issues/comments/5172387484 --method PATCH -f body="$(cat "$RUNNER_TEMP/v3-run.md")"
