@@ -9,10 +9,7 @@ async function canvasBlob(canvas: HTMLCanvasElement, type: string, quality: numb
 export async function prepareReportPhoto(file: File): Promise<File> {
   if (!ALLOWED.has(file.type)) throw new Error('Sólo se admiten imágenes JPEG, PNG o WebP.');
   if (file.size < 1 || file.size > 12 * 1024 * 1024) throw new Error('La foto original supera el límite de procesamiento.');
-  if (typeof createImageBitmap !== 'function') {
-    if (file.size > MAX_BYTES) throw new Error('La foto supera 4 MiB y este navegador no puede reducirla.');
-    return file;
-  }
+  if (typeof createImageBitmap !== 'function') throw new Error('Este navegador no permite reducir y limpiar metadatos de la foto. Podés enviar el informe sin adjuntos.');
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   try {
     const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
