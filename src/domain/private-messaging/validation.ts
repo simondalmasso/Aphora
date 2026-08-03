@@ -1,8 +1,10 @@
 import type { SendMessageInput } from './types';
 
-export const PRIVATE_MESSAGE_MAX_LENGTH = 800;
+export const PRIVATE_MESSAGE_MAX_LENGTH = 280;
 export const PRIVATE_PAGE_LIMIT = 40;
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,127}$/;
+const UNSAFE_INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/u;
+const PICTOGRAPHIC = /\p{Extended_Pictographic}|[\u{1F1E6}-\u{1F1FF}]/u;
 
 export function normalizeSendMessage(value: unknown): SendMessageInput {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError('INVALID_MESSAGE_BODY');
@@ -20,6 +22,12 @@ export function normalizeSendMessage(value: unknown): SendMessageInput {
   if (typeof record.body !== 'string') throw new TypeError('INVALID_MESSAGE_TEXT');
   const body = record.body.trim();
   if (body.length < 1 || body.length > PRIVATE_MESSAGE_MAX_LENGTH) throw new TypeError('INVALID_MESSAGE_LENGTH');
-  if (/\p{C}/u.test(body.replaceAll('\n', ''))) throw new TypeError('INVALID_MESSAGE_CHARACTERS');
+  if (UNSAFE_INVISIBLE.test(body) || PICTOGRAPHIC.test(body)) throw new TypeError('INVALID_MESSAGE_CHARACTERS');
   return Object.freeze({ conversationId: record.conversationId, body, idempotencyKey: record.idempotencyKey });
+}
+
+export function messagePassesModeration(body: string, configuredTerms: string): boolean {
+  const normalized = body.normalize('NFKC').toLocaleLowerCase('es');
+  const terms = configuredTerms.split(',').map((term) => term.trim().normalize('NFKC').toLocaleLowerCase('es')).filter((term) => term.length >= 2).slice(0, 100);
+  return !terms.some((term) => normalized.includes(term));
 }
