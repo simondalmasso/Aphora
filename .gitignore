@@ -7,3 +7,5 @@ test-results/
 *.tsbuildinfo
 .env*
 !.env.example
+wrangler.generated.jsonc
+.worker-secrets.json
