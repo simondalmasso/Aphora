@@ -2,9 +2,13 @@ name: Deploy Workers
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: sos-sf-workers-production
@@ -13,10 +17,20 @@ concurrency:
 jobs:
   quality-build-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+      SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+      MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
+      REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+      INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+      INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+      PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+      SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+      SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,13 +65,25 @@ jobs:
       - name: End-to-end tests and screenshots
         run: npm run test:e2e
 
+      - name: Provision bounded Cloudflare resources
+        id: provision
+        run: |
+          node scripts/provision-cloudflare.mjs
+          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/cloudflare-resources.json",JSON.stringify({schemaVersion:"1.0",worker:"sos-sf",d1Database:"sos-sf-private",r2Bucket:"sos-sf-private-reports",d1DatabaseId:process.env.D1_ID??"see-step-output",generatedAt:new Date().toISOString()},null,2)+"\n")'
+
       - name: Wrangler dry run
-        run: npm run deploy:dry
+        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc
+
+      - name: Apply D1 migrations
+        run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee d1-migrations.log
+
+      - name: Configure protected Worker secrets
+        run: npx wrangler secret bulk .worker-secrets.json --config wrangler.generated.jsonc
 
       - name: Deploy Worker and Static Assets
         id: deploy
         run: |
-          npx wrangler deploy 2>&1 | tee wrangler-deploy.log
+          npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee wrangler-deploy.log
           deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' wrangler-deploy.log | tail -n 1)
           test -n "$deployment_url"
           echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
@@ -71,16 +97,50 @@ jobs:
       - name: Write verification summary
         if: always()
         run: |
-          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,conclusion:"see-workflow-conclusion",generatedAt:new Date().toISOString()},null,2)+"\n")'
+          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",orderId:"SOS-SF-AUD-V3-INTEGRATED-004",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:"see-workflow-conclusion",generatedAt:new Date().toISOString()},null,2)+"\n")'
 
-      - name: Upload V1 evidence
+      - name: Remove generated secret material
+        if: always()
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc
+
+      - name: Upload V3 evidence
+        id: evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sos-sf-v1-evidence-${{ github.sha }}
+          name: sos-sf-v3-integrated-${{ github.sha }}
           path: |
             artifacts/v1/
             playwright-report/
             wrangler-deploy.log
-          if-no-files-found: error
+            d1-migrations.log
+          if-no-files-found: warn
           retention-days: 30
+
+      - name: Update issue 8 run status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.evidence.outputs.artifact-url }}
+          ARTIFACT_DIGEST: ${{ steps.evidence.outputs.artifact-digest }}
+        run: |
+          cat > "$RUNNER_TEMP/v3-run.md" <<EOF
+          # ARQ V3 integrated execution — run status
+
+          \`ORDER_ID=SOS-SF-AUD-V3-INTEGRATED-004\`
+          \`STATUS=${JOB_STATUS}\`
+          \`SOURCE_SHA=${GITHUB_SHA}\`
+
+          - Actions run: ${RUN_URL}
+          - Deployment: ${DEPLOYMENT_URL:-not reached}
+          - Artifact: ${ARTIFACT_URL:-not available} (${ARTIFACT_ID:-n/a})
+          - Artifact digest: \`${ARTIFACT_DIGEST:-n/a}\`
+          - Exact failing/passing steps are preserved in the linked run.
+
+          This comment is an execution checkpoint, not AUD acceptance. Issue remains open.
+          EOF
+          gh api repos/${GITHUB_REPOSITORY}/issues/comments/5172387484 --method PATCH --input "$RUNNER_TEMP/v3-run.md"
