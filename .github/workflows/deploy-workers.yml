@@ -90,12 +90,13 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish UI simplification checkpoint
-        if: ${{ success() && github.ref == 'refs/heads/arq/ui-simplification-v2' }}
+      - name: Publish UI simplification run report
+        if: ${{ always() && github.ref == 'refs/heads/arq/ui-simplification-v2' }}
         env:
           GH_TOKEN: ${{ github.token }}
           CHECKPOINT_BODY: ${{ runner.temp }}/ui-simplification-checkpoint.md
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
           ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
           ARTIFACT_URL: ${{ steps.evidence.outputs.artifact-url }}
@@ -109,12 +110,13 @@ jobs:
             '- Order: `SOS-SF-OWNER-UI-SIMPLIFICATION-002`',
             `- Deployment source: \`${process.env.GITHUB_SHA}\``,
             `- Actions run: ${process.env.RUN_URL}`,
+            `- Combined job status: \`${process.env.JOB_STATUS}\``,
             `- Deployment: ${process.env.DEPLOYMENT_URL}`,
             `- Artifact: [${process.env.ARTIFACT_ID}](${process.env.ARTIFACT_URL})`,
             `- Artifact digest: \`${process.env.ARTIFACT_DIGEST}\``,
-            '- Typecheck, lint, 25 unit tests, 9 contract tests, build, E2E desktop/mobile, Wrangler dry-run and remote verification: `PASS`',
+            '- Consult the linked run for the exact completed and failing steps.',
             '- Final trigger cleanup and remote-head reconciliation: pending ARQ terminal step.',
           ];
           fs.writeFileSync(process.env.CHECKPOINT_BODY, `${lines.join('\n')}\n`);
           NODE
-          gh issue create --title "UI simplification checkpoint — one-shot" --body-file "$CHECKPOINT_BODY"
+          gh issue create --title "UI simplification run — one-shot #${GITHUB_RUN_ID}" --body-file "$CHECKPOINT_BODY"
