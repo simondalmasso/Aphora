@@ -12,6 +12,7 @@ interface TestEnv {
 const server = createTestHarness({ workers: [{ configPath: './wrangler.test.jsonc' }] });
 const origin = 'http://sos-sf.test';
 let env: TestEnv;
+const workerFetch = (path: string, init?: RequestInit) => server.fetch(`${origin}${path}`, init);
 
 async function session(principal: SessionPrincipal): Promise<string> {
   await env.MESSAGES_DB.prepare('INSERT INTO auth_sessions (id,sub,email,role,created_at,expires_at,revoked_at,rotated_from) VALUES (?,?,?,?,?,?,NULL,NULL)')
@@ -39,7 +40,7 @@ afterAll(async () => { await server.close(); });
 
 describe.sequential('Worker real con bindings locales', () => {
   test('sirve la página con geolocalización same-origin y headers endurecidos', async () => {
-    const response = await server.fetch('/offline.html');
+    const response = await workerFetch('/offline.html');
     expect(response.status).toBe(200);
     expect(response.headers.get('Permissions-Policy')).toContain('geolocation=(self)');
     expect(response.headers.get('Permissions-Policy')).toContain('camera=()');
@@ -48,11 +49,11 @@ describe.sequential('Worker real con bindings locales', () => {
   });
 
   test('rechaza escritura pública y privados anónimos sin cachearlos', async () => {
-    expect((await server.fetch('/api/snapshot', { method: 'POST' })).status).toBe(405);
-    const sessionResponse = await server.fetch('/api/session');
+    expect((await workerFetch('/api/snapshot', { method: 'POST' })).status).toBe(405);
+    const sessionResponse = await workerFetch('/api/session');
     expect(sessionResponse.headers.get('Cache-Control')).toContain('private');
     expect(await envelope(sessionResponse)).toMatchObject({ enabled: true, authenticated: false });
-    const privateResponse = await server.fetch('/api/private/reports');
+    const privateResponse = await workerFetch('/api/private/reports');
     expect(privateResponse.status).toBe(401);
     expect(privateResponse.headers.get('Cache-Control')).toContain('private');
   });
@@ -62,17 +63,17 @@ describe.sequential('Worker real con bindings locales', () => {
     const second = principal('user-two');
     const firstCookie = await session(first);
     const secondCookie = await session(second);
-    const created = await server.fetch('/api/private/conversations', { method: 'POST', headers: { Cookie: firstCookie, Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
+    const created = await workerFetch('/api/private/conversations', { method: 'POST', headers: { Cookie: firstCookie, Origin: origin, 'Content-Type': 'application/json' }, body: '{}' });
     expect(created.status).toBe(201);
     const conversation = (await envelope<{ conversation: { id: string } }>(created)).conversation;
-    const forbidden = await server.fetch(`/api/private/messages?conversationId=${encodeURIComponent(conversation.id)}`, { headers: { Cookie: secondCookie } });
+    const forbidden = await workerFetch(`/api/private/messages?conversationId=${encodeURIComponent(conversation.id)}`, { headers: { Cookie: secondCookie } });
     expect(forbidden.status).toBe(403);
-    const accepted = await server.fetch('/api/private/messages', { method: 'POST', headers: { Cookie: firstCookie, Origin: origin, 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.10' }, body: JSON.stringify({ conversationId: conversation.id, body: 'Necesito orientación.', idempotencyKey: 'runtime-message-one' }) });
+    const accepted = await workerFetch('/api/private/messages', { method: 'POST', headers: { Cookie: firstCookie, Origin: origin, 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.10' }, body: JSON.stringify({ conversationId: conversation.id, body: 'Necesito orientación.', idempotencyKey: 'runtime-message-one' }) });
     expect(accepted.status).toBe(201);
-    const logout = await server.fetch('/api/logout', { method: 'POST', headers: { Cookie: firstCookie, Origin: origin } });
+    const logout = await workerFetch('/api/logout', { method: 'POST', headers: { Cookie: firstCookie, Origin: origin } });
     expect(logout.status).toBe(200);
     expect(logout.headers.get('Set-Cookie')).toContain('Max-Age=0');
-    const afterLogout = await server.fetch('/api/session', { headers: { Cookie: firstCookie } });
+    const afterLogout = await workerFetch('/api/session', { headers: { Cookie: firstCookie } });
     expect(await envelope(afterLogout)).toMatchObject({ authenticated: false });
   });
 
@@ -84,19 +85,19 @@ describe.sequential('Worker real con bindings locales', () => {
     const form = new FormData();
     form.set('metadata', JSON.stringify({ category: 'ANEGAMIENTO', description: 'Agua acumulada desde hace una hora.', locationLabel: 'Barrio Centro', exactLocationConsent: false, idempotencyKey: 'runtime-report-one' }));
     form.append('photos', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9])], 'evidence.jpg', { type: 'image/jpeg' }));
-    const submitted = await server.fetch('/api/private/reports', { method: 'POST', headers: { Cookie: userCookie, Origin: origin, 'CF-Connecting-IP': '203.0.113.20' }, body: form });
+    const submitted = await workerFetch('/api/private/reports', { method: 'POST', headers: { Cookie: userCookie, Origin: origin, 'CF-Connecting-IP': '203.0.113.20' }, body: form });
     expect(submitted.status).toBe(201);
     const submittedData = await envelope<{ report: { id: string } }>(submitted);
-    const listed = await server.fetch('/api/private/reports', { headers: { Cookie: operatorCookie } });
+    const listed = await workerFetch('/api/private/reports', { headers: { Cookie: operatorCookie } });
     const reports = (await envelope<{ reports: Array<{ id: string; photos: Array<{ id: string }> }> }>(listed)).reports;
     const row = reports.find((item) => item.id === submittedData.report.id)!;
     expect(row.photos).toHaveLength(1);
     const photoId = row.photos[0]!.id;
-    const photo = await server.fetch(`/api/private/operator/reports/${encodeURIComponent(row.id)}/photos/${encodeURIComponent(photoId)}`, { headers: { Cookie: operatorCookie } });
+    const photo = await workerFetch(`/api/private/operator/reports/${encodeURIComponent(row.id)}/photos/${encodeURIComponent(photoId)}`, { headers: { Cookie: operatorCookie } });
     expect(photo.status).toBe(200);
     expect(photo.headers.get('Cache-Control')).toContain('private');
-    expect((await server.fetch(`/api/private/operator/reports/${encodeURIComponent(row.id)}/photos/${encodeURIComponent(photoId)}`, { method: 'PATCH', headers: { Cookie: operatorCookie, Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'APPROVED', note: 'Revisión manual.' }) })).status).toBe(200);
-    const patch = (status: string, extra: Record<string, unknown> = {}) => server.fetch(`/api/private/operator/reports/${encodeURIComponent(row.id)}`, { method: 'PATCH', headers: { Cookie: operatorCookie, Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ status, note: 'Revisión manual.', ...extra }) });
+    expect((await workerFetch(`/api/private/operator/reports/${encodeURIComponent(row.id)}/photos/${encodeURIComponent(photoId)}`, { method: 'PATCH', headers: { Cookie: operatorCookie, Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'APPROVED', note: 'Revisión manual.' }) })).status).toBe(200);
+    const patch = (status: string, extra: Record<string, unknown> = {}) => workerFetch(`/api/private/operator/reports/${encodeURIComponent(row.id)}`, { method: 'PATCH', headers: { Cookie: operatorCookie, Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ status, note: 'Revisión manual.', ...extra }) });
     expect((await patch('UNDER_REVIEW', { moderationFlags: ['PERSONAL_DATA'], redactedDescription: 'Descripción redactada.', operatorNote: 'Se removió información personal.' })).status).toBe(200);
     expect((await patch('ESCALATION_READY')).status).toBe(200);
     expect((await patch('FORWARDED')).status).toBe(400);
