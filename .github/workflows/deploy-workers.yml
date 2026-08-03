@@ -2,6 +2,9 @@ name: Deploy Workers
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - arq/one-shot-deploy
 
 permissions:
   contents: read
@@ -84,3 +87,16 @@ jobs:
             wrangler-deploy.log
           if-no-files-found: error
           retention-days: 30
+
+  report-run:
+    if: always()
+    needs: quality-build-deploy
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Publish auditable run marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_RESULT: ${{ needs.quality-build-deploy.result }}
+        run: gh issue create --repo "$GITHUB_REPOSITORY" --title "V1 checkpoint — Workers-first public demo (run $GITHUB_RUN_ID)" --body "ORDER_ID=SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001%0ARUN_ID=$GITHUB_RUN_ID%0ASOURCE_SHA=$GITHUB_SHA%0ARESULT=$JOB_RESULT%0ARUN_URL=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
