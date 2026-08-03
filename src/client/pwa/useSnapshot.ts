@@ -75,6 +75,7 @@ export function useSnapshot() {
         const stored: StoredSnapshot = { snapshot: validated, savedAt: now };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
         if (mounted.current) {
+          setOnline(true);
           setSnapshot(validated);
           setSavedAt(now);
           setLastSuccessAt(now);
@@ -82,7 +83,10 @@ export function useSnapshot() {
         }
         return true;
       } catch {
-        if (mounted.current) setRefreshError('La actualización falló. Se conserva el snapshot anterior.');
+        if (mounted.current) {
+          setOnline(false);
+          setRefreshError('La actualización falló. Se conserva el snapshot anterior.');
+        }
         return false;
       } finally {
         if (mounted.current) setRefreshing(false);
