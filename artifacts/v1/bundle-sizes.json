@@ -1,30 +1,55 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T02:44:03.268Z",
+  "generatedAt": "2026-08-03T04:12:07.328Z",
   "budgets": {
     "initialJsGzipBytes": 122880,
-    "initialCssGzipBytes": 25600
+    "initialCssGzipBytes": 25600,
+    "lazyVisualJsGzipBytes": 184320
   },
   "actual": {
-    "jsGzipBytes": 70585,
-    "cssGzipBytes": 5650,
-    "totalDistBytes": 1181836
+    "jsGzipBytes": 74520,
+    "initialJsGzipBytes": 74520,
+    "lazyVisualJsGzipBytes": 129597,
+    "totalJsGzipBytes": 204117,
+    "cssGzipBytes": 7018,
+    "totalDistBytes": 4464851
+  },
+  "loading": {
+    "threeJs": "DYNAMIC_IMPORT_ONLY",
+    "initialFiles": [
+      "assets/index-D3WLK88H.js"
+    ]
   },
   "files": [
     {
-      "path": "assets/index-BV0u3-en.css",
-      "bytes": 20914,
-      "gzipBytes": 5253
+      "path": ".vite/manifest.json",
+      "bytes": 446,
+      "gzipBytes": 218
     },
     {
-      "path": "assets/index-Dan3nd4E.js",
-      "bytes": 226890,
-      "gzipBytes": 69603
+      "path": "assets/index-D3WLK88H.js",
+      "bytes": 240676,
+      "gzipBytes": 74520
     },
     {
-      "path": "assets/index-Dan3nd4E.js.map",
-      "bytes": 927091,
-      "gzipBytes": 185455
+      "path": "assets/index-D3WLK88H.js.map",
+      "bytes": 959763,
+      "gzipBytes": 195250
+    },
+    {
+      "path": "assets/index-MiGu4_ov.css",
+      "bytes": 26480,
+      "gzipBytes": 6621
+    },
+    {
+      "path": "assets/pulse-three-C2TdOE-D.js",
+      "bytes": 520619,
+      "gzipBytes": 128605
+    },
+    {
+      "path": "assets/pulse-three-C2TdOE-D.js.map",
+      "bytes": 2709913,
+      "gzipBytes": 506187
     },
     {
       "path": "icons/icon.svg",
@@ -34,7 +59,7 @@
     {
       "path": "index.html",
       "bytes": 938,
-      "gzipBytes": 519
+      "gzipBytes": 522
     },
     {
       "path": "lite.css",
@@ -53,8 +78,8 @@
     },
     {
       "path": "service-worker.js",
-      "bytes": 2661,
-      "gzipBytes": 982
+      "bytes": 2674,
+      "gzipBytes": 992
     }
   ],
   "externalFonts": false,

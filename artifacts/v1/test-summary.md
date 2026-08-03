@@ -1,19 +1,17 @@
-# V1 test summary
+# Pulso del Paraná — test summary
 
-Final evidence for `SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001` on 2026-08-02/03:
+Pre-publication evidence on 2026-08-03, based on remote `102123ac47c26d091494fad8d1a4d5fc8b866b6b`:
 
 - Typecheck: PASS
 - ESLint: PASS
-- Unit: PASS — 23 tests
+- Unit: PASS — 25 tests, including semantic SVG fallback and projection validation
 - API contract: PASS — 9 tests
 - Production build: PASS
-- Performance budgets: PASS — 70,585 B JS gzip; 5,650 B CSS gzip
-- GitHub Actions E2E: PASS — 11 passed, 1 expected desktop skip for a mobile-only assertion
-- Offline shell E2E: PASS on desktop and mobile, unchanged assertion
-- Screenshots: PASS — `artifacts/v1/screenshots/desktop.png` and `mobile.png`
-- Wrangler dry-run: PASS
-- Cloudflare Workers deployment: PASS
-- CI remote verification: PASS — health, dashboard, lite, snapshot and manifest
-- Independent post-run remote verification: PASS
+- Initial JS budget: PASS — 74,520 B gzip / 122,880 B
+- Dynamic Three.js visual budget: PASS — 129,597 B gzip / 184,320 B
+- CSS budget: PASS — 7,018 B gzip / 25,600 B
+- External fonts/trackers: NONE
+- Local E2E assertions: PLATFORM-LIMITED before browser launch; Chromium download returned a truncated zero-byte archive. No product assertion was reclassified as passing.
+- GitHub Actions E2E, screenshots, Wrangler dry-run, deployment and remote verification: PENDING NEW MANUAL RUN
 
-Local Playwright execution remained platform-limited because this workspace could not download Chromium; no local browser assertion was represented as passing. GitHub Actions installed Chromium and is the authoritative browser evidence: run `30780029104`, artifact `8843336040`.
+The existing workflow remains `workflow_dispatch` only. Its new run is authoritative for desktop/mobile, SVG fallback, reduced motion, offline shell, screenshots, deployment and remote verification.

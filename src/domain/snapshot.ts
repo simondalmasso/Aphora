@@ -22,6 +22,19 @@ export interface RiverPoint {
   readonly measured: boolean;
 }
 
+export interface RiverForecastPoint {
+  readonly at: string;
+  readonly metres: number;
+  readonly lowMetres: number;
+  readonly highMetres: number;
+}
+
+export interface RiverThreshold {
+  readonly id: 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'EVACUACION';
+  readonly label: string;
+  readonly metres: number;
+}
+
 export interface RainPoint {
   readonly at: string;
   readonly millimetres: number;
@@ -76,6 +89,8 @@ export interface Snapshot {
     readonly observedAt: string;
     readonly sourceId: string;
     readonly points: readonly RiverPoint[];
+    readonly forecastPoints: readonly RiverForecastPoint[];
+    readonly thresholds: readonly RiverThreshold[];
   };
   readonly rain: {
     readonly accumulated1hMm: number;

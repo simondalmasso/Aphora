@@ -4,7 +4,7 @@
 - No emite órdenes algorítmicas de evacuación ni usa rumores.
 - No hay chat público, feed, comentarios, grupos ni texto ciudadano visible a terceros.
 - La bandeja privada opcional no reemplaza al 911 y no promete entrega, lectura, respuesta, satélite, receipts firmados ni exactly-once.
-- Refugios y cifras son fixtures rotulados `DEMO / NO OFICIAL`.
+- Refugios, niveles, proyecciones, bandas de incertidumbre y los cuatro umbrales visuales son fixtures rotulados `DEMO / NO OFICIAL`; “Evacuación” nombra un plano explicativo ficticio y nunca una orden activa.
 - El modo offline muestra timestamp absoluto y aclara que la copia no es el estado actual.
 
 La lectura pública no requiere cuenta. Las respuestas privadas usan `private, no-store`, `noindex` y nunca exponen email. El Worker verifica identidad y rol en cada operación; limita longitud, forma, conversación, idempotencia, tasa por usuario/IP y retención. React escapa el contenido y D1 recibe parámetros vinculados. La auditoría guarda actor, acción, objetivo y timestamp, nunca el texto.

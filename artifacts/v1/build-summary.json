@@ -1,10 +1,14 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-03T02:44:03.268Z",
+  "generatedAt": "2026-08-03T04:12:07.328Z",
   "build": "PASS",
-  "fileCount": 9,
-  "totalDistBytes": 1181836,
-  "jsGzipBytes": 70585,
-  "cssGzipBytes": 5650,
+  "fileCount": 12,
+  "totalDistBytes": 4464851,
+  "jsGzipBytes": 74520,
+  "initialJsGzipBytes": 74520,
+  "lazyVisualJsGzipBytes": 129597,
+  "totalJsGzipBytes": 204117,
+  "cssGzipBytes": 7018,
+  "threeJsLoading": "DYNAMIC_IMPORT_ONLY",
   "performanceBudgets": "PASS"
 }

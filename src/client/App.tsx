@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
 import { visibleMessages } from '../domain/messages';
 import { sourceAgeLabel } from '../domain/sources';
-import { RainChart, RiverChart } from './components/Charts';
+import { RainChart } from './components/Charts';
 import { DetailsDialog } from './components/DetailsDialog';
 import { MessagesPanel } from './components/MessagesPanel';
+import { ParanaPulse } from './components/ParanaPulse';
 import { useSnapshot } from './pwa/useSnapshot';
 import './styles/app.css';
 
@@ -16,10 +17,11 @@ function DirectionIcon({ direction }: { readonly direction: 'UP' | 'DOWN' | 'NEW
 }
 
 export default function App() {
-  const { snapshot, online, savedAt, source, refresh, refreshing, lastSuccessAt, refreshError } = useSnapshot();
+  const { snapshot, online, savedAt, refresh, refreshing, lastSuccessAt, refreshError } = useSnapshot();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
   const [messagesSeen, setMessagesSeen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const messagesButtonRef = useRef<HTMLButtonElement>(null);
   const messages = useMemo(() => visibleMessages(snapshot.messages, new Date(snapshot.generatedAt)), [snapshot]);
   const unread = messagesSeen ? 0 : messages.length;
@@ -27,6 +29,20 @@ export default function App() {
   function openMessages() {
     setMessagesSeen(true);
     setMessagesOpen(true);
+  }
+
+  async function shareStatusSnapshot() {
+    const text = `${snapshot.stateLabel}: ${snapshot.river.currentMetres.toFixed(2)} m, ${Math.round(snapshot.river.delta24h * 100) >= 0 ? '+' : ''}${Math.round(snapshot.river.delta24h * 100)} cm en 24 h. DEMO / NO OFICIAL.`;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Pulso del Paraná · SOS Santa Fe', text, url: window.location.href });
+      else {
+        await navigator.clipboard.writeText(`${text} ${window.location.href}`);
+        setShareStatus('Enlace copiado');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareStatus('No se pudo compartir');
+    }
   }
 
   return (
@@ -60,32 +76,13 @@ export default function App() {
           </div>
         )}
 
-        <section className="hero-card card" aria-labelledby="state-heading">
-          <div className="hero-main">
-            <div>
-              <span className="eyebrow">Estado hídrico · escenario fijo</span>
-              <div className="state-row"><span className="state-pulse" aria-hidden="true" /><h1 id="state-heading">{snapshot.stateLabel}</h1></div>
-              <p className="hero-summary">{snapshot.summary}</p>
-            </div>
-            <div className="state-time"><span>Snapshot</span><time dateTime={snapshot.generatedAt}>{formatDate(snapshot.generatedAt)}</time><small>{source === 'NETWORK' ? 'API verificada' : source === 'OFFLINE_CACHE' ? 'Copia local' : 'Incluido en la app'}</small></div>
-          </div>
-          <div className="hero-lower">
-            <div className="action-now"><span className="action-icon" aria-hidden="true">✓</span><div><strong>Qué hacer ahora</strong><p>{snapshot.recommendedAction}</p></div></div>
-            <button className="evidence-button" type="button" onClick={() => setDetailsOpen(true)} aria-haspopup="dialog">Ver evidencia <span aria-hidden="true">→</span></button>
-          </div>
-        </section>
+        <ParanaPulse key={lastSuccessAt ?? 'bundled-pulse'} snapshot={snapshot} refreshToken={lastSuccessAt} />
 
         <section className="change-card card" aria-labelledby="changes-heading">
           <div className="card-head"><div><span className="eyebrow">Desde el snapshot anterior</span><h2 id="changes-heading">Qué cambió</h2></div><span className="mini-time">1 hora</span></div>
           <div className="changes-list">
             {snapshot.changes.slice(0, 4).map((change) => <div className="change-item" key={change.id}><DirectionIcon direction={change.direction} /><div><strong>{change.label}</strong><span>{change.detail}</span></div></div>)}
           </div>
-        </section>
-
-        <section className="river-card card" aria-labelledby="river-heading">
-          <div className="metric-head"><div><span className="eyebrow">{snapshot.river.stationName}</span><h2 id="river-heading">Nivel del río</h2></div><div className="metric-value"><strong>{snapshot.river.currentMetres.toFixed(2)}</strong><span>m</span></div></div>
-          <div className="deltas" aria-label="Variaciones del nivel"><span><b>+{Math.round(snapshot.river.delta1h * 100)} cm</b> 1 h</span><span><b>+{Math.round(snapshot.river.delta6h * 100)} cm</b> 6 h</span><span><b>+{Math.round(snapshot.river.delta24h * 100)} cm</b> 24 h</span><span className="trend-chip">↗ Ascenso lento</span></div>
-          <RiverChart points={snapshot.river.points} />
         </section>
 
         <section className="rain-card card" aria-labelledby="rain-heading">
@@ -100,10 +97,15 @@ export default function App() {
           <div className="source-list">
             {snapshot.sources.map((source) => <div className="source-item" key={source.id}><span className={`source-dot source-dot--${source.status.toLowerCase()}`} aria-label={source.status} /><div><strong>{source.name}</strong><span>{sourceAgeLabel(source.observedAt, snapshot.generatedAt)} · {source.contribution}</span></div></div>)}
           </div>
+          <div className="source-actions">
+            <button type="button" onClick={() => void shareStatusSnapshot()} aria-label="Compartir estado demo"><span aria-hidden="true">↗</span> Compartir</button>
+            <a href="/lite">Modo lite</a>
+            {shareStatus && <span role="status">{shareStatus}</span>}
+          </div>
         </section>
 
-        <section className="contradiction-card card" aria-labelledby="contradiction-heading">
-          <div className="card-head"><div><span className="eyebrow">Incertidumbre preservada</span><h2 id="contradiction-heading">Señales en tensión</h2></div><span className="watch-badge">VIGILANCIA</span></div>
+        <section className="contradiction-card card" aria-labelledby="outlook-heading">
+          <div className="card-head"><div><span className="eyebrow">Próximas 24 horas · escenario demo</span><h2 id="outlook-heading">Qué puede pasar</h2></div><span className="watch-badge">VIGILANCIA</span></div>
           {snapshot.contradictions.map((contradiction) => <div key={contradiction.id}><div className="signal-stack">{contradiction.signals.map((signal, index) => <div key={signal}><span aria-hidden="true">{index === 0 ? '◇' : index === 1 ? '∿' : '○'}</span>{signal}</div>)}</div><p className="contradiction-result">{contradiction.explanation}</p></div>)}
         </section>
 
@@ -114,11 +116,12 @@ export default function App() {
           </div>
         </section>
 
-        <section className="places-card card" aria-labelledby="places-heading">
-          <div className="card-head"><div><span className="eyebrow">Puntos ficticios</span><h2 id="places-heading">Refugios y encuentro</h2></div><span className="inactive-badge">0 activos</span></div>
+        <section className="places-card card" aria-labelledby="action-heading">
+          <div className="card-head"><div><span className="eyebrow">Acción recomendada primero</span><h2 id="action-heading">Qué hacer ahora</h2></div><span className="inactive-badge">0 refugios activos</span></div>
+          <p className="action-summary">{snapshot.recommendedAction}</p>
           <p className="place-warning">No concurrir: estas ubicaciones son sólo demostrativas.</p>
-          <div className="places-list">{snapshot.shelters.map((shelter) => <div key={shelter.id}><span className="place-icon" aria-hidden="true">⌖</span><div><strong>{shelter.name}</strong><span>{shelter.status.replaceAll('_', ' ')} · {shelter.address}</span></div></div>)}</div>
-          <div className="quick-actions"><strong>Recordá</strong>{snapshot.actions.slice(0, 2).map((action) => <span key={action}>✓ {action}</span>)}</div>
+          <div className="quick-actions"><strong>Pasos concretos</strong>{snapshot.actions.map((action) => <span key={action}>✓ {action}</span>)}</div>
+          <div className="places-details"><strong>Puntos demo preidentificados</strong><div className="places-list">{snapshot.shelters.map((shelter) => <div key={shelter.id}><span className="place-icon" aria-hidden="true">⌖</span><div><strong>{shelter.name}</strong><span>{shelter.status.replaceAll('_', ' ')} · {shelter.address}</span></div></div>)}</div></div>
         </section>
       </main>
 

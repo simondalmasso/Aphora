@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "checkpoint": "PULSO_DEL_PARANA",
+  "generatedAt": "2026-08-03T04:12:07.328Z",
+  "baseSha": "102123ac47c26d091494fad8d1a4d5fc8b866b6b",
+  "status": "LOCAL_VERIFIED_PENDING_MANUAL_WORKFLOW",
+  "visual": {
+    "observedWindowHours": 48,
+    "forecastWindowHours": 24,
+    "observedSegments": "48x10",
+    "projectionSegments": "24x16",
+    "particleCount": 18,
+    "fpsCap": 30,
+    "dprCap": 1.5,
+    "shadows": false,
+    "postprocessing": false,
+    "fallback": "SVG",
+    "liteWebgl": false
+  },
+  "local": {
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "unitTests": { "status": "PASS", "count": 25 },
+    "contractTests": { "status": "PASS", "count": 9 },
+    "build": "PASS",
+    "initialJsGzipBytes": 74520,
+    "lazyVisualJsGzipBytes": 129597,
+    "cssGzipBytes": 7018,
+    "e2e": "PLATFORM_LIMITATION_CHROMIUM_ARCHIVE_TRUNCATED"
+  },
+  "githubActions": "PENDING_MANUAL_WORKFLOW",
+  "deployment": "PENDING_MANUAL_WORKFLOW",
+  "containsSecrets": false,
+  "audReady": false
+}

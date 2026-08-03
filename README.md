@@ -2,6 +2,8 @@
 
 Web/PWA pública, demostrativa y no oficial para comprender un escenario hídrico ficticio de Santa Fe en menos de tres segundos: estado, cambios, fuentes, contradicciones y próxima acción.
 
+El hero **Pulso del Paraná** explica el nivel con una superficie observada de 48 horas, una proyección de 24 horas con incertidumbre y umbrales demo. Three.js se carga sólo al entrar en viewport; SVG mantiene la lectura si WebGL no está disponible y `/lite` no ejecuta JavaScript ni WebGL.
+
 ## Ejecutar
 
 ```bash

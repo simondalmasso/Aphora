@@ -1,4 +1,5 @@
 import type { Snapshot } from './snapshot';
+import { validateRiverPulse } from './river-pulse';
 import { validateCriticalMessage } from './zungun-compat/validation';
 
 function plainRecord(value: unknown, label: string): Record<string, unknown> {
@@ -17,5 +18,7 @@ export function validateSnapshot(value: unknown): Snapshot {
   if (!Array.isArray(record.messages)) throw new TypeError('snapshot.messages debe ser un arreglo');
   record.messages.forEach(validateCriticalMessage);
   if (!Array.isArray(record.sources) || record.sources.length < 1) throw new TypeError('snapshot.sources no puede estar vacío');
+  const river = plainRecord(record.river, 'snapshot.river');
+  validateRiverPulse(river as unknown as Snapshot['river']);
   return value as Snapshot;
 }

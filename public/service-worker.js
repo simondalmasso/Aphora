@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'sos-sf-v1-20260802d';
+const CACHE_VERSION = 'sos-sf-v1-pulso-parana-20260803a';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css'];
