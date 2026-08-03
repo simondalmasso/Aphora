@@ -1,19 +1,22 @@
 # SOS Santa Fe
 
-Web/PWA experimental de información hídrica verificada para la ciudad de Santa Fe, Argentina.
+Web/PWA pública, demostrativa y no oficial para comprender un escenario hídrico ficticio de Santa Fe en menos de tres segundos: estado, cambios, fuentes, contradicciones y próxima acción.
 
-> Proyecto no oficial. No reemplaza al 911, 103, Protección Civil ni a los organismos públicos competentes.
+## Ejecutar
 
-## Construcción V1
-
-El punto de entrada para ARQ 🛠️ es:
-
-- [`AGENTS.md`](./AGENTS.md)
-- [`START_HERE_ARQ.md`](./START_HERE_ARQ.md)
-- [`RULES_SOS_SF.md`](./RULES_SOS_SF.md)
-
-Orden vigente:
-
-```text
-SOS-SF-HUMAN-ARQ-WEBAPP-V1-ONE-SHOT-001
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run test:contract
+npm run build
+npm run test:e2e
+npm run deploy:dry
 ```
+
+`npm run preview` inicia el Worker local con Static Assets. Rutas públicas: `/`, `/lite`, `/api/health`, `/api/snapshot`, `/api/sources`, `/api/messages` y `/manifest.webmanifest`.
+
+## Límites
+
+Todos los datos de V1 son `DEMO / NO OFICIAL`. No es una autoridad de alerta ni despacho de emergencias; no recibe texto ciudadano libre; no usa trackers, fuentes externas o geolocalización; no promete transporte o entrega de mensajes.

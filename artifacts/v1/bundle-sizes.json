@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-03T01:44:09.886Z",
+  "budgets": {
+    "initialJsGzipBytes": 122880,
+    "initialCssGzipBytes": 25600
+  },
+  "actual": {
+    "jsGzipBytes": 67155,
+    "cssGzipBytes": 4552,
+    "totalDistBytes": 1135300
+  },
+  "files": [
+    {
+      "path": "assets/index-BOkCrjSK.js",
+      "bytes": 215932,
+      "gzipBytes": 66492
+    },
+    {
+      "path": "assets/index-BOkCrjSK.js.map",
+      "bytes": 898579,
+      "gzipBytes": 178402
+    },
+    {
+      "path": "assets/index-D6v87dSJ.css",
+      "bytes": 15534,
+      "gzipBytes": 4155
+    },
+    {
+      "path": "icons/icon.svg",
+      "bytes": 492,
+      "gzipBytes": 358
+    },
+    {
+      "path": "index.html",
+      "bytes": 938,
+      "gzipBytes": 520
+    },
+    {
+      "path": "lite.css",
+      "bytes": 665,
+      "gzipBytes": 397
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 646,
+      "gzipBytes": 373
+    },
+    {
+      "path": "offline.html",
+      "bytes": 830,
+      "gzipBytes": 529
+    },
+    {
+      "path": "service-worker.js",
+      "bytes": 1684,
+      "gzipBytes": 663
+    }
+  ],
+  "externalFonts": false,
+  "thirdPartyTrackers": [],
+  "pass": true
+}

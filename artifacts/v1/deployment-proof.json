@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "worker_name": "sos-sf",
+  "workers_dev_url": null,
+  "deployed_at_utc": null,
+  "remote_status": "PENDING_GITHUB_ACTIONS",
+  "api_health_status": "PENDING_GITHUB_ACTIONS",
+  "verified_paths": [],
+  "source_commit_or_precommit_tree_reference": "local-prepublish-tree-from-base-61b5474dd8e94baf496804638f1cffc6b8a0ed7a",
+  "cloudflare_account_identity_redacted_or_non_sensitive": "GitHub Actions secret-backed; not read back"
+}

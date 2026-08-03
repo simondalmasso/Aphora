@@ -1,0 +1,86 @@
+name: Deploy Workers
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sos-sf-workers-production
+  cancel-in-progress: false
+
+jobs:
+  quality-build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Contract tests
+        run: npm run test:contract
+
+      - name: Build and performance budgets
+        run: npm run build
+
+      - name: End-to-end tests and screenshots
+        run: npm run test:e2e
+
+      - name: Wrangler dry run
+        run: npm run deploy:dry
+
+      - name: Deploy Worker and Static Assets
+        id: deploy
+        run: |
+          npx wrangler deploy 2>&1 | tee wrangler-deploy.log
+          deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' wrangler-deploy.log | tail -n 1)
+          test -n "$deployment_url"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify remote deployment
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          WRITE_PROOF: "1"
+        run: npm run verify:remote -- "$DEPLOYMENT_URL"
+
+      - name: Write verification summary
+        if: always()
+        run: |
+          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,conclusion:"see-workflow-conclusion",generatedAt:new Date().toISOString()},null,2)+"\n")'
+
+      - name: Upload V1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-v1-evidence-${{ github.sha }}
+          path: |
+            artifacts/v1/
+            playwright-report/
+            wrangler-deploy.log
+          if-no-files-found: error
+          retention-days: 30

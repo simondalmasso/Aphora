@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "SOS Santa Fe — Demo",
+  "short_name": "SOS SF",
+  "description": "Panel demostrativo y no oficial para comprender un escenario hídrico ficticio de Santa Fe.",
+  "lang": "es-AR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f5f3",
+  "theme_color": "#f5f5f3",
+  "categories": ["utilities", "weather"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Modo lite", "short_name": "Lite", "url": "/lite" }
+  ]
+}
