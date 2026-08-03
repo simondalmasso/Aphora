@@ -1,40 +1,39 @@
-import { demoSnapshot } from '../data/demo-snapshot';
+import type { Snapshot } from '../domain/snapshot';
 import { sourceAgeLabel } from '../domain/sources';
-import { visibleMessages } from '../domain/messages';
 import { withSecurityHeaders } from './security';
+
+interface Contact { readonly label: string; readonly number: string; readonly href: string }
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
 }
 
 function list(items: readonly string[]): string {
-  return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+  return items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '<p>Sin información disponible.</p>';
 }
 
-export function liteResponse(): Response {
-  const snapshot = demoSnapshot;
-  const messages = visibleMessages(snapshot.messages, new Date(snapshot.generatedAt));
+function statusLabel(snapshot: Snapshot): string {
+  if (snapshot.mode === 'OFFLINE' || snapshot.dataStatus === 'OFFLINE') return 'Modo sin conexión';
+  if (snapshot.dataStatus === 'STALE') return 'Datos desactualizados';
+  if (snapshot.dataStatus === 'LIVE') return 'Datos en vivo';
+  return 'Sin datos en vivo';
+}
+
+export function liteResponse(snapshot: Snapshot, contacts: readonly Contact[]): Response {
+  const systems = snapshot.systems ?? [];
   const html = `<!doctype html>
 <html lang="es-AR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SOS Santa Fe Lite — DEMO / NO OFICIAL</title><link rel="stylesheet" href="/lite.css"></head>
-<body><header><a href="/">SOS Santa Fe</a><strong>DEMO / NO OFICIAL</strong></header>
+<title>SOS Santa Fe Lite — estado hídrico</title><link rel="stylesheet" href="/lite.css"></head>
+<body><header><a href="/">SOS Santa Fe</a><strong>${escapeHtml(statusLabel(snapshot))}</strong></header>
 <main>
-<h1>${escapeHtml(snapshot.stateLabel)}</h1><p><strong>Estado: ${snapshot.state}</strong></p>
+<h1>Estado hídrico de Santa Fe</h1><p><strong>${escapeHtml(snapshot.stateLabel)}</strong></p>
 <p>${escapeHtml(snapshot.summary)}</p>
-<p><strong>Qué hacer ahora:</strong> ${escapeHtml(snapshot.recommendedAction)}</p>
-<p class="time">Snapshot fijo: <time datetime="${snapshot.generatedAt}">${escapeHtml(snapshot.generatedAt)}</time>. Vigente sólo dentro del escenario hasta ${escapeHtml(snapshot.validUntil)}.</p>
-<section><h2>Qué cambió</h2>${list(snapshot.changes.map((change) => `${change.label}: ${change.detail}`))}</section>
-<section><h2>Río y lluvia</h2><p>Nivel demo: <strong>${snapshot.river.currentMetres.toFixed(2)} m</strong> · tendencia ascendente lenta · ${snapshot.river.delta1h >= 0 ? '+' : ''}${Math.round(snapshot.river.delta1h * 100)} cm/1 h.</p><p>Lluvia demo: <strong>${snapshot.rain.accumulated1hMm.toFixed(1)} mm/1 h</strong> · ${snapshot.rain.accumulated24hMm.toFixed(1)} mm/24 h.</p></section>
-<section><h2>Contradicciones</h2>${snapshot.contradictions.map((item) => `<h3>${escapeHtml(item.title)}</h3>${list(item.signals)}<p>${escapeHtml(item.explanation)}</p>`).join('')}</section>
-<section><h2>Fuentes demo</h2>${list(snapshot.sources.map((source) => `${source.name} — ${source.status} — ${sourceAgeLabel(source.observedAt, snapshot.generatedAt)} — ${source.contribution}`))}</section>
-<section><h2>Comunicaciones críticas</h2>${messages.map((message) => `<article><h3>${escapeHtml(message.title)}</h3><p>${escapeHtml(message.body)}</p><small>Prioridad ${message.priority} · vence ${escapeHtml(message.expiresAt)} · ${escapeHtml(message.sourceId)}</small></article>`).join('')}</section>
-<section><h2>Refugios y puntos</h2><p><strong>Ningún refugio activo.</strong> Las ubicaciones son ficticias.</p>${list(snapshot.shelters.map((shelter) => `${shelter.name}: ${shelter.status} — ${shelter.address}`))}</section>
+<p><strong>Recomendaciones operativas:</strong> ${escapeHtml(snapshot.recommendedAction)}</p>
+<p class="time">Actualizado: <time datetime="${snapshot.generatedAt}">${escapeHtml(snapshot.generatedAt)}</time>. Fuente principal: ${escapeHtml(snapshot.river.sourceName ?? snapshot.river.sourceId)}.</p>
+<section><h2>Sistemas y estaciones</h2>${systems.length ? systems.map((system) => `<article><h3>${escapeHtml(system.label)} · ${escapeHtml(system.stationName)}</h3><p>${system.available && system.currentMetres !== null ? `<strong>${system.currentMetres.toFixed(2)} m</strong> · ${escapeHtml(system.trend)}` : '<strong>Sin datos en vivo</strong>'}</p><small>${escapeHtml(system.sourceName)} · ${system.observedAt ? escapeHtml(sourceAgeLabel(system.observedAt, snapshot.generatedAt)) : 'sin timestamp'}</small></article>`).join('') : '<p>Sin estaciones validadas disponibles.</p>'}</section>
+<section><h2>Fuentes</h2>${list(snapshot.sources.map((source) => `${source.name} — ${source.status} — ${sourceAgeLabel(source.observedAt, snapshot.generatedAt)} — ${source.contribution}`))}</section>
+<section><h2>Teléfonos esenciales</h2><ul>${contacts.map((contact) => `<li><a href="${escapeHtml(contact.href)}">${escapeHtml(contact.number)} — ${escapeHtml(contact.label)}</a></li>`).join('')}</ul></section>
 <section><h2>Acciones recomendadas</h2>${list(snapshot.actions)}</section>
-</main><footer><p>${escapeHtml(snapshot.emergencyDisclaimer)}</p><p>Esta pantalla no necesita JavaScript.</p></footer></body></html>`;
-  return withSecurityHeaders(new Response(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
-    },
-  }));
+</main><footer><p>${escapeHtml(snapshot.emergencyDisclaimer)}</p><p>Esta pantalla no necesita JavaScript y queda disponible después de una visita exitosa.</p></footer></body></html>`;
+  return withSecurityHeaders(new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } }));
 }
