@@ -8,11 +8,13 @@ interface TestEnv {
   readonly REPORTS_BUCKET: R2Bucket;
   readonly SESSION_SIGNING_KEY: string;
 }
+interface JsonResponseLike { json(): Promise<unknown> }
 
 const server = createTestHarness({ workers: [{ configPath: './wrangler.test.jsonc' }] });
+type HarnessRequestInit = Parameters<typeof server.fetch>[1];
 const origin = 'http://sos-sf.test';
 let env: TestEnv;
-const workerFetch = (path: string, init?: RequestInit) => server.fetch(`${origin}${path}`, init);
+const workerFetch = (path: string, init?: RequestInit) => server.fetch(`${origin}${path}`, init as HarnessRequestInit);
 
 async function session(principal: SessionPrincipal): Promise<string> {
   await env.MESSAGES_DB.prepare('INSERT INTO auth_sessions (id,sub,email,role,created_at,expires_at,revoked_at,rotated_from) VALUES (?,?,?,?,?,?,NULL,NULL)')
@@ -24,7 +26,7 @@ function principal(id: string, role: SessionPrincipal['role'] = 'AUTHENTICATED_U
   return { sessionId: `session:${id}`, sub: `100000${id}`, email: role === 'VERIFIED_OPERATOR' ? 'operator@example.org' : `${id}@example.org`, role, expiresAt: '2099-08-03T23:00:00.000Z' };
 }
 
-async function envelope<T>(response: Response): Promise<T> {
+async function envelope<T>(response: JsonResponseLike): Promise<T> {
   const body = await response.json() as { data: T };
   return body.data;
 }
@@ -52,7 +54,7 @@ describe.sequential('Worker real con bindings locales', () => {
     expect((await workerFetch('/api/snapshot', { method: 'POST' })).status).toBe(405);
     const sessionResponse = await workerFetch('/api/session');
     expect(sessionResponse.headers.get('Cache-Control')).toContain('private');
-    expect(await envelope(sessionResponse)).toMatchObject({ enabled: true, authenticated: false });
+    expect(await envelope<{ enabled: boolean; authenticated: boolean }>(sessionResponse)).toMatchObject({ enabled: true, authenticated: false });
     const privateResponse = await workerFetch('/api/private/reports');
     expect(privateResponse.status).toBe(401);
     expect(privateResponse.headers.get('Cache-Control')).toContain('private');
@@ -74,7 +76,7 @@ describe.sequential('Worker real con bindings locales', () => {
     expect(logout.status).toBe(200);
     expect(logout.headers.get('Set-Cookie')).toContain('Max-Age=0');
     const afterLogout = await workerFetch('/api/session', { headers: { Cookie: firstCookie } });
-    expect(await envelope(afterLogout)).toMatchObject({ authenticated: false });
+    expect(await envelope<{ authenticated: boolean }>(afterLogout)).toMatchObject({ authenticated: false });
   });
 
   test('procesa multipart, guarda foto privada y permite revisión operadora auditada', async () => {
@@ -84,7 +86,7 @@ describe.sequential('Worker real con bindings locales', () => {
     const operatorCookie = await session(operator);
     const form = new FormData();
     form.set('metadata', JSON.stringify({ category: 'ANEGAMIENTO', description: 'Agua acumulada desde hace una hora.', locationLabel: 'Barrio Centro', exactLocationConsent: false, idempotencyKey: 'runtime-report-one' }));
-    form.append('photos', new File([new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9])], 'evidence.jpg', { type: 'image/jpeg' }));
+    form.append('photos', new File([Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9]).buffer], 'evidence.jpg', { type: 'image/jpeg' }));
     const submitted = await workerFetch('/api/private/reports', { method: 'POST', headers: { Cookie: userCookie, Origin: origin, 'CF-Connecting-IP': '203.0.113.20' }, body: form });
     expect(submitted.status).toBe(201);
     const submittedData = await envelope<{ report: { id: string } }>(submitted);
