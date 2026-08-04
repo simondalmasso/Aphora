@@ -1,11 +1,8 @@
 name: Deploy Workers
-# verification-revision: 11
+# verification-revision: 12
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - arq/visual-dashboard-v3
 
 permissions:
   contents: read
