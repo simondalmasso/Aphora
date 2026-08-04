@@ -11,80 +11,38 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Probe official provider surfaces
+      - name: Deep probe official provider surfaces
         run: |
           mkdir -p artifacts/all-sources-013-discovery
           cat > /tmp/discover.mjs <<'NODE'
           import { writeFile } from 'node:fs/promises';
-          const output = { generatedAt: new Date().toISOString(), probes: {}, findings: {} };
-          async function probe(name, url, options = {}) {
-            const started = Date.now();
-            try {
-              const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(options.timeout ?? 20000), headers: { 'User-Agent': 'SOS-SF/013 endpoint discovery', Accept: options.accept ?? '*/*' } });
-              const body = await response.text();
-              output.probes[name] = { url, finalUrl: response.url, status: response.status, contentType: response.headers.get('content-type'), bytes: Buffer.byteLength(body), elapsedMs: Date.now() - started, bodyHead: body.slice(0, options.head ?? 3000) };
-              return { response, body };
-            } catch (error) {
-              output.probes[name] = { url, error: String(error), elapsedMs: Date.now() - started };
-              return null;
-            }
-          }
-          const inaCatalog = await probe('ina_catalog', 'https://alerta.ina.gob.ar/a5/obs/puntual/series?format=geojson', { accept: 'application/json' });
-          if (inaCatalog) {
-            try {
-              const json = JSON.parse(inaCatalog.body);
-              const features = Array.isArray(json.features) ? json.features : [];
-              output.findings.inaCandidates = features.filter((feature) => {
-                const text = JSON.stringify(feature.properties ?? {}).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-                return text.includes('santa fe') || text.includes('santo tome') || text.includes('salado');
-              }).map((feature) => ({ geometry: feature.geometry, properties: feature.properties })).slice(0, 150);
-            } catch (error) { output.findings.inaCatalogParseError = String(error); }
-          }
-          for (const id of ['30','3044','1679']) {
-            const start = new Date(Date.now() - 14 * 86400000).toISOString().slice(0,10);
-            const end = new Date(Date.now() + 86400000).toISOString().slice(0,10);
-            await probe(`ina_rest_${id}`, `https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=${id}&timestart=${start}&timeend=${end}`, { accept: 'application/json' });
-            await probe(`ina_waterml2_${id}`, `https://alerta.ina.gob.ar/a5/obs/puntual/series/${id}?timestart=${start}&timeend=${end}&format=waterml2`, { accept: 'application/xml,text/xml' });
-          }
-          const sites = await probe('ina_wml_sites', 'https://alerta.ina.gob.ar/wml/GetSites', { accept: 'application/xml,text/xml', head: 12000 });
-          await probe('ina_wml_variables', 'https://alerta.ina.gob.ar/wml/GetVariables', { accept: 'application/xml,text/xml', head: 12000 });
-          if (sites) {
-            const chunks = [...sites.body.matchAll(/<(?:\w+:)?siteInfo\b[\s\S]*?<\/(?:\w+:)?siteInfo>/gi)].map((match) => match[0]);
-            output.findings.waterMlSites = chunks.filter((chunk) => /Santa\s*Fe|Santo\s*Tom[eé]|Salado/i.test(chunk)).slice(0,50);
-          }
-          const portsPage = await probe('ports_santa_fe_page', 'https://hidrografia.agpse.gob.ar/santafe/', { accept: 'text/html', head: 20000 });
-          if (portsPage) {
-            const urls = [...portsPage.body.matchAll(/(?:https?:)?\/\/[^"'\s<>]+|(?:src|href)=["']([^"']+)["']/gi)].map((m) => m[1] ?? m[0]).filter(Boolean);
-            output.findings.portsLinkedResources = [...new Set(urls)].slice(0,200);
-            const scripts = [...portsPage.body.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => new URL(m[1], portsPage.response.url).toString());
-            output.findings.portsScripts = scripts;
-            for (const [index, url] of scripts.slice(0,20).entries()) await probe(`ports_script_${index}`, url, { accept: 'application/javascript,text/javascript,*/*', head: 12000 });
-          }
-          for (const [name, url] of Object.entries({
-            smn_root: 'https://ws2.smn.gob.ar/',
-            smn_alerts_page: 'https://ws2.smn.gob.ar/alertas',
-            smn_observations_candidate: 'https://ws2.smn.gob.ar/map_items/weather',
-            smn_alerts_candidate_1: 'https://ws2.smn.gob.ar/alertas/alertas.json',
-            smn_alerts_candidate_2: 'https://ws2.smn.gob.ar/api/alertas',
-            smn_alerts_rss: 'https://ws2.smn.gob.ar/rss/alertas'
-          })) await probe(name, url, { head: 16000 });
-          const smnRoot = output.probes.smn_root?.bodyHead ?? '';
-          const smnScripts = [...smnRoot.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => new URL(m[1], 'https://ws2.smn.gob.ar/').toString());
-          output.findings.smnScripts = smnScripts;
-          for (const [index, url] of smnScripts.slice(0,25).entries()) await probe(`smn_script_${index}`, url, { accept: 'application/javascript,text/javascript,*/*', head: 20000 });
-          await probe('nasa_service', 'https://maps.disasters.nasa.gov/ags03/rest/services/NRT_Latest/GPM_NRT_30min_Latest/ImageServer?f=json', { accept: 'application/json', head: 16000 });
-          const geometry = encodeURIComponent(JSON.stringify({ x: -60.700, y: -31.630, spatialReference: { wkid: 4326 } }));
-          await probe('nasa_identify', `https://maps.disasters.nasa.gov/ags03/rest/services/NRT_Latest/GPM_NRT_30min_Latest/ImageServer/identify?geometry=${geometry}&geometryType=esriGeometryPoint&sr=4326&returnGeometry=false&returnCatalogItems=true&f=json`, { accept: 'application/json', head: 16000 });
-          const text = JSON.stringify(output.probes);
-          output.findings.endpointStrings = [...new Set([...text.matchAll(/https?:\\?\/\\?\/[^"\\\s]+|\/(?:api|map_items|alertas|observaciones|hidro)[A-Za-z0-9_?&=./-]*/gi)].map((m) => m[0].replaceAll('\\/','/')))].slice(0,500);
-          await writeFile('artifacts/all-sources-013-discovery/report.json', JSON.stringify(output, null, 2));
-          console.log(JSON.stringify({ generatedAt: output.generatedAt, findings: output.findings, probeSummary: Object.fromEntries(Object.entries(output.probes).map(([k,v]) => [k, { status: v.status, contentType: v.contentType, bytes: v.bytes, error: v.error }])) }, null, 2));
+          const out={generatedAt:new Date().toISOString(),probes:{},findings:{}};
+          async function get(name,url,accept='*/*',timeout=20000){const t=Date.now();try{const r=await fetch(url,{redirect:'follow',signal:AbortSignal.timeout(timeout),headers:{Accept:accept,'User-Agent':'SOS-SF/013 reproducible official endpoint discovery'}});const b=await r.text();out.probes[name]={url,finalUrl:r.url,status:r.status,contentType:r.headers.get('content-type'),bytes:Buffer.byteLength(b),elapsedMs:Date.now()-t,body:b};return {r,b};}catch(e){out.probes[name]={url,error:String(e),elapsedMs:Date.now()-t};return null}}
+          const start=new Date(Date.now()-180*86400000).toISOString().slice(0,10),end=new Date(Date.now()+86400000).toISOString().slice(0,10);
+          for(const id of ['30','3044','29911']){await get(`ina_rest_${id}`,`https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=${id}&timestart=${start}&timeend=${end}`,'application/json');await get(`ina_waterml2_${id}`,`https://alerta.ina.gob.ar/a5/obs/puntual/series/${id}?timestart=${start}&timeend=${end}&format=waterml2`,'application/xml,text/xml');}
+          const sites=await get('ina_wml_sites','https://alerta.ina.gob.ar/wml/GetSites','application/xml,text/xml');
+          if(sites){const chunks=[...sites.b.matchAll(/<(?:\w+:)?siteInfo\b[\s\S]*?<\/(?:\w+:)?siteInfo>/gi)].map(m=>m[0]);out.findings.waterMlSites=chunks.filter(x=>/Santa\s*Fe|Santo\s*Tom[eé]/i.test(x));}
+          for(const url of [
+            `https://alerta.ina.gob.ar/wml/GetValues?location=30&variable=2&startDate=${start}&endDate=${end}`,
+            `https://alerta.ina.gob.ar/wml/GetValues?location=1679&variable=2&startDate=${start}&endDate=${end}`,
+            `https://alerta.ina.gob.ar/wml/GetValues?location=1679&variable=39&startDate=${start}&endDate=${end}`,
+            `https://alerta.ina.gob.ar/wml/GetValues?location=alturas_bdhi:30&variable=INA:2&startDate=${start}&endDate=${end}`,
+            `https://alerta.ina.gob.ar/wml/GetValues?location=alturas_bdhi:1679&variable=INA:2&startDate=${start}&endDate=${end}`
+          ]) await get(`wml_values_${Object.keys(out.probes).length}`,url,'application/xml,text/xml');
+          const officialPorts=await get('ports_official_page','https://www.argentina.gob.ar/economia/agencia-nacional-de-puertos-y-navegacion/navegacion/navegable-troncal/hidrometros','text/html');
+          if(officialPorts){out.findings.portsIframes=[...officialPorts.b.matchAll(/<iframe[^>]+src=["']([^"']+)["']/gi)].map(m=>new URL(m[1],officialPorts.r.url).toString());out.findings.portsLinks=[...officialPorts.b.matchAll(/(?:href|src)=["']([^"']+)["']/gi)].map(m=>new URL(m[1],officialPorts.r.url).toString()).filter(u=>/hidro|santa|agp|json|api/i.test(u));for(const [i,u] of out.findings.portsIframes.entries())await get(`ports_iframe_${i}`,u,'text/html,application/json');}
+          for(const page of ['https://ws2.smn.gob.ar/','https://ws2.smn.gob.ar/observaciones','https://ws2.smn.gob.ar/alertas']){const key='smn_page_'+page.split('/').filter(Boolean).at(-1);const p=await get(key,page,'text/html');if(p){const scripts=[...p.b.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map(m=>new URL(m[1],p.r.url).toString());out.findings[key+'_scripts']=scripts;for(const [i,u] of scripts.entries()){if(out.probes['smn_script_'+encodeURIComponent(u)])continue;await get('smn_script_'+encodeURIComponent(u),u,'application/javascript,text/javascript,*/*');}}}
+          const smnText=Object.entries(out.probes).filter(([k])=>k.startsWith('smn_')).map(([,v])=>v.body||'').join('\n');out.findings.smnEndpointCandidates=[...new Set([...smnText.matchAll(/(?:https?:\\?\/\\?\/[^"'\s)]+|["'](\/(?:api|map_items|alertas|observaciones|pronostico|ajax)[^"']*))["']/gi)].map(m=>(m[1]||m[0]).replaceAll('\\/','/')))].slice(0,1000);
+          for(const u of ['https://maps.disasters.nasa.gov/ags03/rest/services?f=json','https://maps.disasters.nasa.gov/ags03/rest/services/NRT?f=json','https://maps.disasters.nasa.gov/ags03/rest/services/NRT_Latest?f=json'])await get('nasa_directory_'+encodeURIComponent(u),u,'application/json');
+          const nasaText=Object.entries(out.probes).filter(([k])=>k.startsWith('nasa_')).map(([,v])=>v.body||'').join('\n');out.findings.nasaGpmServices=[...new Set([...nasaText.matchAll(/"name"\s*:\s*"([^"]*(?:GPM|IMERG)[^"]*)"/gi)].map(m=>m[1]))];
+          const compact={...out,probes:Object.fromEntries(Object.entries(out.probes).map(([k,v])=>[k,{...v,bodyHead:(v.body||'').slice(0,20000),body:undefined}]))};
+          await writeFile('artifacts/all-sources-013-discovery/report.json',JSON.stringify(out,null,2));await writeFile('artifacts/all-sources-013-discovery/compact.json',JSON.stringify(compact,null,2));console.log(JSON.stringify({findings:out.findings,summary:Object.fromEntries(Object.entries(out.probes).map(([k,v])=>[k,{status:v.status,contentType:v.contentType,bytes:v.bytes,error:v.error}]))},null,2));
           NODE
           node /tmp/discover.mjs | tee artifacts/all-sources-013-discovery/summary.log
       - uses: actions/upload-artifact@v4
