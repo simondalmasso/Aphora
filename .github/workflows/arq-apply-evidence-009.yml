@@ -1,0 +1,39 @@
+name: ARQ Apply Evidence 009
+
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+    paths:
+      - .github/arq-apply-trigger
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Apply exact audited patch
+        run: |
+          git apply --check .github/arq-evidence-009.patch
+          git apply .github/arq-evidence-009.patch
+          rm -f .github/arq-evidence-009.patch .github/arq-apply-trigger .github/workflows/arq-apply-evidence-009.yml
+          git config user.name "ARQ Evidence 009"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix: close AUD evidence and mobile visual hold"
+          git push origin HEAD:arq/visual-dashboard-v3
+          echo "RESULT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Publish corrective SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body=$(printf 'ARQ_EVIDENCE_009_PATCH_APPLIED\nSHA=%s\nRUN_ID=%s\nAUD_HOLD=ACTIVE\n' "$RESULT_SHA" "$GITHUB_RUN_ID")
+          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="$body"
