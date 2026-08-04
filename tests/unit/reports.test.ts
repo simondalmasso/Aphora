@@ -45,7 +45,23 @@ class FakeStatement implements D1Statement {
     if (this.query.startsWith('UPDATE reports SET status')) {
       const [status, updated_at, flags, operator_note, redacted_description, last_reviewed_by, last_reviewed_at, forwarded_destination, forwarded_reference, , forwarded_at, , forwarded_by, id] = this.values;
       const row = this.db.reports.get(String(id));
-      if (row) this.db.reports.set(String(id), { ...row, status, updated_at, moderation_flags_json: flags, operator_note, redacted_description, last_reviewed_by, last_reviewed_at, forwarded_destination: forwarded_destination ?? row.forwarded_destination, forwarded_reference: forwarded_reference ?? row.forwarded_reference, forwarded_at, forwarded_by });
+      if (row) {
+        const preservedFlags = flags === '[]' && row.moderation_flags_json !== '[]' ? row.moderation_flags_json : flags;
+        this.db.reports.set(String(id), {
+          ...row,
+          status,
+          updated_at,
+          moderation_flags_json: preservedFlags,
+          operator_note: operator_note ?? row.operator_note,
+          redacted_description: redacted_description ?? row.redacted_description,
+          last_reviewed_by,
+          last_reviewed_at,
+          forwarded_destination: forwarded_destination ?? row.forwarded_destination,
+          forwarded_reference: forwarded_reference ?? row.forwarded_reference,
+          forwarded_at,
+          forwarded_by,
+        });
+      }
     }
     if (this.query.startsWith('INSERT INTO report_photos')) {
       const [id, report_id, object_key, mime_type, bytes, created_at, expires_at, review_status] = this.values;
@@ -130,7 +146,7 @@ describe('report workflow', () => {
     expect(db.photos.get(photoId)?.review_status).toBe('APPROVED');
   });
 
-  it('permits only valid audited operator transitions and redaction', async () => {
+  it('permits only valid audited operator transitions and preserves review data', async () => {
     const db = new FakeDb(); const bucket = new FakeBucket();
     const created = await createReport(request(), { MESSAGES_DB: db, REPORTS_BUCKET: bucket }, user, 'network:one');
     const id = (created.report as { id: string }).id;
@@ -139,7 +155,7 @@ describe('report workflow', () => {
     await updateReport(patch({ status: 'ESCALATION_READY' }), { MESSAGES_DB: db }, operator, id);
     await expect(updateReport(patch({ status: 'FORWARDED' }), { MESSAGES_DB: db }, operator, id)).rejects.toThrow('FORWARDING_EVIDENCE_REQUIRED');
     await updateReport(patch({ status: 'FORWARDED', forwardedDestination: 'COBEM', forwardedReference: 'exp-123' }), { MESSAGES_DB: db }, operator, id);
-    expect(db.reports.get(id)).toMatchObject({ status: 'FORWARDED', redacted_description: 'Descripción redactada.' });
+    expect(db.reports.get(id)).toMatchObject({ status: 'FORWARDED', redacted_description: 'Descripción redactada.', moderation_flags_json: '["PERSONAL_DATA"]', operator_note: 'Se eliminó un dato personal.' });
     expect(db.redactionCount).toBe(1);
     expect(db.eventCount).toBeGreaterThanOrEqual(4);
   });
