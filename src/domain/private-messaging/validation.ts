@@ -3,8 +3,15 @@ import type { SendMessageInput } from './types';
 export const PRIVATE_MESSAGE_MAX_LENGTH = 280;
 export const PRIVATE_PAGE_LIMIT = 40;
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,127}$/;
-const UNSAFE_INVISIBLE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/u;
 const PICTOGRAPHIC = /\p{Extended_Pictographic}|[\u{1F1E6}-\u{1F1FF}]/u;
+
+function unsafeInvisible(value: string): boolean {
+  for (const character of value) {
+    const code = character.codePointAt(0)!;
+    if (code <= 0x08 || code === 0x0b || code === 0x0c || (code >= 0x0e && code <= 0x1f) || (code >= 0x7f && code <= 0x9f) || (code >= 0x200b && code <= 0x200f) || (code >= 0x202a && code <= 0x202e) || (code >= 0x2060 && code <= 0x206f) || code === 0xfeff) return true;
+  }
+  return false;
+}
 
 export function normalizeSendMessage(value: unknown): SendMessageInput {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError('INVALID_MESSAGE_BODY');
@@ -22,7 +29,7 @@ export function normalizeSendMessage(value: unknown): SendMessageInput {
   if (typeof record.body !== 'string') throw new TypeError('INVALID_MESSAGE_TEXT');
   const body = record.body.trim();
   if (body.length < 1 || body.length > PRIVATE_MESSAGE_MAX_LENGTH) throw new TypeError('INVALID_MESSAGE_LENGTH');
-  if (UNSAFE_INVISIBLE.test(body) || PICTOGRAPHIC.test(body)) throw new TypeError('INVALID_MESSAGE_CHARACTERS');
+  if (unsafeInvisible(body) || PICTOGRAPHIC.test(body)) throw new TypeError('INVALID_MESSAGE_CHARACTERS');
   return Object.freeze({ conversationId: record.conversationId, body, idempotencyKey: record.idempotencyKey });
 }
 
