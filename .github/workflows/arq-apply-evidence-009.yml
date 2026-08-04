@@ -20,15 +20,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="ARQ_EVIDENCE_009_PATCH_START\nRUN_ID=${GITHUB_RUN_ID}\nSHA=${GITHUB_SHA}"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="ARQ_EVIDENCE_009_VALID_PATCH_START\nRUN_ID=${GITHUB_RUN_ID}\nSHA=${GITHUB_SHA}"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Apply exact audited patch
+      - name: Reconstruct and apply validated patch
         run: |
-          git apply --check .github/arq-evidence-009.patch
-          git apply .github/arq-evidence-009.patch
-          rm -f .github/arq-evidence-009.patch .github/arq-apply-trigger .github/workflows/arq-apply-evidence-009.yml
+          cat .github/arq-valid-patch/*.b64 | tr -d '\n' | base64 --decode | gzip --decompress > /tmp/arq-evidence-009.patch
+          printf '%s  %s\n' 'baa4f2e1a08968bd6da5768ee9ee3ff18026c00e336cb42df547202f78cb10f7' '/tmp/arq-evidence-009.patch' | sha256sum --check
+          git apply --check /tmp/arq-evidence-009.patch
+          git apply /tmp/arq-evidence-009.patch
+          rm -rf \
+            .github/arq-valid-patch \
+            .github/arq-patch-chunks \
+            .github/arq-evidence-009.patch \
+            .github/arq-apply-trigger \
+            .github/workflows/arq-apply-evidence-009.yml
           git config user.name "ARQ Evidence 009"
           git config user.email "actions@users.noreply.github.com"
           git add -A
@@ -40,11 +47,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          body=$(printf 'ARQ_EVIDENCE_009_PATCH_APPLIED\nSHA=%s\nRUN_ID=%s\nAUD_HOLD=ACTIVE\n' "$RESULT_SHA" "$GITHUB_RUN_ID")
+          body=$(printf 'ARQ_EVIDENCE_009_VALID_PATCH_APPLIED\nSHA=%s\nRUN_ID=%s\nAUD_HOLD=ACTIVE\nDEPLOY_PIPELINE=TRIGGERED\n' "$RESULT_SHA" "$GITHUB_RUN_ID")
           gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="$body"
       - name: Publish apply failure
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="ARQ_EVIDENCE_009_PATCH_FAILURE\nRUN_ID=${GITHUB_RUN_ID}\nSHA=${GITHUB_SHA}"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="ARQ_EVIDENCE_009_VALID_PATCH_FAILURE\nRUN_ID=${GITHUB_RUN_ID}\nSHA=${GITHUB_SHA}"
