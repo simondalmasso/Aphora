@@ -1,0 +1,453 @@
+diff --git a/.github/arq-export-trigger b/.github/arq-export-trigger
+deleted file mode 100644
+index 6d64745ef9d695a3ac5c1671e29fafdd436dae2a..0000000000000000000000000000000000000000
+--- a/.github/arq-export-trigger
++++ /dev/null
+@@ -1 +0,0 @@
+-source-export-2026-08-04T16:14-03:00
+diff --git a/.github/arq-v3-deploy-trigger b/.github/arq-v3-deploy-trigger
+new file mode 100644
+index 0000000000000000000000000000000000000000..a86ed97739da5135bafd99e168d400fe5545b51e
+--- /dev/null
++++ b/.github/arq-v3-deploy-trigger
+@@ -0,0 +1 @@
++aud-evidence-009-final
+diff --git a/.github/workflows/arq-export.yml b/.github/workflows/arq-export.yml
+deleted file mode 100644
+index 5c58b484d88a4c6d1e5e6dc6c989a3f5f8e41297..0000000000000000000000000000000000000000
+--- a/.github/workflows/arq-export.yml
++++ /dev/null
+@@ -1,38 +0,0 @@
+-name: ARQ Source Export
+-
+-on:
+-  push:
+-    branches:
+-      - arq/visual-dashboard-v3
+-    paths:
+-      - .github/arq-export-trigger
+-
+-permissions:
+-  contents: read
+-  issues: write
+-
+-jobs:
+-  export:
+-    runs-on: ubuntu-latest
+-    timeout-minutes: 10
+-    steps:
+-      - uses: actions/checkout@v4
+-      - name: Create exact source archive
+-        run: |
+-          git rev-parse HEAD > SOURCE_SHA.txt
+-          tar --exclude=.git --exclude=node_modules --exclude=dist --exclude=artifacts --exclude=playwright-report --exclude=test-results -czf /tmp/sos-sf-source.tgz .
+-      - id: artifact
+-        uses: actions/upload-artifact@v4
+-        with:
+-          name: sos-sf-source-${{ github.sha }}
+-          path: /tmp/sos-sf-source.tgz
+-          if-no-files-found: error
+-          retention-days: 1
+-      - name: Publish export reference
+-        env:
+-          GH_TOKEN: ${{ github.token }}
+-          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
+-          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact-digest }}
+-        run: |
+-          body=$(printf 'ARQ_SOURCE_EXPORT\nRUN_ID=%s\nSHA=%s\nARTIFACT_ID=%s\nARTIFACT_DIGEST=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "$ARTIFACT_ID" "$ARTIFACT_DIGEST")
+-          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="$body"
+diff --git a/.github/workflows/deploy-workers.yml b/.github/workflows/deploy-workers.yml
+index 3805e8ee435b4ad3c188c4bc15e7f78da0a320b3..76bf60d8d9fded4cea6e309e0aa4597a6be8f722 100644
+--- a/.github/workflows/deploy-workers.yml
++++ b/.github/workflows/deploy-workers.yml
+@@ -1,8 +1,13 @@
+ name: Deploy Workers
+-# verification-revision: 12
++# verification-revision: 13
+ 
+ on:
+   workflow_dispatch:
++  push:
++    branches:
++      - arq/visual-dashboard-v3
++    paths:
++      - .github/arq-v3-deploy-trigger
+ 
+ permissions:
+   contents: read
+@@ -17,6 +22,7 @@ jobs:
+     runs-on: ubuntu-latest
+     timeout-minutes: 55
+     env:
++      EVIDENCE_DIR: artifacts/current-run
+       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+@@ -41,6 +47,12 @@ jobs:
+       - name: Checkout exact SHA
+         uses: actions/checkout@v4
+ 
++      - name: Start with an empty evidence directory
++        run: |
++          rm -rf artifacts playwright-report test-results wrangler-dry-run.log wrangler-deploy.log d1-migrations.log d1-schema.json
++          mkdir -p "$EVIDENCE_DIR"
++          printf '%s\n' "$GITHUB_SHA" > "$EVIDENCE_DIR/source-sha.txt"
++
+       - name: Setup Node
+         uses: actions/setup-node@v4
+         with:
+@@ -56,7 +68,7 @@ jobs:
+         run: npm run typecheck
+ 
+       - name: Lint
+-        run: npm run lint
++        run: npm run lint -- --max-warnings=0
+ 
+       - name: Unit tests
+         run: npm run test:unit
+@@ -73,6 +85,7 @@ jobs:
+ 
+       - name: End-to-end tests and screenshots
+         run: npm run test:e2e
++
+       - name: Validate protected configuration names
+         run: |
+           node <<'NODE'
+@@ -80,8 +93,8 @@ jobs:
+           const fs = require('node:fs');
+           const required = ['GOOGLE_CLIENT_ID', 'SESSION_SIGNING_KEY', 'SOS_SF_OPERATOR_EMAILS'];
+           const missing = required.filter((name) => !String(process.env[name] || '').trim());
+-          fs.mkdirSync('artifacts/v1', { recursive: true });
+-          fs.writeFileSync('artifacts/v1/protected-config-preflight.json', JSON.stringify({ schemaVersion: '1.0', requiredNames: required, presentNames: required.filter((name) => !missing.includes(name)), missingNames: missing, valuesExposed: false, generatedAt: new Date().toISOString() }, null, 2) + '\n');
++          fs.mkdirSync(process.env.EVIDENCE_DIR, { recursive: true });
++          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/protected-config-preflight.json`, JSON.stringify({ schemaVersion: '1.0', decisionId: 'SOS-SF-AUD-V3-EVIDENCE-009', requiredNames: required, presentNames: required.filter((name) => !missing.includes(name)), missingNames: missing, valuesExposed: false, generatedAt: new Date().toISOString() }, null, 2) + '\n');
+           if (missing.length) {
+             console.error(`MISSING_PROTECTED_CONFIGURATION_NAMES=${missing.join(',')}`);
+             process.exit(1);
+@@ -93,25 +106,25 @@ jobs:
+         id: provision
+         run: |
+           node scripts/provision-cloudflare.mjs
+-          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/cloudflare-resources.json",JSON.stringify({schemaVersion:"1.0",worker:"sos-sf",d1Database:"sos-sf-private",r2Bucket:"sos-sf-private-reports",generatedAt:new Date().toISOString()},null,2)+"\n")'
++          node -e 'const fs=require("node:fs");fs.mkdirSync(process.env.EVIDENCE_DIR,{recursive:true});fs.writeFileSync(`${process.env.EVIDENCE_DIR}/cloudflare-resources.json`,JSON.stringify({schemaVersion:"1.0",worker:"sos-sf",d1Database:"sos-sf-private",r2Bucket:"sos-sf-private-reports",generatedAt:new Date().toISOString()},null,2)+"\n")'
+ 
+       - name: Wrangler dry run
+-        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc 2>&1 | tee wrangler-dry-run.log
++        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-dry-run.log"
+ 
+       - name: Apply D1 migrations
+-        run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee d1-migrations.log
++        run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/d1-migrations.log"
+ 
+       - name: Verify D1 schema
+         run: |
+-          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','rate_windows') ORDER BY name" --json > d1-schema.json
+-          node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync("d1-schema.json","utf8"));const rows=(Array.isArray(p)?p:[p]).flatMap(x=>x.results||x.result?.[0]?.results||[]);const names=new Set(rows.map(x=>x.name));for(const n of ["auth_sessions","conversations","messages","reports","report_photos","report_events","rate_windows"])if(!names.has(n))throw new Error(`D1_TABLE_MISSING:${n}`)'
++          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','rate_windows') ORDER BY name" --json > "$EVIDENCE_DIR/d1-schema.json"
++          node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/d1-schema.json`,"utf8"));const rows=(Array.isArray(p)?p:[p]).flatMap(x=>x.results||x.result?.[0]?.results||[]);const names=new Set(rows.map(x=>x.name));for(const n of ["auth_sessions","conversations","messages","reports","report_photos","report_events","rate_windows"])if(!names.has(n))throw new Error(`D1_TABLE_MISSING:${n}`)'
+ 
+       - name: Verify private R2 lifecycle
+@@ -132,7 +145,7 @@ jobs:
+       - name: Deploy Worker and Static Assets
+         id: deploy
+         run: |
+-          npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee wrangler-deploy.log
+-          deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' wrangler-deploy.log | tail -n 1 || true)
++          npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
++          deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' "$EVIDENCE_DIR/wrangler-deploy.log" | tail -n 1 || true)
+           deployment_url=${deployment_url:-$EXPECTED_DEPLOYMENT_URL}
+           test "$deployment_url" = "$EXPECTED_DEPLOYMENT_URL"
+@@ -154,8 +167,8 @@ jobs:
+           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+         run: |
+-          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",decisionId:"SOS-SF-AUD-V3-GATE-007",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:process.env.JOB_STATUS,deploymentUrl:process.env.DEPLOYMENT_URL||null,generatedAt:new Date().toISOString()},null,2)+"\n")'
++          node -e 'const fs=require("node:fs");fs.mkdirSync(process.env.EVIDENCE_DIR,{recursive:true});fs.writeFileSync(`${process.env.EVIDENCE_DIR}/verification.json`,JSON.stringify({schemaVersion:"1.0",decisionId:"SOS-SF-AUD-V3-EVIDENCE-009",audHold:"ACTIVE",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:process.env.JOB_STATUS,deploymentUrl:process.env.DEPLOYMENT_URL||null,generatedAt:new Date().toISOString()},null,2)+"\n")'
+ 
+       - name: Remove generated secret material
+         if: always()
+         run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/sos-sf-r2-probe.txt /tmp/sos-sf-r2-read.txt
+ 
++      - name: Finalize clean evidence manifest
++        if: always()
++        run: node scripts/finalize-evidence.mjs
++
+       - name: Upload V3 evidence
+         id: evidence
+         if: always()
+         uses: actions/upload-artifact@v4
+         with:
+-          name: sos-sf-v3-integrated-${{ github.sha }}
+-          path: |
+-            artifacts/v1/
+-            playwright-report/
+-            wrangler-dry-run.log
+-            wrangler-deploy.log
+-            d1-migrations.log
+-            d1-schema.json
+-          if-no-files-found: warn
++          name: sos-sf-v3-evidence-${{ github.sha }}-${{ github.run_id }}
++          path: ${{ env.EVIDENCE_DIR }}/
++          if-no-files-found: error
+           retention-days: 30
+@@ -185,7 +198,7 @@ jobs:
+           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+         run: |
+-          body=$(printf 'ARQ_V3_GATE_STATUS=%s\nRUN_ID=%s\nSHA=%s\nREF=%s\nARTIFACT_ID=%s\nARTIFACT_DIGEST=%s\nDEPLOYMENT_URL=%s\n' "$JOB_STATUS" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$GITHUB_REF" "${ARTIFACT_ID:-NONE}" "${ARTIFACT_DIGEST:-NONE}" "${DEPLOYMENT_URL:-NOT_DEPLOYED}")
++          body=$(printf 'ARQ_V3_GATE_STATUS=%s\nAUD_HOLD=ACTIVE\nRUN_ID=%s\nSHA=%s\nREF=%s\nARTIFACT_ID=%s\nARTIFACT_DIGEST=%s\nDEPLOYMENT_URL=%s\n' "$JOB_STATUS" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$GITHUB_REF" "${ARTIFACT_ID:-NONE}" "${ARTIFACT_DIGEST:-NONE}" "${DEPLOYMENT_URL:-NOT_DEPLOYED}")
+           gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${CHECKPOINT_COMMENT_ID}" --method PATCH -f body="$body"
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 59bf8a180ac8bdf154891f7938e0244c0d552f94..ce89a581027a4d3f49ba982592a33d37698d78ad 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -1,11 +1,13 @@
+ import { defineConfig, devices } from '@playwright/test';
+ 
++const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
++
+ export default defineConfig({
+@@ -6,9 +8,10 @@ export default defineConfig({
+-  reporter: [['list'], ['html', { open: 'never' }]],
++  reporter: [['list'], ['html', { open: 'never', outputFolder: `${evidenceDir}/playwright-report` }]],
++  outputDir: `${evidenceDir}/test-results`,
+   use: {
+     baseURL: 'http://127.0.0.1:8787',
+     trace: 'retain-on-failure',
+     screenshot: 'only-on-failure',
+   },
+diff --git a/scripts/finalize-evidence.mjs b/scripts/finalize-evidence.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..31bc13fdc7f22f5b4976f8967ef2bbfe11305161
+--- /dev/null
++++ b/scripts/finalize-evidence.mjs
+@@ -0,0 +1,93 @@
++import { createHash } from 'node:crypto';
++import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
++import { join, relative, resolve } from 'node:path';
++
++const root = process.cwd();
++const evidenceDir = resolve(root, process.env.EVIDENCE_DIR ?? 'artifacts/current-run');
++if (!evidenceDir.startsWith(resolve(root, 'artifacts') + '/')) throw new Error('EVIDENCE_DIR_OUTSIDE_ARTIFACTS');
++
++async function walk(directory) {
++  const entries = await readdir(directory);
++  const files = [];
++  for (const entry of entries) {
++    const path = join(directory, entry);
++    if ((await stat(path)).isDirectory()) files.push(...await walk(path));
++    else files.push(path);
++  }
++  return files;
++}
++
++const all = (await walk(evidenceDir)).filter((path) => !path.endsWith('evidence-manifest.json'));
++const rows = [];
++for (const path of all) {
++  const content = await readFile(path);
++  rows.push({
++    path: relative(evidenceDir, path).replaceAll('\\', '/'),
++    bytes: content.byteLength,
++    sha256: createHash('sha256').update(content).digest('hex'),
++  });
++}
++
++const forbidden = rows.filter((row) => /(^|\/)(v1|pulso|old)(\/|[-_.])/i.test(row.path));
++if (forbidden.length) throw new Error(`STALE_EVIDENCE_PATHS:${forbidden.map((row) => row.path).join(',')}`);
++
++const expectedScreenshots = ['360', '390', '768', '1024', '1440']
++  .map((width) => `screenshots/dashboard-live-${width}.png`);
++for (const expected of expectedScreenshots) {
++  if (!rows.some((row) => row.path === expected)) throw new Error(`MISSING_DETERMINISTIC_SCREENSHOT:${expected}`);
++}
++
++const proofRow = rows.find((row) => row.path === 'deployment-proof.json');
++if (proofRow) {
++  const proof = JSON.parse(await readFile(join(evidenceDir, proofRow.path), 'utf8'));
++  if (proof.source_commit !== process.env.GITHUB_SHA) throw new Error('DEPLOYMENT_PROOF_SHA_MISMATCH');
++}
++
++const manifest = {
++  schemaVersion: '1.0',
++  decisionId: 'SOS-SF-AUD-V3-EVIDENCE-009',
++  audHold: 'ACTIVE',
++  sourceCommit: process.env.GITHUB_SHA ?? null,
++  runId: process.env.GITHUB_RUN_ID ?? null,
++  generatedAt: new Date().toISOString(),
++  cleanDirectory: true,
++  deterministicScenario: 'LIVE_FIXED',
++  fileCount: rows.length,
++  files: rows.sort((a, b) => a.path.localeCompare(b.path)),
++};
++await writeFile(join(evidenceDir, 'evidence-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
++console.log(JSON.stringify({ event: 'evidence_finalized', fileCount: rows.length, cleanDirectory: true }));
+diff --git a/scripts/run-worker-tests.mjs b/scripts/run-worker-tests.mjs
+index d79c724c9caa1690e58ed5703f31ab25ba853c84..39c9b984ff1afc46cb78d35c37852f0652a8ad20 100644
+--- a/scripts/run-worker-tests.mjs
++++ b/scripts/run-worker-tests.mjs
+@@ -1,7 +1,9 @@
+ import { mkdir, writeFile } from 'node:fs/promises';
+ import { spawn } from 'node:child_process';
++import { join } from 'node:path';
+ 
+-await mkdir('artifacts/v1', { recursive: true });
++const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
++await mkdir(evidenceDir, { recursive: true });
+@@ -22,5 +24,5 @@ const exitCode = await new Promise((resolve, reject) => {
+ });
+-await writeFile('artifacts/v1/worker-test.log', output, 'utf8');
++await writeFile(join(evidenceDir, 'worker-test.log'), output, 'utf8');
+ process.exitCode = exitCode;
+diff --git a/scripts/verify-build.mjs b/scripts/verify-build.mjs
+index 53624c9c21de9ae132aa51e5b3d13d5c08ac7d12..5bca3ea7ae4f7f794904e5dd11fb1642589b6ec5 100644
+--- a/scripts/verify-build.mjs
++++ b/scripts/verify-build.mjs
+@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
+ const root = new URL('..', import.meta.url).pathname;
+ const dist = join(root, 'dist');
+-const artifactDir = join(root, 'artifacts', 'v1');
++const artifactDir = process.env.EVIDENCE_DIR ? join(root, process.env.EVIDENCE_DIR) : join(root, 'artifacts', 'current-run');
+ async function walk(directory) { const entries = await readdir(directory); const files = []; for (const entry of entries) { const path = join(directory, entry); if ((await stat(path)).isDirectory()) files.push(...await walk(path)); else files.push(path); } return files; }
+diff --git a/scripts/verify-deployment.mjs b/scripts/verify-deployment.mjs
+index 7139cd55b9140100bf567eb0a5f96f9109c797fd..ac9e29e5322a19636eb4b3f3f6f04ea956822eda 100644
+--- a/scripts/verify-deployment.mjs
++++ b/scripts/verify-deployment.mjs
+@@ -75,7 +75,7 @@ const proof = { schemaVersion: '1.0', worker_name: 'sos-sf', workers_dev_url: baseUrl, deployed_at_utc: new Date().toISOString(), remote_status: pass ? 'PASS' : 'FAIL', verified_paths: results, source_commit: process.env.GITHUB_SHA ?? 'unknown', cloudflare_account_identity: 'GitHub Actions protected configuration; no secret readback' };
+ if (process.env.WRITE_PROOF === '1') {
+-  const artifactDir = join(process.cwd(), 'artifacts', 'v1');
++  const artifactDir = join(process.cwd(), process.env.EVIDENCE_DIR ?? 'artifacts/current-run');
+   await mkdir(artifactDir, { recursive: true });
+diff --git a/src/client/app/DashboardPage.tsx b/src/client/app/DashboardPage.tsx
+index 1fdaf1c57d815a8e9300d3046c53100fd84e6bc3..f58f2dd9feb335cb7dad60686d437e99dd6ab093 100644
+--- a/src/client/app/DashboardPage.tsx
++++ b/src/client/app/DashboardPage.tsx
+@@ -1,4 +1,4 @@
+-import type { RefObject } from 'react';
++import type { CSSProperties, RefObject } from 'react';
+@@ -17,6 +17,13 @@ interface Props {
+ }
+ 
++const mobileDockFlowStyle: CSSProperties = {
++  position: 'static',
++  bottom: 'auto',
++  marginBottom: 'max(10px, env(safe-area-inset-bottom))',
++};
++
+ export function DashboardPage(props: Props) {
+-  return <main id="main" className="dashboard--v3"><div className="dashboard-grid"><div className="dashboard-hero"><HydroHero snapshot={props.snapshot} refreshing={props.refreshing} refreshError={props.refreshError} evidenceButtonRef={props.evidenceButtonRef} informButtonRef={props.informButtonRef} onEvidence={props.onEvidence} onInform={props.onInform}/></div><aside className="dashboard-rail" aria-label="Resumen operativo"><LiveOverview snapshot={props.snapshot}/><OperationalRecommendations snapshot={props.snapshot} informButtonRef={props.informButtonRef} onInform={props.onInform}/></aside><div className="dashboard-outlook"><LiveOutlook snapshot={props.snapshot}/></div></div><div className="mobile-action-dock" aria-label="Acciones rápidas"><a href="#operational-recommendations">Recomendaciones</a><button type="button" onClick={(event) => props.onEvidence(event.currentTarget)}>Evidencia</button><button type="button" onClick={(event) => props.onInform(event.currentTarget)}>Informar</button></div></main>;
++  return (
++    <main id="main" className="dashboard--v3">
++      <div className="dashboard-grid">
++        <div className="dashboard-hero">
++          <HydroHero
++            snapshot={props.snapshot}
++            refreshing={props.refreshing}
++            refreshError={props.refreshError}
++            evidenceButtonRef={props.evidenceButtonRef}
++            informButtonRef={props.informButtonRef}
++            onEvidence={props.onEvidence}
++            onInform={props.onInform}
++          />
++        </div>
++        <aside className="dashboard-rail" aria-label="Resumen operativo">
++          <LiveOverview snapshot={props.snapshot} />
++          <OperationalRecommendations
++            snapshot={props.snapshot}
++            informButtonRef={props.informButtonRef}
++            onInform={props.onInform}
++          />
++        </aside>
++        <div className="dashboard-outlook">
++          <LiveOutlook snapshot={props.snapshot} />
++        </div>
++      </div>
++      <div
++        className="mobile-action-dock"
++        data-testid="mobile-action-dock"
++        aria-label="Acciones rápidas"
++        style={mobileDockFlowStyle}
++      >
++        <a href="#operational-recommendations">Recomendaciones</a>
++        <button type="button" onClick={(event) => props.onEvidence(event.currentTarget)}>Evidencia</button>
++        <button type="button" onClick={(event) => props.onInform(event.currentTarget)}>Informar</button>
++      </div>
++    </main>
++  );
+ }
+diff --git a/src/client/features/reports/ReportDialog.tsx b/src/client/features/reports/ReportDialog.tsx
+index 91b346d6980e771caed0a13f8deb462a3df2fa94..08bbbde4a81d9e2c73603125914b8cc96177ddf8 100644
+--- a/src/client/features/reports/ReportDialog.tsx
++++ b/src/client/features/reports/ReportDialog.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
++import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+@@ -101,7 +101,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Props) {
+-  const storedDraft = (nextQueueState: StoredReportDraft['queueState']): StoredReportDraft => ({
++  const storedDraft = useCallback((nextQueueState: StoredReportDraft['queueState']): StoredReportDraft => ({
+@@ -116,7 +116,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Props) {
+-  });
++  }), [draft, exactConsent, idempotencyKey, location, photos]);
+@@ -131,7 +131,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Props) {
+-  }, [draft, exactConsent, hydrated, idempotencyKey, location, photos, queueState]);
++  }, [hydrated, queueState, storedDraft]);
+diff --git a/tests/e2e/dashboard.spec.ts b/tests/e2e/dashboard.spec.ts
+index cf0dc5bc931936aa709e09dad821d9df62cb555b..9b21a42dff362ea59cc82c342ed61a13666511f4 100644
+--- a/tests/e2e/dashboard.spec.ts
++++ b/tests/e2e/dashboard.spec.ts
+@@ -1,6 +1,8 @@
+ import { expect, test, type Page } from '@playwright/test';
+-import { mkdir } from 'node:fs/promises';
++import { mkdir, writeFile } from 'node:fs/promises';
+ import type { Snapshot } from '../../src/domain/snapshot';
++
++const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
+@@ -38,7 +40,17 @@ async function removePublicApiMocks(page: Page) {
+ }
+ 
+-test.beforeAll(async () => { await mkdir('artifacts/v1/screenshots', { recursive: true }); });
++test.beforeAll(async () => {
++  await mkdir(`${evidenceDir}/screenshots`, { recursive: true });
++  await writeFile(`${evidenceDir}/screenshot-scenario.json`, `${JSON.stringify({
++    schemaVersion: '1.0',
++    scenario: 'LIVE_FIXED',
++    snapshotId: liveSnapshot.id,
++    generatedAt,
++    widths: [360, 390, 768, 1024, 1440],
++    serviceWorkers: 'blocked-for-deterministic-capture',
++  }, null, 2)}\n`);
++});
+@@ -151,16 +163,39 @@ test('messages remain closed by default and private features fail closed without protected config', async ({ page }) => {
+-test('required widths have no horizontal overflow and produce screenshots', async ({ page }) => {
++test('required widths use one deterministic live scenario and the mobile dock never obscures content', async ({ browser }) => {
+   const sizes = [{ width: 360, height: 800, name: '360' }, { width: 390, height: 844, name: '390' }, { width: 768, height: 1024, name: '768' }, { width: 1024, height: 900, name: '1024' }, { width: 1440, height: 1000, name: '1440' }];
+   for (const size of sizes) {
++    const context = await browser.newContext({ viewport: size, serviceWorkers: 'block' });
++    const page = await context.newPage();
+     await mockPublicApi(page);
+-    await page.setViewportSize(size);
+     await page.goto('/');
++    await expect(page.getByTestId('hydro-hero').getByText('Datos en vivo', { exact: true })).toBeVisible();
++    await expect(page.getByText('Sin datos en vivo', { exact: true })).toHaveCount(0);
+     const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+     expect(dimensions.scrollWidth, `${size.width}px overflow`).toBeLessThanOrEqual(dimensions.clientWidth);
+     const heroWidth = (await page.getByTestId('hydro-hero').boundingBox())?.width ?? 0;
+     expect(heroWidth, `${size.width}px hero width`).toBeGreaterThan(size.width >= 1024 ? size.width * .48 : size.width * .84);
+-    await page.screenshot({ path: `artifacts/v1/screenshots/dashboard-${size.name}.png`, fullPage: true });
++    if (size.width <= 390) {
++      const dock = page.getByTestId('mobile-action-dock');
++      const chart = page.getByTestId('main-hydro-chart');
++      const readout = page.getByTestId('hydro-chart-active-readout');
++      const [dockBox, chartBox, readoutBox, dockPosition] = await Promise.all([
++        dock.boundingBox(), chart.boundingBox(), readout.boundingBox(),
++        dock.evaluate((element) => getComputedStyle(element).position),
++      ]);
++      expect(dockPosition).toBe('static');
++      expect(dockBox).not.toBeNull();
++      expect(chartBox).not.toBeNull();
++      expect(readoutBox).not.toBeNull();
++      if (dockBox && chartBox && readoutBox) {
++        expect(dockBox.y).toBeGreaterThanOrEqual(Math.max(chartBox.y + chartBox.height, readoutBox.y + readoutBox.height));
++      }
++    }
++    await page.screenshot({ path: `${evidenceDir}/screenshots/dashboard-live-${size.name}.png`, fullPage: true });
++    await context.close();
+   }
+ });
