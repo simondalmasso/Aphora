@@ -8,6 +8,13 @@ const STORAGE_KEY = 'sos-sf:last-live-snapshot:v3';
 interface StoredSnapshot { readonly snapshot: Snapshot; readonly savedAt: string }
 interface ApiEnvelope { readonly data?: unknown }
 
+class OfflineResponseError extends Error {
+  constructor(path: string) {
+    super(`Sin conexión al actualizar ${path}`);
+    this.name = 'OfflineResponseError';
+  }
+}
+
 function loadStored(): StoredSnapshot | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -17,6 +24,10 @@ function loadStored(): StoredSnapshot | null {
     if (!Number.isFinite(Date.parse(parsed.savedAt)) || parsed.snapshot.mode === 'DEMO') return null;
     return parsed;
   } catch { return null; }
+}
+
+function noStoredOfflineSnapshot(): Snapshot {
+  return { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' };
 }
 
 function offlineSnapshot(stored: StoredSnapshot): Snapshot {
@@ -45,10 +56,22 @@ function backendFailureSnapshot(stored: StoredSnapshot): Snapshot {
   };
 }
 
+function isOfflineEnvelope(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const data = (value as { data?: unknown }).data;
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return false;
+  const error = (data as { error?: unknown }).error;
+  return typeof error === 'object' && error !== null && !Array.isArray(error) && (error as { code?: unknown }).code === 'OFFLINE';
+}
+
 async function fetchEnvelope(path: string): Promise<unknown> {
   const response = await fetch(path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-  if (!response.ok) throw new Error(`No se pudo actualizar ${path}`);
-  return (await response.json() as ApiEnvelope).data;
+  const payload = await response.json().catch(() => null) as ApiEnvelope | null;
+  if (!response.ok) {
+    if (response.status === 503 && isOfflineEnvelope(payload)) throw new OfflineResponseError(path);
+    throw new Error(`No se pudo actualizar ${path}`);
+  }
+  return payload?.data;
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -58,7 +81,7 @@ function objectValue(value: unknown): Record<string, unknown> {
 
 export function useSnapshot() {
   const [initialStored] = useState<StoredSnapshot | null>(loadStored);
-  const [snapshot, setSnapshot] = useState<Snapshot>(() => navigator.onLine ? unavailableSnapshot : initialStored ? offlineSnapshot(initialStored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
+  const [snapshot, setSnapshot] = useState<Snapshot>(() => navigator.onLine ? unavailableSnapshot : initialStored ? offlineSnapshot(initialStored) : noStoredOfflineSnapshot());
   const [online, setOnline] = useState(() => navigator.onLine);
   const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(() => initialStored?.savedAt ?? null);
@@ -69,19 +92,22 @@ export function useSnapshot() {
   const refreshInFlight = useRef<Promise<boolean> | null>(null);
   const mounted = useRef(true);
 
+  const enterOfflineState = useCallback(() => {
+    const stored = loadStored();
+    if (!mounted.current) return;
+    setOnline(false);
+    setBackendAvailable(null);
+    setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
+    setSnapshot(stored ? offlineSnapshot(stored) : noStoredOfflineSnapshot());
+    setRefreshError('Modo sin conexión. No es información actual.');
+    setRefreshing(false);
+  }, []);
+
   const refresh = useCallback((): Promise<boolean> => {
     if (refreshInFlight.current) return refreshInFlight.current;
     const operation = (async () => {
-      const browserOnline = navigator.onLine;
-      if (!browserOnline) {
-        const stored = loadStored();
-        if (mounted.current) {
-          setOnline(false);
-          setBackendAvailable(null);
-          setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
-          setSnapshot(stored ? offlineSnapshot(stored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
-          setRefreshError('Modo sin conexión. No es información actual.');
-        }
+      if (!navigator.onLine) {
+        enterOfflineState();
         return false;
       }
       if (mounted.current) { setOnline(true); setRefreshing(true); setRefreshError(null); }
@@ -104,7 +130,11 @@ export function useSnapshot() {
           setRefreshError(validated.dataStatus === 'UNAVAILABLE' ? 'El servicio responde, pero no hay datos en vivo disponibles.' : null);
         }
         return true;
-      } catch {
+      } catch (error) {
+        if (error instanceof OfflineResponseError || !navigator.onLine) {
+          enterOfflineState();
+          return false;
+        }
         const stored = loadStored();
         if (mounted.current) {
           setOnline(true);
@@ -121,25 +151,17 @@ export function useSnapshot() {
     })();
     refreshInFlight.current = operation;
     return operation;
-  }, [initialStored]);
+  }, [enterOfflineState, initialStored]);
 
   useEffect(() => {
     mounted.current = true;
     const onOnline = () => { setOnline(true); void refresh(); };
-    const onOffline = () => {
-      const stored = loadStored();
-      setOnline(false);
-      setBackendAvailable(null);
-      setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
-      setSnapshot(stored ? offlineSnapshot(stored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
-      setRefreshError('Modo sin conexión. No es información actual.');
-      setRefreshing(false);
-    };
+    const onOffline = () => { enterOfflineState(); };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     void refresh();
     return () => { mounted.current = false; window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
-  }, [refresh]);
+  }, [enterOfflineState, refresh]);
 
   return { snapshot, online, backendAvailable, savedAt, source, refresh, refreshing, lastSuccessAt, refreshError } as const;
 }
