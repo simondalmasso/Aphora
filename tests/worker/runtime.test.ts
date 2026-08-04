@@ -31,6 +31,22 @@ async function envelope<T>(response: JsonResponseLike): Promise<T> {
   return body.data;
 }
 
+function multipartReportBody(metadata: Record<string, unknown>): { body: Uint8Array; contentType: string } {
+  const boundary = 'sos-sf-runtime-boundary-001';
+  const encoder = new TextEncoder();
+  const chunks = [
+    encoder.encode(`--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n${JSON.stringify(metadata)}\r\n`),
+    encoder.encode(`--${boundary}\r\nContent-Disposition: form-data; name="photos"; filename="evidence.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`),
+    Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9]),
+    encoder.encode(`\r\n--${boundary}--\r\n`),
+  ];
+  const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+  return { body, contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 beforeAll(async () => {
   await server.listen();
   const worker = server.getWorker<TestEnv>('sos-sf-test');
@@ -84,11 +100,9 @@ describe.sequential('Worker real con bindings locales', () => {
     const operator = principal('operator-one', 'VERIFIED_OPERATOR');
     const userCookie = await session(user);
     const operatorCookie = await session(operator);
-    const form = new FormData();
-    form.set('metadata', JSON.stringify({ category: 'ANEGAMIENTO', description: 'Agua acumulada desde hace una hora.', locationLabel: 'Barrio Centro', exactLocationConsent: false, idempotencyKey: 'runtime-report-one' }));
-    form.append('photos', new File([Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9]).buffer], 'evidence.jpg', { type: 'image/jpeg' }));
-    const submitted = await workerFetch('/api/private/reports', { method: 'POST', headers: { Cookie: userCookie, Origin: origin, 'CF-Connecting-IP': '203.0.113.20' }, body: form });
-    expect(submitted.status).toBe(201);
+    const multipart = multipartReportBody({ category: 'ANEGAMIENTO', description: 'Agua acumulada desde hace una hora.', locationLabel: 'Barrio Centro', exactLocationConsent: false, idempotencyKey: 'runtime-report-one' });
+    const submitted = await workerFetch('/api/private/reports', { method: 'POST', headers: { Cookie: userCookie, Origin: origin, 'CF-Connecting-IP': '203.0.113.20', 'Content-Type': multipart.contentType }, body: multipart.body });
+    if (submitted.status !== 201) throw new Error(`REPORT_SUBMIT_${submitted.status}:${await submitted.text()}`);
     const submittedData = await envelope<{ report: { id: string } }>(submitted);
     const listed = await workerFetch('/api/private/reports', { headers: { Cookie: operatorCookie } });
     const reports = (await envelope<{ reports: Array<{ id: string; photos: Array<{ id: string }> }> }>(listed)).reports;
