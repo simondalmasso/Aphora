@@ -1,5 +1,5 @@
 name: Deploy Workers
-# verification-revision: 7
+# verification-revision: 8
 
 on:
   workflow_dispatch:
