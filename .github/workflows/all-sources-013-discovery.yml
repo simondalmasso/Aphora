@@ -1,0 +1,94 @@
+name: All Sources 013 Discovery
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/all-sources-013-discovery.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Probe official provider surfaces
+        run: |
+          mkdir -p artifacts/all-sources-013-discovery
+          cat > /tmp/discover.mjs <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          const output = { generatedAt: new Date().toISOString(), probes: {}, findings: {} };
+          async function probe(name, url, options = {}) {
+            const started = Date.now();
+            try {
+              const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(options.timeout ?? 20000), headers: { 'User-Agent': 'SOS-SF/013 endpoint discovery', Accept: options.accept ?? '*/*' } });
+              const body = await response.text();
+              output.probes[name] = { url, finalUrl: response.url, status: response.status, contentType: response.headers.get('content-type'), bytes: Buffer.byteLength(body), elapsedMs: Date.now() - started, bodyHead: body.slice(0, options.head ?? 3000) };
+              return { response, body };
+            } catch (error) {
+              output.probes[name] = { url, error: String(error), elapsedMs: Date.now() - started };
+              return null;
+            }
+          }
+          const inaCatalog = await probe('ina_catalog', 'https://alerta.ina.gob.ar/a5/obs/puntual/series?format=geojson', { accept: 'application/json' });
+          if (inaCatalog) {
+            try {
+              const json = JSON.parse(inaCatalog.body);
+              const features = Array.isArray(json.features) ? json.features : [];
+              output.findings.inaCandidates = features.filter((feature) => {
+                const text = JSON.stringify(feature.properties ?? {}).normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+                return text.includes('santa fe') || text.includes('santo tome') || text.includes('salado');
+              }).map((feature) => ({ geometry: feature.geometry, properties: feature.properties })).slice(0, 150);
+            } catch (error) { output.findings.inaCatalogParseError = String(error); }
+          }
+          for (const id of ['30','3044','1679']) {
+            const start = new Date(Date.now() - 14 * 86400000).toISOString().slice(0,10);
+            const end = new Date(Date.now() + 86400000).toISOString().slice(0,10);
+            await probe(`ina_rest_${id}`, `https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=${id}&timestart=${start}&timeend=${end}`, { accept: 'application/json' });
+            await probe(`ina_waterml2_${id}`, `https://alerta.ina.gob.ar/a5/obs/puntual/series/${id}?timestart=${start}&timeend=${end}&format=waterml2`, { accept: 'application/xml,text/xml' });
+          }
+          const sites = await probe('ina_wml_sites', 'https://alerta.ina.gob.ar/wml/GetSites', { accept: 'application/xml,text/xml', head: 12000 });
+          await probe('ina_wml_variables', 'https://alerta.ina.gob.ar/wml/GetVariables', { accept: 'application/xml,text/xml', head: 12000 });
+          if (sites) {
+            const chunks = [...sites.body.matchAll(/<(?:\w+:)?siteInfo\b[\s\S]*?<\/(?:\w+:)?siteInfo>/gi)].map((match) => match[0]);
+            output.findings.waterMlSites = chunks.filter((chunk) => /Santa\s*Fe|Santo\s*Tom[eé]|Salado/i.test(chunk)).slice(0,50);
+          }
+          const portsPage = await probe('ports_santa_fe_page', 'https://hidrografia.agpse.gob.ar/santafe/', { accept: 'text/html', head: 20000 });
+          if (portsPage) {
+            const urls = [...portsPage.body.matchAll(/(?:https?:)?\/\/[^"'\s<>]+|(?:src|href)=["']([^"']+)["']/gi)].map((m) => m[1] ?? m[0]).filter(Boolean);
+            output.findings.portsLinkedResources = [...new Set(urls)].slice(0,200);
+            const scripts = [...portsPage.body.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => new URL(m[1], portsPage.response.url).toString());
+            output.findings.portsScripts = scripts;
+            for (const [index, url] of scripts.slice(0,20).entries()) await probe(`ports_script_${index}`, url, { accept: 'application/javascript,text/javascript,*/*', head: 12000 });
+          }
+          for (const [name, url] of Object.entries({
+            smn_root: 'https://ws2.smn.gob.ar/',
+            smn_alerts_page: 'https://ws2.smn.gob.ar/alertas',
+            smn_observations_candidate: 'https://ws2.smn.gob.ar/map_items/weather',
+            smn_alerts_candidate_1: 'https://ws2.smn.gob.ar/alertas/alertas.json',
+            smn_alerts_candidate_2: 'https://ws2.smn.gob.ar/api/alertas',
+            smn_alerts_rss: 'https://ws2.smn.gob.ar/rss/alertas'
+          })) await probe(name, url, { head: 16000 });
+          const smnRoot = output.probes.smn_root?.bodyHead ?? '';
+          const smnScripts = [...smnRoot.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => new URL(m[1], 'https://ws2.smn.gob.ar/').toString());
+          output.findings.smnScripts = smnScripts;
+          for (const [index, url] of smnScripts.slice(0,25).entries()) await probe(`smn_script_${index}`, url, { accept: 'application/javascript,text/javascript,*/*', head: 20000 });
+          await probe('nasa_service', 'https://maps.disasters.nasa.gov/ags03/rest/services/NRT_Latest/GPM_NRT_30min_Latest/ImageServer?f=json', { accept: 'application/json', head: 16000 });
+          const geometry = encodeURIComponent(JSON.stringify({ x: -60.700, y: -31.630, spatialReference: { wkid: 4326 } }));
+          await probe('nasa_identify', `https://maps.disasters.nasa.gov/ags03/rest/services/NRT_Latest/GPM_NRT_30min_Latest/ImageServer/identify?geometry=${geometry}&geometryType=esriGeometryPoint&sr=4326&returnGeometry=false&returnCatalogItems=true&f=json`, { accept: 'application/json', head: 16000 });
+          const text = JSON.stringify(output.probes);
+          output.findings.endpointStrings = [...new Set([...text.matchAll(/https?:\\?\/\\?\/[^"\\\s]+|\/(?:api|map_items|alertas|observaciones|hidro)[A-Za-z0-9_?&=./-]*/gi)].map((m) => m[0].replaceAll('\\/','/')))].slice(0,500);
+          await writeFile('artifacts/all-sources-013-discovery/report.json', JSON.stringify(output, null, 2));
+          console.log(JSON.stringify({ generatedAt: output.generatedAt, findings: output.findings, probeSummary: Object.fromEntries(Object.entries(output.probes).map(([k,v]) => [k, { status: v.status, contentType: v.contentType, bytes: v.bytes, error: v.error }])) }, null, 2));
+          NODE
+          node /tmp/discover.mjs | tee artifacts/all-sources-013-discovery/summary.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-sources-013-discovery-${{ github.run_id }}
+          path: artifacts/all-sources-013-discovery
+          retention-days: 30
