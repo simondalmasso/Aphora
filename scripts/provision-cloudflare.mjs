@@ -1,14 +1,17 @@
-import { readFile, writeFile, appendFile } from 'node:fs/promises';
+import { readFile, writeFile, appendFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 const token = process.env.CLOUDFLARE_API_TOKEN;
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const sessionKey = process.env.SESSION_SIGNING_KEY;
-const operatorEmails = process.env.SOS_SF_OPERATOR_EMAILS;
+const googleClientId = String(process.env.GOOGLE_CLIENT_ID ?? '').trim();
+const sessionKey = String(process.env.SESSION_SIGNING_KEY ?? '');
+const operatorEmails = String(process.env.SOS_SF_OPERATOR_EMAILS ?? '').trim();
 const messageBlocklist = process.env.MESSAGE_BLOCKLIST ?? '';
 if (!accountId || !token) throw new Error('Cloudflare Actions credentials are required.');
-if (!googleClientId || !sessionKey || sessionKey.length < 32) throw new Error('Protected Google/session configuration is required before deployment.');
-if (!operatorEmails || !operatorEmails.split(',').map((value) => value.trim()).filter(Boolean).every((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) throw new Error('At least one valid protected SOS-SF operator email is required.');
+
+const parsedOperatorEmails = operatorEmails.split(',').map((value) => value.trim()).filter(Boolean);
+const operatorEmailsValid = parsedOperatorEmails.length > 0 && parsedOperatorEmails.every((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+const privateConfigurationReady = Boolean(googleClientId && sessionKey.length >= 32 && operatorEmailsValid);
 
 const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}`;
 async function api(path, init = {}) {
@@ -44,17 +47,38 @@ await ensureR2(bucketName);
 const config = JSON.parse(await readFile('wrangler.jsonc', 'utf8'));
 config.vars = {
   ...(config.vars ?? {}),
-  PRIVATE_MESSAGING_ENABLED: 'true',
-  GOOGLE_CLIENT_ID: googleClientId,
-  REPORT_RETENTION_DAYS: process.env.REPORT_RETENTION_DAYS ?? '30',
+  PRIVATE_MESSAGING_ENABLED: privateConfigurationReady ? 'true' : 'false',
+  REPORT_RETENTION_DAYS: process.env.REPORT_RETENTION_DAYS || '30',
   INA_WATERML_PARANA_URL: process.env.INA_WATERML_PARANA_URL ?? '',
   INA_WATERML_SALADO_URL: process.env.INA_WATERML_SALADO_URL ?? '',
   PORTS_HYDROMETER_JSON_URL: process.env.PORTS_HYDROMETER_JSON_URL ?? '',
   SMN_OBSERVATIONS_JSON_URL: process.env.SMN_OBSERVATIONS_JSON_URL ?? '',
   SMN_ALERTS_JSON_URL: process.env.SMN_ALERTS_JSON_URL ?? '',
 };
+if (privateConfigurationReady) config.vars.GOOGLE_CLIENT_ID = googleClientId;
+else delete config.vars.GOOGLE_CLIENT_ID;
 config.d1_databases = [{ binding: 'MESSAGES_DB', database_name: databaseName, database_id: databaseId, migrations_dir: 'migrations' }];
 config.r2_buckets = [{ binding: 'REPORTS_BUCKET', bucket_name: bucketName }];
 await writeFile('wrangler.generated.jsonc', `${JSON.stringify(config, null, 2)}\n`);
-await writeFile('.worker-secrets.json', `${JSON.stringify({ SESSION_SIGNING_KEY: sessionKey, SOS_SF_OPERATOR_EMAILS: operatorEmails, MESSAGE_BLOCKLIST: messageBlocklist })}\n`, { mode: 0o600 });
-if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `d1_database_id=${databaseId}\nr2_bucket=${bucketName}\nconfig=wrangler.generated.jsonc\n`);
+
+const workerSecrets = privateConfigurationReady
+  ? { SESSION_SIGNING_KEY: sessionKey, SOS_SF_OPERATOR_EMAILS: operatorEmails, MESSAGE_BLOCKLIST: messageBlocklist }
+  : { MESSAGE_BLOCKLIST: messageBlocklist };
+await writeFile('.worker-secrets.json', `${JSON.stringify(workerSecrets)}\n`, { mode: 0o600 });
+
+const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
+await mkdir(evidenceDir, { recursive: true });
+await writeFile(join(evidenceDir, 'deployment-mode.json'), `${JSON.stringify({
+  schemaVersion: '1.0',
+  publicRuntime: 'ACTIVE',
+  privateRuntime: privateConfigurationReady ? 'ACTIVE' : 'FAIL_CLOSED_PENDING_PROTECTED_CONFIGURATION',
+  protectedConfigurationNamesPresent: {
+    GOOGLE_CLIENT_ID: Boolean(googleClientId),
+    SESSION_SIGNING_KEY: sessionKey.length >= 32,
+    SOS_SF_OPERATOR_EMAILS: operatorEmailsValid,
+  },
+  valuesExposed: false,
+  generatedAt: new Date().toISOString(),
+}, null, 2)}\n`);
+
+if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `d1_database_id=${databaseId}\nr2_bucket=${bucketName}\nconfig=wrangler.generated.jsonc\nprivate_ready=${privateConfigurationReady ? 'true' : 'false'}\n`);
