@@ -16,6 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Publish apply start
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="ARQ_EVIDENCE_009_PATCH_START\nRUN_ID=${GITHUB_RUN_ID}\nSHA=${GITHUB_SHA}"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -37,3 +42,9 @@ jobs:
         run: |
           body=$(printf 'ARQ_EVIDENCE_009_PATCH_APPLIED\nSHA=%s\nRUN_ID=%s\nAUD_HOLD=ACTIVE\n' "$RESULT_SHA" "$GITHUB_RUN_ID")
           gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="$body"
+      - name: Publish apply failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="ARQ_EVIDENCE_009_PATCH_FAILURE\nRUN_ID=${GITHUB_RUN_ID}\nSHA=${GITHUB_SHA}"
