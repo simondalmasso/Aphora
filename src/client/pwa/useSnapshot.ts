@@ -126,7 +126,15 @@ export function useSnapshot() {
   useEffect(() => {
     mounted.current = true;
     const onOnline = () => { setOnline(true); void refresh(); };
-    const onOffline = () => { setOnline(false); setBackendAvailable(null); void refresh(); };
+    const onOffline = () => {
+      const stored = loadStored();
+      setOnline(false);
+      setBackendAvailable(null);
+      setSource(stored ? 'OFFLINE_CACHE' : 'UNAVAILABLE');
+      setSnapshot(stored ? offlineSnapshot(stored) : { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' });
+      setRefreshError('Modo sin conexión. No es información actual.');
+      setRefreshing(false);
+    };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     void refresh();
