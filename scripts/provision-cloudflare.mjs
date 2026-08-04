@@ -17,7 +17,11 @@ const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}`;
 async function api(path, init = {}) {
   const response = await fetch(`${base}${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.success === false) throw new Error(`Cloudflare API failed for ${path}: ${response.status}`);
+  if (!response.ok || payload.success === false) {
+    const error = new Error(`Cloudflare API failed for ${path}: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   return payload.result;
 }
 
@@ -41,13 +45,24 @@ async function ensureR2(name) {
 
 const databaseName = 'sos-sf-private';
 const bucketName = 'sos-sf-private-reports';
-const databaseId = await ensureD1(databaseName);
-await ensureR2(bucketName);
+let databaseId = '';
+let resourcesReady = false;
+let storageApiState = 'NOT_ATTEMPTED';
+try {
+  databaseId = await ensureD1(databaseName);
+  await ensureR2(bucketName);
+  resourcesReady = true;
+  storageApiState = 'READY';
+} catch (error) {
+  if (error?.status !== 401 && error?.status !== 403) throw error;
+  storageApiState = `UNAUTHORIZED_${error.status}`;
+}
 
+const effectivePrivateReady = privateConfigurationReady && resourcesReady;
 const config = JSON.parse(await readFile('wrangler.jsonc', 'utf8'));
 config.vars = {
   ...(config.vars ?? {}),
-  PRIVATE_MESSAGING_ENABLED: privateConfigurationReady ? 'true' : 'false',
+  PRIVATE_MESSAGING_ENABLED: effectivePrivateReady ? 'true' : 'false',
   REPORT_RETENTION_DAYS: process.env.REPORT_RETENTION_DAYS || '30',
   INA_WATERML_PARANA_URL: process.env.INA_WATERML_PARANA_URL ?? '',
   INA_WATERML_SALADO_URL: process.env.INA_WATERML_SALADO_URL ?? '',
@@ -55,15 +70,20 @@ config.vars = {
   SMN_OBSERVATIONS_JSON_URL: process.env.SMN_OBSERVATIONS_JSON_URL ?? '',
   SMN_ALERTS_JSON_URL: process.env.SMN_ALERTS_JSON_URL ?? '',
 };
-if (privateConfigurationReady) config.vars.GOOGLE_CLIENT_ID = googleClientId;
+if (effectivePrivateReady) config.vars.GOOGLE_CLIENT_ID = googleClientId;
 else delete config.vars.GOOGLE_CLIENT_ID;
-config.d1_databases = [{ binding: 'MESSAGES_DB', database_name: databaseName, database_id: databaseId, migrations_dir: 'migrations' }];
-config.r2_buckets = [{ binding: 'REPORTS_BUCKET', bucket_name: bucketName }];
+if (resourcesReady) {
+  config.d1_databases = [{ binding: 'MESSAGES_DB', database_name: databaseName, database_id: databaseId, migrations_dir: 'migrations' }];
+  config.r2_buckets = [{ binding: 'REPORTS_BUCKET', bucket_name: bucketName }];
+} else {
+  delete config.d1_databases;
+  delete config.r2_buckets;
+}
 await writeFile('wrangler.generated.jsonc', `${JSON.stringify(config, null, 2)}\n`);
 
-const workerSecrets = privateConfigurationReady
+const workerSecrets = effectivePrivateReady
   ? { SESSION_SIGNING_KEY: sessionKey, SOS_SF_OPERATOR_EMAILS: operatorEmails, MESSAGE_BLOCKLIST: messageBlocklist }
-  : { MESSAGE_BLOCKLIST: messageBlocklist };
+  : {};
 await writeFile('.worker-secrets.json', `${JSON.stringify(workerSecrets)}\n`, { mode: 0o600 });
 
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
@@ -71,7 +91,9 @@ await mkdir(evidenceDir, { recursive: true });
 await writeFile(join(evidenceDir, 'deployment-mode.json'), `${JSON.stringify({
   schemaVersion: '1.0',
   publicRuntime: 'ACTIVE',
-  privateRuntime: privateConfigurationReady ? 'ACTIVE' : 'FAIL_CLOSED_PENDING_PROTECTED_CONFIGURATION',
+  privateRuntime: effectivePrivateReady ? 'ACTIVE' : 'FAIL_CLOSED_PENDING_PROTECTED_CONFIGURATION_OR_STORAGE_AUTHORITY',
+  resourcesReady,
+  storageApiState,
   protectedConfigurationNamesPresent: {
     GOOGLE_CLIENT_ID: Boolean(googleClientId),
     SESSION_SIGNING_KEY: sessionKey.length >= 32,
@@ -81,4 +103,4 @@ await writeFile(join(evidenceDir, 'deployment-mode.json'), `${JSON.stringify({
   generatedAt: new Date().toISOString(),
 }, null, 2)}\n`);
 
-if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `d1_database_id=${databaseId}\nr2_bucket=${bucketName}\nconfig=wrangler.generated.jsonc\nprivate_ready=${privateConfigurationReady ? 'true' : 'false'}\n`);
+if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `d1_database_id=${databaseId}\nr2_bucket=${resourcesReady ? bucketName : ''}\nconfig=wrangler.generated.jsonc\nprivate_ready=${effectivePrivateReady ? 'true' : 'false'}\nresources_ready=${resourcesReady ? 'true' : 'false'}\n`);
