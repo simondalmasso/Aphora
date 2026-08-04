@@ -35,6 +35,7 @@ function privateMessagingEnabled(env: WorkerEnv): boolean {
   return env.PRIVATE_MESSAGING_ENABLED === 'true' && Boolean(env.GOOGLE_CLIENT_ID && env.SESSION_SIGNING_KEY && env.SESSION_SIGNING_KEY.length >= 32 && env.MESSAGES_DB);
 }
 function reportingEnabled(env: WorkerEnv): boolean { return privateMessagingEnabled(env) && Boolean(env.REPORTS_BUCKET); }
+function publicMode(mode: 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' | 'DEMO'): 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' { return mode === 'DEMO' ? 'UNAVAILABLE' : mode; }
 
 async function publicApiResponse(pathname: string, env: WorkerEnv): Promise<Response> {
   if (pathname === '/api/essential-contacts') return jsonResponse({ contacts: ESSENTIAL_CONTACTS, sources: ['https://santafeciudad.gov.ar/direccion-de-gestion-de-riesgo/cobem/', 'https://www.santafe.gov.ar/index.php/web/guia/contactenosAccesible'] }, { cacheControl: 'public, max-age=86400' });
@@ -53,9 +54,10 @@ async function publicApiResponse(pathname: string, env: WorkerEnv): Promise<Resp
       connectedProviders: providers.filter((provider) => provider.status !== 'UNAVAILABLE').map((provider) => provider.id),
     }, { cacheControl: 'no-store' });
   }
-  if (pathname === '/api/snapshot') return jsonResponse(snapshot, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store' });
-  if (pathname === '/api/sources') return jsonResponse({ snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, contradictions: snapshot.contradictions }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store' });
-  if (pathname === '/api/messages') return jsonResponse({ snapshotId: snapshot.id, messages: snapshot.messages, deliveryClaims: 'NONE' }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store' });
+  const mode = publicMode(snapshot.mode);
+  if (pathname === '/api/snapshot') return jsonResponse(snapshot, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
+  if (pathname === '/api/sources') return jsonResponse({ snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, contradictions: snapshot.contradictions }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
+  if (pathname === '/api/messages') return jsonResponse({ snapshotId: snapshot.id, messages: snapshot.messages, deliveryClaims: 'NONE' }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
   return errorResponse('NOT_FOUND', 'Ruta API inexistente', 404);
 }
 
