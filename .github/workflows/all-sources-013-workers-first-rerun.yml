@@ -1,0 +1,101 @@
+name: All Sources 013 Workers First Rerun
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/all-sources-013-workers-first-rerun.yml]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: sos-sf-workers-production
+  cancel-in-progress: false
+
+env:
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  EVIDENCE_DIR: artifacts/all-sources-013
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+  SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+
+jobs:
+  workers-first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Restore and apply audited runtime patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm -rf "$EVIDENCE_DIR" /tmp/as013 && mkdir -p "$EVIDENCE_DIR" /tmp/as013
+          curl --fail --location --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/artifacts/8912882051/zip \
+            -o /tmp/as013.zip
+          unzip -q /tmp/as013.zip -d /tmp/as013
+          git apply /tmp/as013/runtime.patch
+          python <<'PY'
+          from pathlib import Path
+          p=Path('src/worker/live-data.ts'); s=p.read_text()
+          s=s.replace('async function buildUncached(env: LiveDataEnv, now: Date)', 'async function buildUncached(_env: LiveDataEnv, now: Date)')
+          old="    official: true, connected: Boolean(result.value),\n  });\n}\n\nasync function nasaSource"
+          new="    official: true, connected: result.value !== null, url,\n  });\n}\n\nasync function nasaSource"
+          assert s.count(old)==1; s=s.replace(old,new)
+          old="    official: true, connected: Boolean(result.value), latencyMinutes: result.value?.latencyMinutes ?? 240,"
+          new="    official: true, connected: result.value !== null, url: query.toString(), latencyMinutes: result.value?.latencyMinutes ?? 240,"
+          assert s.count(old)==1; s=s.replace(old,new)
+          p.write_text(s)
+          PY
+          git diff -- src/worker > "$EVIDENCE_DIR/runtime.patch"
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint -- --max-warnings=0
+      - run: npm run test:unit
+      - run: npm run test:contract
+      - run: npm run build
+      - run: npm run test:worker
+      - name: Prepare bounded Cloudflare configuration
+        run: node scripts/provision-cloudflare.mjs
+      - name: Wrangler dry run
+        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-dry-run.log"
+      - name: Deploy Worker first
+        run: npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+      - name: Verify all source families twice in production
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs'); const base=process.env.DEPLOYMENT_URL;
+          async function read(path){const r=await fetch(`${base}${path}?all013=${Date.now()}-${Math.random()}`,{cache:'no-store',headers:{'Cache-Control':'no-store'},signal:AbortSignal.timeout(30000)});const text=await r.text();if(!r.ok)throw Error(`${path}:HTTP_${r.status}`);return JSON.parse(text).data}
+          (async()=>{const rounds=[];for(let i=0;i<2;i++){rounds.push({health:await read('/api/health'),sources:await read('/api/sources'),snapshot:await read('/api/snapshot')});await new Promise(r=>setTimeout(r,1500))}
+          const h=rounds[1].health.providers,s=rounds[1].sources.sources;
+          const connected=[['ina-rest-30','ina:30'],['ina-rest-3044','ina:3044'],['ina-waterml-parana','ina-waterml-parana'],['ina-waterml-salado','ina-waterml-salado'],['smn-alerts','smn-alerts'],['nasa-gpm-imerg-early','nasa-gpm-imerg-early']];
+          for(const [healthId,sourceId] of connected){const hp=h.find(x=>x.id===healthId),sp=s.find(x=>x.id===sourceId);if(!hp||hp.errorClass!==null||hp.circuitOpenUntil!==null)throw Error(`health:${healthId}:${JSON.stringify(hp)}`);if(!sp||sp.connected!==true||!sp.url)throw Error(`source:${sourceId}:${JSON.stringify(sp)}`)}
+          for(const [id,error] of [['ports-hydrometers','OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE'],['smn-observations','CREDENTIAL_REQUIRED']]){const hp=h.find(x=>x.id===id),sp=s.find(x=>x.id===id);if(hp?.errorClass!==error||hp?.circuitOpenUntil!==null||sp?.connected!==false||!sp?.url)throw Error(`external-block:${id}:${JSON.stringify({hp,sp})}`)}
+          const systems=rounds[1].snapshot.systems;if(!systems.find(x=>x.id==='parana-santa-fe'&&x.available)||!systems.find(x=>x.id==='salado-santo-tome'&&x.available))throw Error('separated-systems-not-available');
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/production-matrix.json`,JSON.stringify(rounds,null,2));console.log(JSON.stringify({status:'PASS',providers:h,sources:s},null,2))})().catch(e=>{console.error(e);process.exit(1)})
+          NODE
+      - name: Synchronize exact verified source to GitHub second
+        run: |
+          git config user.name 'SOS-SF ARQ'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/worker/providers/core.ts src/worker/providers/ina.ts src/worker/providers/smn.ts src/worker/providers/nasa.ts src/worker/live-data.ts
+          git commit -m 'feat: connect and classify all official source families 013'
+          printf 'all-sources-013-terminal-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" > .github/arq-v3-deploy-trigger
+          git add .github/arq-v3-deploy-trigger
+          git commit -m 'ci: run terminal all-sources 013 pipeline'
+          git push origin HEAD:arq/visual-dashboard-v3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: all-sources-013-workers-first-${{ github.run_id }}
+          path: artifacts/all-sources-013
+          if-no-files-found: warn
+          retention-days: 30
