@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'sos-sf-v3-live-20260803b';
+const CACHE_VERSION = 'sos-sf-v3-live-20260803c';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PUBLIC_DATA_CACHE = `${CACHE_VERSION}-public-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css', '/essential-contacts.json', '/offline-guidance.json'];
@@ -13,7 +13,7 @@ function mayStore(response) {
 async function precacheCompleteShell() {
   const cache = await caches.open(STATIC_CACHE);
   await cache.addAll(SHELL);
-  const documentResponse = await cache.match('/');
+  const documentResponse = await cache.match('/', { ignoreVary: true });
   if (!documentResponse) throw new Error('SHELL_DOCUMENT_MISSING');
   const html = await documentResponse.text();
   const buildAssets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"?#]+)"/g)].map((match) => match[1]);
@@ -87,7 +87,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(navigationNetworkFirst(request));
     return;
   }
-  event.respondWith(caches.match(request, { ignoreVary: false }).then(async (cached) => {
+  event.respondWith(caches.match(request, { ignoreVary: true }).then(async (cached) => {
     if (cached) return cached;
     const response = await fetch(request);
     if (mayStore(response)) void caches.open(STATIC_CACHE).then((cache) => cache.put(request, response.clone()));
