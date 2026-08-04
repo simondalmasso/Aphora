@@ -3,30 +3,28 @@ import { mkdir } from 'node:fs/promises';
 import type { Snapshot } from '../../src/domain/snapshot';
 
 const generatedAt = '2026-08-03T18:00:00.000Z';
+const storageKey = 'sos-sf:last-live-snapshot:v3';
 const points = (base: number) => Array.from({ length: 13 }, (_, index) => ({ at: new Date(Date.parse(generatedAt) - (12 - index) * 2 * 3_600_000).toISOString(), metres: base + index * .01, measured: true }));
 const systems = [
   { id: 'parana-santa-fe', label: 'Sistema Paraná', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', available: true, dataStatus: 'LIVE' as const, currentMetres: 3.22, observedAt: generatedAt, sourceId: 'ina:30', sourceName: 'INA · Sistema de Información Hidrológica', points: points(3.1), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia baja', metres: 2 }, { id: 'ALERTA' as const, label: 'Alerta', metres: 5.3 }, { id: 'EVACUACION' as const, label: 'Evacuación', metres: 5.7 }], trend: 'RISING_SLOWLY' as const, delta1h: .01, delta6h: .03, delta24h: .12 },
   { id: 'salado-santo-tome', label: 'Sistema Salado', watercourse: 'Río Salado', stationName: 'Santo Tomé', stationCode: '1679', available: true, dataStatus: 'LIVE' as const, currentMetres: 4.8, observedAt: generatedAt, sourceId: 'ina:3044', sourceName: 'INA · Sistema de Información Hidrológica', points: points(4.68), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia baja', metres: 0 }, { id: 'ALERTA' as const, label: 'Alerta', metres: 4.7 }], trend: 'RISING' as const, delta1h: .02, delta6h: .06, delta24h: .12 },
 ] as const;
 const liveSnapshot: Snapshot = {
-  schemaVersion: '1.0', id: 'live-e2e', mode: 'LIVE', dataStatus: 'LIVE', generatedAt, previousSnapshotAt: '2026-08-03T17:45:00.000Z', state: 'ALERTA', stateLabel: 'Umbral de alerta alcanzado', summary: 'Dos estaciones oficiales se presentan en escalas separadas.', dominantSourceId: 'ina:3044', validUntil: '2026-08-03T18:15:00.000Z', recommendedAction: 'Seguí instrucciones oficiales y evitá zonas ribereñas o anegadas.', emergencyDisclaimer: 'SOS Santa Fe agrega fuentes públicas y no reemplaza a los servicios de emergencia.', changes: [{ id: 'change', label: 'Río Paraná · Santa Fe', direction: 'UP', detail: '+12 cm en 24 horas' }], systems, river: { systemId: 'parana-santa-fe', available: true, dataStatus: 'LIVE', stationName: 'Santa Fe', currentMetres: 3.22, delta1h: .01, delta6h: .03, delta24h: .12, trend: 'RISING_SLOWLY', observedAt: generatedAt, sourceId: 'ina:30', sourceName: systems[0].sourceName, points: systems[0].points, forecastPoints: [], thresholds: systems[0].thresholds }, rain: { available: false, dataStatus: 'UNAVAILABLE', accumulated1hMm: 0, accumulated24hMm: 0, forecast: 'Sin estimación local validada.', observedAt: generatedAt, sourceId: 'nasa-gpm-imerg-early', points: [] }, sources: systems.map((system) => ({ id: system.sourceId, name: system.sourceName, kind: 'OFFICIAL_OBSERVATION' as const, status: 'FRESH' as const, observedAt: generatedAt, validUntil: '2026-08-04T06:00:00.000Z', contribution: `${system.watercourse}, estación ${system.stationName}`, official: true })), contradictions: [], shelters: [], actions: ['Consultá alertas y recomendaciones oficiales.', 'Tené disponibles los teléfonos esenciales.'], messages: [],
+  schemaVersion: '1.0', id: 'live-e2e', mode: 'LIVE', dataStatus: 'LIVE', generatedAt, previousSnapshotAt: '2026-08-03T17:45:00.000Z', state: 'ALERTA', stateLabel: 'Umbral de alerta alcanzado', summary: 'Dos estaciones oficiales se presentan en escalas separadas.', dominantSourceId: 'ina:3044', validUntil: '2026-08-03T18:15:00.000Z', recommendedAction: 'Seguí instrucciones oficiales y evitá zonas ribereñas o anegadas.', emergencyDisclaimer: 'SOS Santa Fe agrega fuentes públicas y no reemplaza a los servicios de emergencia.', changes: [{ id: 'change', label: 'Río Paraná · Santa Fe', direction: 'UP', detail: '+12 cm en 24 horas' }], systems, river: { systemId: 'parana-santa-fe', available: true, dataStatus: 'LIVE', stationName: 'Santa Fe', currentMetres: 3.22, delta1h: .01, delta6h: .03, delta24h: .12, trend: 'RISING_SLOWLY', observedAt: generatedAt, sourceId: 'ina:30', sourceName: systems[0].sourceName, points: systems[0].points, forecastPoints: [], thresholds: systems[0].thresholds }, rain: { available: false, dataStatus: 'UNAVAILABLE', accumulated1hMm: 0, accumulated24hMm: 0, forecast: 'Sin estimación local publicada.', observedAt: generatedAt, sourceId: 'nasa-gpm-imerg-early', points: [] }, sources: systems.map((system) => ({ id: system.sourceId, name: system.sourceName, kind: 'OFFICIAL_OBSERVATION' as const, status: 'FRESH' as const, observedAt: generatedAt, validUntil: '2026-08-04T06:00:00.000Z', contribution: `${system.watercourse}, estación ${system.stationName}`, official: true })), contradictions: [], shelters: [], actions: ['Consultá alertas y recomendaciones oficiales.', 'Tené disponibles los teléfonos esenciales.'], messages: [],
 };
 
 async function mockPublicApi(page: Page, snapshot: Snapshot = liveSnapshot) {
-  await page.route('**/api/snapshot', (route) => route.fulfill({ json: { ok: true, data: snapshot, meta: { schemaVersion: '1.0', generatedAt, mode: snapshot.mode, official: false } } }));
-  await page.route('**/api/sources', (route) => route.fulfill({ json: { ok: true, data: { snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, contradictions: [] } } }));
-  await page.route('**/api/messages', (route) => route.fulfill({ json: { ok: true, data: { snapshotId: snapshot.id, messages: [], deliveryClaims: 'NONE' } } }));
-  await page.route('**/api/auth/config', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, reportingEnabled: false, googleClientId: null } } }));
-  await page.route('**/api/session', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
+  await page.route('**/api/snapshot', (route) => route.fulfill({ headers: { 'Cache-Control': 'public, max-age=60' }, json: { ok: true, data: snapshot, meta: { schemaVersion: '1.0', generatedAt, mode: snapshot.mode, official: false } } }));
+  await page.route('**/api/sources', (route) => route.fulfill({ headers: { 'Cache-Control': 'public, max-age=60' }, json: { ok: true, data: { snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, contradictions: [] } } }));
+  await page.route('**/api/messages', (route) => route.fulfill({ headers: { 'Cache-Control': 'public, max-age=60' }, json: { ok: true, data: { snapshotId: snapshot.id, messages: [], deliveryClaims: 'NONE' } } }));
+  await page.route('**/api/auth/config', (route) => route.fulfill({ headers: { 'Cache-Control': 'private, no-store' }, json: { ok: true, data: { enabled: false, reportingEnabled: false, googleClientId: null } } }));
+  await page.route('**/api/session', (route) => route.fulfill({ headers: { 'Cache-Control': 'private, no-store' }, json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
 }
 
 async function removePublicApiMocks(page: Page) {
   await Promise.all([
-    page.unroute('**/api/snapshot'),
-    page.unroute('**/api/sources'),
-    page.unroute('**/api/messages'),
-    page.unroute('**/api/auth/config'),
-    page.unroute('**/api/session'),
+    page.unroute('**/api/snapshot'), page.unroute('**/api/sources'), page.unroute('**/api/messages'),
+    page.unroute('**/api/auth/config'), page.unroute('**/api/session'),
   ]);
 }
 
@@ -40,7 +38,7 @@ test('first viewport exposes live state and separate Paraná/Salado systems with
   await expect(hero.getByText('Datos en vivo', { exact: true })).toBeVisible();
   await expect(hero.getByRole('tab', { name: /Sistema Paraná/ })).toBeVisible();
   await expect(hero.getByRole('tab', { name: /Sistema Salado/ })).toBeVisible();
-  const level = hero.locator('.hydro-hero__summary > div').filter({ hasText: 'Nivel actual' }).locator('strong');
+  const level = hero.getByTestId('hydro-current-level');
   await expect(level).toBeVisible();
   await expect(level).toContainText('3.22');
   await expect(hero.getByText('+12 cm', { exact: true })).toBeVisible();
@@ -50,6 +48,7 @@ test('first viewport exposes live state and separate Paraná/Salado systems with
   await expect(page.getByRole('button', { name: 'Compartir' })).toHaveCount(0);
   const box = await hero.boundingBox();
   expect(box?.y).toBeLessThan(80);
+  if ((page.viewportSize()?.width ?? 0) >= 1024) expect(box?.width).toBeGreaterThan(650);
 });
 
 test('three formal modules follow the hero and no unrelated station levels share one gauge', async ({ page }) => {
@@ -59,11 +58,14 @@ test('three formal modules follow the hero and no unrelated station levels share
   await expect(page.getByRole('heading', { name: 'Estado actual' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Recomendaciones operativas' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Evolución prevista' })).toBeVisible();
-  const gauges = page.getByRole('img', { name: /Sin umbral|alerta|Sin datos/i });
-  await expect(gauges).toHaveCount(2);
-  const current = page.getByLabel('Estado actual');
-  await expect(current.getByText('Río Paraná · Santa Fe', { exact: true })).toBeVisible();
-  await expect(current.getByText('Río Salado · Santo Tomé', { exact: true })).toBeVisible();
+  await expect(page.getByRole('img', { name: /Sin umbral|alerta|Sin datos/i })).toHaveCount(2);
+  const current = page.getByTestId('current-state-panel');
+  const parana = current.getByTestId('current-system-parana-santa-fe');
+  const salado = current.getByTestId('current-system-salado-santo-tome');
+  await expect(parana).toBeVisible();
+  await expect(parana).toContainText('Río Paraná · Santa Fe');
+  await expect(salado).toBeVisible();
+  await expect(salado).toContainText('Río Salado · Santo Tomé');
 });
 
 test('main graph supports pointer and keyboard reading', async ({ page }) => {
@@ -71,20 +73,25 @@ test('main graph supports pointer and keyboard reading', async ({ page }) => {
   await page.goto('/');
   const chart = page.getByTestId('main-hydro-chart');
   const svg = chart.locator('svg');
+  const readout = chart.getByTestId('hydro-chart-active-readout');
   await svg.focus();
   await page.keyboard.press('Home');
-  await expect(chart.locator('.hydro-chart__readout')).toContainText('lectura publicada por INA');
-  const first = await chart.locator('.hydro-chart__readout').textContent();
+  await expect(readout).toHaveAttribute('data-active', 'true');
+  await expect(readout).toContainText('lectura publicada por INA');
+  const first = await readout.textContent();
   await page.keyboard.press('ArrowRight');
-  await expect(chart.locator('.hydro-chart__readout')).not.toHaveText(first ?? '');
+  await expect(readout).not.toHaveText(first ?? '');
   const box = await svg.boundingBox();
-  if (box) await page.mouse.move(box.x + box.width * .8, box.y + box.height * .5);
+  expect(box).not.toBeNull();
+  if (box) await page.mouse.move(box.x + box.width * .75, box.y + box.height * .5);
   await expect(chart.locator('.hydro-chart__crosshair')).toBeVisible();
+  await expect(readout).toHaveAttribute('data-active', 'true');
+  await expect(readout).toContainText('m · lectura publicada por INA');
   await expect(chart.getByText('Sin proyección operativa', { exact: true })).toBeVisible();
 });
 
 test('unavailable data renders safe empty charts and gauges', async ({ page }) => {
-  const unavailable: Snapshot = { ...liveSnapshot, id: 'unavailable-e2e', mode: 'UNAVAILABLE', dataStatus: 'UNAVAILABLE', state: 'UNKNOWN', stateLabel: 'Sin datos en vivo', systems: liveSnapshot.systems?.map((system) => ({ ...system, available: false, dataStatus: 'UNAVAILABLE', currentMetres: null, observedAt: null, points: [], thresholds: [] })), river: { ...liveSnapshot.river, available: false, dataStatus: 'UNAVAILABLE', currentMetres: 0, points: [], thresholds: [] }, summary: 'No hay una lectura hídrica validada disponible.' };
+  const unavailable: Snapshot = { ...liveSnapshot, id: 'unavailable-e2e', mode: 'UNAVAILABLE', dataStatus: 'UNAVAILABLE', state: 'UNKNOWN', stateLabel: 'Sin datos en vivo', systems: liveSnapshot.systems?.map((system) => ({ ...system, available: false, dataStatus: 'UNAVAILABLE', currentMetres: null, observedAt: null, points: [], thresholds: [] })), river: { ...liveSnapshot.river, available: false, dataStatus: 'UNAVAILABLE', currentMetres: 0, points: [], thresholds: [] }, summary: 'No hay una lectura hídrica publicada disponible.' };
   await mockPublicApi(page, unavailable);
   await page.goto('/');
   await expect(page.getByText('Sin datos en vivo', { exact: true }).first()).toBeVisible();
@@ -148,8 +155,10 @@ test('required widths have no horizontal overflow and produce screenshots', asyn
     await mockPublicApi(page);
     await page.setViewportSize(size);
     await page.goto('/');
-    const widths = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
-    expect(widths.scrollWidth, `${size.width}px overflow`).toBeLessThanOrEqual(widths.clientWidth);
+    const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+    expect(dimensions.scrollWidth, `${size.width}px overflow`).toBeLessThanOrEqual(dimensions.clientWidth);
+    const heroWidth = (await page.getByTestId('hydro-hero').boundingBox())?.width ?? 0;
+    expect(heroWidth, `${size.width}px hero width`).toBeGreaterThan(size.width >= 1024 ? size.width * .48 : size.width * .84);
     await page.screenshot({ path: `artifacts/v1/screenshots/dashboard-${size.name}.png`, fullPage: true });
   }
 });
@@ -188,12 +197,21 @@ test('lite stays textual, script-free and contains essential contacts', async ({
 test('PWA opens the cached dashboard offline and labels prior data as not current', async ({ page, context }) => {
   await mockPublicApi(page);
   await page.goto('/');
+  await expect.poll(() => page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as { snapshot?: { id?: string; mode?: string } };
+    return `${stored.snapshot?.id}:${stored.snapshot?.mode}`;
+  }, storageKey)).toBe('live-e2e:LIVE');
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
   await removePublicApiMocks(page);
   await context.setOffline(true);
+  await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
+  await expect(page.getByText('Modo sin conexión', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('No es información actual.', { exact: false })).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await expect(page.getByText('Modo sin conexión', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('No es información actual.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Informar', exact: true }).last().click();
