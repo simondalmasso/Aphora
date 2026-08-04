@@ -31,7 +31,7 @@ async function envelope<T>(response: JsonResponseLike): Promise<T> {
   return body.data;
 }
 
-function multipartReportBody(metadata: Record<string, unknown>): { body: Uint8Array; contentType: string } {
+function multipartReportBody(metadata: Record<string, unknown>): { body: ArrayBuffer; contentType: string } {
   const boundary = 'sos-sf-runtime-boundary-001';
   const encoder = new TextEncoder();
   const chunks = [
@@ -41,9 +41,10 @@ function multipartReportBody(metadata: Record<string, unknown>): { body: Uint8Ar
     encoder.encode(`\r\n--${boundary}--\r\n`),
   ];
   const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
-  const body = new Uint8Array(total);
+  const body = new ArrayBuffer(total);
+  const view = new Uint8Array(body);
   let offset = 0;
-  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+  for (const chunk of chunks) { view.set(chunk, offset); offset += chunk.byteLength; }
   return { body, contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
