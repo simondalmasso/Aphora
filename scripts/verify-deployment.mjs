@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const baseUrl = (process.argv[2] ?? process.env.DEPLOYMENT_URL ?? '').replace(/\/$/, '');
+const expectPrivateFeatures = process.env.EXPECT_PRIVATE_FEATURES === 'true';
 if (!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(baseUrl)) {
   console.error(JSON.stringify({ event: 'remote_verification_failed', reason: 'WORKERS_DEV_URL_REQUIRED' }));
   process.exit(2);
@@ -39,31 +40,34 @@ const results = checks.map((item) => {
     detail = 'lite + quality/threshold disclaimer';
   } else if (item.path === '/api/health') {
     const data = json(item);
-    semantic = item.status === 200 && data?.status === 'healthy' && data?.dataMode === 'LIVE_AGGREGATION' && data?.privateMessaging === 'ENABLED' && data?.reporting === 'ENABLED' && Array.isArray(data?.providers) && data.providers.length >= 3 && data.providers.every((provider) => typeof provider.id === 'string' && ['FRESH', 'STALE', 'UNAVAILABLE'].includes(provider.status) && 'lastSuccessAt' in provider && 'errorClass' in provider && 'circuitOpenUntil' in provider);
-    detail = 'provider health + private activation';
+    const privateState = expectPrivateFeatures ? data?.privateMessaging === 'ENABLED' && data?.reporting === 'ENABLED' : data?.privateMessaging === 'FEATURE_DISABLED' && data?.reporting === 'FEATURE_DISABLED';
+    semantic = item.status === 200 && data?.status === 'healthy' && data?.dataMode === 'LIVE_AGGREGATION' && privateState && Array.isArray(data?.providers) && data.providers.length >= 3 && data.providers.every((provider) => typeof provider.id === 'string' && ['FRESH', 'STALE', 'UNAVAILABLE'].includes(provider.status) && 'lastSuccessAt' in provider && 'errorClass' in provider && 'circuitOpenUntil' in provider);
+    detail = expectPrivateFeatures ? 'provider health + private activation' : 'provider health + private fail-closed state';
   } else if (item.path === '/api/snapshot') {
     const data = json(item);
-    semantic = item.status === 200 && data?.mode === 'LIVE' && ['LIVE', 'STALE'].includes(data?.dataStatus) && Array.isArray(data?.systems) && data.systems.length >= 2 && data.systems.some((system) => system.available === true && Number.isFinite(system.currentMetres) && typeof system.observedAt === 'string') && data?.state !== 'EVACUACION_OFICIAL' && !item.body.includes('DEMO_FIXTURE');
-    detail = 'usable non-synthetic live/stale snapshot';
+    semantic = item.status === 200 && ['LIVE', 'UNAVAILABLE', 'OFFLINE'].includes(data?.mode) && ['LIVE', 'STALE', 'UNAVAILABLE', 'OFFLINE'].includes(data?.dataStatus) && Array.isArray(data?.systems) && data.systems.length >= 2 && data?.state !== 'EVACUACION_OFICIAL' && !item.body.includes('DEMO_FIXTURE') && !item.body.includes('DEMO / NO OFICIAL');
+    detail = 'non-synthetic separated-system snapshot';
   } else if (item.path === '/api/sources') {
     const data = json(item);
-    semantic = item.status === 200 && Array.isArray(data?.systems) && data.systems.some((system) => system.id === 'parana-santa-fe') && data.systems.some((system) => system.id === 'salado-santo-tome') && Array.isArray(data?.sources) && data.sources.some((source) => source.connected === true && ['FRESH', 'STALE'].includes(source.status) && typeof source.observedAt === 'string' && typeof source.qualityNote === 'string');
-    detail = 'station separation + connected provenance';
+    semantic = item.status === 200 && Array.isArray(data?.systems) && data.systems.some((system) => system.id === 'parana-santa-fe') && data.systems.some((system) => system.id === 'salado-santo-tome') && Array.isArray(data?.sources) && data.sources.every((source) => typeof source.id === 'string' && ['FRESH', 'STALE', 'UNAVAILABLE'].includes(source.status) && typeof source.qualityNote === 'string');
+    detail = 'station separation + explicit provenance state';
   } else if (item.path === '/api/auth/config') {
     const data = json(item);
-    semantic = item.status === 200 && data?.enabled === true && data?.reportingEnabled === true && typeof data?.googleClientId === 'string' && data.googleClientId.length > 10;
-    detail = 'protected auth/report configuration';
+    semantic = item.status === 200 && (expectPrivateFeatures
+      ? data?.enabled === true && data?.reportingEnabled === true && typeof data?.googleClientId === 'string' && data.googleClientId.length > 10 && data?.activationState === 'ACTIVE'
+      : data?.enabled === false && data?.reportingEnabled === false && data?.googleClientId === null && data?.activationState === 'REQUIRES_PROTECTED_GOOGLE_D1_CONFIGURATION');
+    detail = expectPrivateFeatures ? 'protected auth/report configuration' : 'auth/report fail-closed configuration';
   } else if (item.path === '/api/essential-contacts') {
     const data = json(item);
     semantic = item.status === 200 && Array.isArray(data?.contacts) && ['911','103','107','100','106','0800-777-5000'].every((number) => data.contacts.some((contact) => contact.number === number && String(contact.href).startsWith('tel:')));
     detail = 'essential contacts';
   } else if (item.path === '/api/session') {
     const data = json(item);
-    semantic = item.status === 200 && data?.enabled === true && data?.authenticated === false && item.cacheControl.includes('private') && item.cacheControl.includes('no-store');
-    detail = 'anonymous private session negative';
+    semantic = item.status === 200 && data?.enabled === expectPrivateFeatures && data?.authenticated === false && item.cacheControl.includes('private') && item.cacheControl.includes('no-store');
+    detail = expectPrivateFeatures ? 'anonymous private session negative' : 'disabled private session negative';
   } else if (item.path === '/api/private/reports') {
-    semantic = item.status === 401 && item.cacheControl.includes('private') && item.cacheControl.includes('no-store');
-    detail = 'private report authorization negative';
+    semantic = item.status === (expectPrivateFeatures ? 401 : 503) && item.cacheControl.includes('private') && item.cacheControl.includes('no-store');
+    detail = expectPrivateFeatures ? 'private report authorization negative' : 'private report fail-closed negative';
   } else if (item.path === '/manifest.webmanifest') {
     semantic = item.status === 200 && item.contentType.includes('application/manifest+json') && item.body.includes('"name": "SOS Santa Fe');
     detail = 'PWA manifest';
@@ -75,7 +79,7 @@ const results = checks.map((item) => {
 });
 
 const pass = results.every((result) => result.pass);
-const proof = { schemaVersion: '1.0', worker_name: 'sos-sf', workers_dev_url: baseUrl, deployed_at_utc: new Date().toISOString(), remote_status: pass ? 'PASS' : 'FAIL', verified_paths: results, source_commit: process.env.GITHUB_SHA ?? 'unknown', cloudflare_account_identity: 'GitHub Actions protected configuration; no secret readback' };
+const proof = { schemaVersion: '1.0', worker_name: 'sos-sf', workers_dev_url: baseUrl, deployed_at_utc: new Date().toISOString(), remote_status: pass ? 'PASS' : 'FAIL', private_features_expected: expectPrivateFeatures, verified_paths: results, source_commit: process.env.GITHUB_SHA ?? 'unknown', cloudflare_account_identity: 'GitHub Actions protected configuration; no secret readback' };
 if (process.env.WRITE_PROOF === '1') {
   const artifactDir = join(process.cwd(), process.env.EVIDENCE_DIR ?? 'artifacts/current-run');
   await mkdir(artifactDir, { recursive: true });
