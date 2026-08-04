@@ -1,7 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 
-await mkdir('artifacts/v1', { recursive: true });
+const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
+await mkdir(evidenceDir, { recursive: true });
 const child = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vitest', 'run', 'tests/worker'], {
   env: process.env,
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -20,5 +21,5 @@ const exitCode = await new Promise((resolve, reject) => {
   child.once('error', reject);
   child.once('close', (code) => resolve(code ?? 1));
 });
-await writeFile('artifacts/v1/worker-test.log', output, 'utf8');
+await writeFile(`${evidenceDir}/worker-test.log`, output, 'utf8');
 process.exitCode = exitCode;

@@ -1,12 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: 1,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [['list'], ['html', { open: 'never', outputFolder: `${evidenceDir}/playwright-report` }]],
+  outputDir: `${evidenceDir}/test-results`,
   use: {
     baseURL: 'http://127.0.0.1:8787',
     trace: 'retain-on-failure',

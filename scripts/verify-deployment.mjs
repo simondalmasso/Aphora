@@ -77,7 +77,7 @@ const results = checks.map((item) => {
 const pass = results.every((result) => result.pass);
 const proof = { schemaVersion: '1.0', worker_name: 'sos-sf', workers_dev_url: baseUrl, deployed_at_utc: new Date().toISOString(), remote_status: pass ? 'PASS' : 'FAIL', verified_paths: results, source_commit: process.env.GITHUB_SHA ?? 'unknown', cloudflare_account_identity: 'GitHub Actions protected configuration; no secret readback' };
 if (process.env.WRITE_PROOF === '1') {
-  const artifactDir = join(process.cwd(), 'artifacts', 'v1');
+  const artifactDir = join(process.cwd(), process.env.EVIDENCE_DIR ?? 'artifacts/current-run');
   await mkdir(artifactDir, { recursive: true });
   await writeFile(join(artifactDir, 'deployment-proof.json'), `${JSON.stringify(proof, null, 2)}\n`);
 }

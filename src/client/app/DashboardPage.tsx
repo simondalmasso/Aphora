@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import type { Snapshot } from '../../domain/snapshot';
 import { HydroHero } from '../features/hydro/HydroHero';
 import { LiveOverview } from '../features/overview/LiveOverview';
@@ -15,6 +15,49 @@ interface Props {
   readonly onInform: (opener?: HTMLButtonElement | null) => void;
 }
 
+const mobileDockFlowStyle: CSSProperties = {
+  position: 'static',
+  bottom: 'auto',
+  marginBottom: 'max(16px, env(safe-area-inset-bottom))',
+};
+
 export function DashboardPage(props: Props) {
-  return <main id="main" className="dashboard--v3"><div className="dashboard-grid"><div className="dashboard-hero"><HydroHero snapshot={props.snapshot} refreshing={props.refreshing} refreshError={props.refreshError} evidenceButtonRef={props.evidenceButtonRef} informButtonRef={props.informButtonRef} onEvidence={props.onEvidence} onInform={props.onInform}/></div><aside className="dashboard-rail" aria-label="Resumen operativo"><LiveOverview snapshot={props.snapshot}/><OperationalRecommendations snapshot={props.snapshot} informButtonRef={props.informButtonRef} onInform={props.onInform}/></aside><div className="dashboard-outlook"><LiveOutlook snapshot={props.snapshot}/></div></div><div className="mobile-action-dock" aria-label="Acciones rápidas"><a href="#operational-recommendations">Recomendaciones</a><button type="button" onClick={(event) => props.onEvidence(event.currentTarget)}>Evidencia</button><button type="button" onClick={(event) => props.onInform(event.currentTarget)}>Informar</button></div></main>;
+  return (
+    <main id="main" className="dashboard--v3">
+      <div className="dashboard-grid">
+        <div className="dashboard-hero">
+          <HydroHero
+            snapshot={props.snapshot}
+            refreshing={props.refreshing}
+            refreshError={props.refreshError}
+            evidenceButtonRef={props.evidenceButtonRef}
+            informButtonRef={props.informButtonRef}
+            onEvidence={props.onEvidence}
+            onInform={props.onInform}
+          />
+        </div>
+        <aside className="dashboard-rail" aria-label="Resumen operativo">
+          <LiveOverview snapshot={props.snapshot} />
+          <OperationalRecommendations
+            snapshot={props.snapshot}
+            informButtonRef={props.informButtonRef}
+            onInform={props.onInform}
+          />
+        </aside>
+        <div className="dashboard-outlook">
+          <LiveOutlook snapshot={props.snapshot} />
+        </div>
+      </div>
+      <div
+        className="mobile-action-dock"
+        data-testid="mobile-action-dock"
+        aria-label="Acciones rápidas"
+        style={mobileDockFlowStyle}
+      >
+        <a href="#operational-recommendations">Recomendaciones</a>
+        <button type="button" onClick={(event) => props.onEvidence(event.currentTarget)}>Evidencia</button>
+        <button type="button" onClick={(event) => props.onInform(event.currentTarget)}>Informar</button>
+      </div>
+    </main>
+  );
 }

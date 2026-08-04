@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;
 const dist = join(root, 'dist');
-const artifactDir = join(root, 'artifacts', 'v1');
+const artifactDir = process.env.EVIDENCE_DIR ? join(root, process.env.EVIDENCE_DIR) : join(root, 'artifacts', 'current-run');
 async function walk(directory) { const entries = await readdir(directory); const files = []; for (const entry of entries) { const path = join(directory, entry); if ((await stat(path)).isDirectory()) files.push(...await walk(path)); else files.push(path); } return files; }
 const files = await walk(dist);
 const rows = [];

@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import type { Snapshot } from '../../src/domain/snapshot';
 
+const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
 const generatedAt = '2026-08-03T18:00:00.000Z';
 const storageKey = 'sos-sf:last-live-snapshot:v3';
 const points = (base: number) => Array.from({ length: 13 }, (_, index) => ({ at: new Date(Date.parse(generatedAt) - (12 - index) * 2 * 3_600_000).toISOString(), metres: base + index * .01, measured: true }));
@@ -28,7 +29,17 @@ async function removePublicApiMocks(page: Page) {
   ]);
 }
 
-test.beforeAll(async () => { await mkdir('artifacts/v1/screenshots', { recursive: true }); });
+test.beforeAll(async () => {
+  await mkdir(`${evidenceDir}/screenshots`, { recursive: true });
+  await writeFile(`${evidenceDir}/screenshot-scenario.json`, `${JSON.stringify({
+    schemaVersion: '1.0',
+    scenario: 'LIVE_FIXED',
+    snapshotId: liveSnapshot.id,
+    generatedAt,
+    widths: [360, 390, 768, 1024, 1440],
+    serviceWorkers: 'BLOCKED_FOR_SCREENSHOT_DETERMINISM',
+  }, null, 2)}\n`);
+});
 
 test('first viewport exposes live state and separate Paraná/Salado systems without demo claims', async ({ page }) => {
   await mockPublicApi(page);
@@ -149,17 +160,60 @@ test('messages remain closed by default and private features fail closed without
   await expect(trigger).toBeFocused();
 });
 
-test('required widths have no horizontal overflow and produce screenshots', async ({ page }) => {
-  const sizes = [{ width: 360, height: 800, name: '360' }, { width: 390, height: 844, name: '390' }, { width: 768, height: 1024, name: '768' }, { width: 1024, height: 900, name: '1024' }, { width: 1440, height: 1000, name: '1440' }];
+test('required widths use one deterministic live scenario without overlap', async ({ browser }) => {
+  const sizes = [
+    { width: 360, height: 800, name: '360' },
+    { width: 390, height: 844, name: '390' },
+    { width: 768, height: 1024, name: '768' },
+    { width: 1024, height: 900, name: '1024' },
+    { width: 1440, height: 1000, name: '1440' },
+  ];
+
   for (const size of sizes) {
-    await mockPublicApi(page);
-    await page.setViewportSize(size);
-    await page.goto('/');
-    const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
-    expect(dimensions.scrollWidth, `${size.width}px overflow`).toBeLessThanOrEqual(dimensions.clientWidth);
-    const heroWidth = (await page.getByTestId('hydro-hero').boundingBox())?.width ?? 0;
-    expect(heroWidth, `${size.width}px hero width`).toBeGreaterThan(size.width >= 1024 ? size.width * .48 : size.width * .84);
-    await page.screenshot({ path: `artifacts/v1/screenshots/dashboard-${size.name}.png`, fullPage: true });
+    const screenshotContext = await browser.newContext({
+      viewport: { width: size.width, height: size.height },
+      serviceWorkers: 'block',
+    });
+    const screenshotPage = await screenshotContext.newPage();
+    try {
+      await mockPublicApi(screenshotPage, liveSnapshot);
+      await screenshotPage.goto('/');
+      const hero = screenshotPage.getByTestId('hydro-hero');
+      await expect(hero.getByText('Datos en vivo', { exact: true })).toBeVisible();
+      await expect(hero.getByTestId('hydro-current-level')).toContainText('3.22');
+      await expect(screenshotPage.getByText('Sin datos en vivo', { exact: true })).toHaveCount(0);
+
+      const dimensions = await screenshotPage.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(dimensions.scrollWidth, `${size.width}px overflow`).toBeLessThanOrEqual(dimensions.clientWidth);
+      const heroWidth = (await hero.boundingBox())?.width ?? 0;
+      expect(heroWidth, `${size.width}px hero width`).toBeGreaterThan(size.width >= 1024 ? size.width * .48 : size.width * .84);
+
+      if (size.width <= 390) {
+        const dock = screenshotPage.getByTestId('mobile-action-dock');
+        await dock.scrollIntoViewIfNeeded();
+        await expect(dock).toHaveCSS('position', 'static');
+        const dockBox = await dock.boundingBox();
+        const chartBox = await screenshotPage.getByTestId('main-hydro-chart').boundingBox();
+        const readoutBox = await screenshotPage.getByTestId('hydro-chart-active-readout').boundingBox();
+        expect(dockBox).not.toBeNull();
+        expect(chartBox).not.toBeNull();
+        expect(readoutBox).not.toBeNull();
+        if (dockBox && chartBox && readoutBox) {
+          expect(dockBox.y, `${size.width}px dock after chart`).toBeGreaterThanOrEqual(chartBox.y + chartBox.height);
+          expect(dockBox.y, `${size.width}px dock after readout`).toBeGreaterThanOrEqual(readoutBox.y + readoutBox.height);
+        }
+      }
+
+      await screenshotPage.screenshot({
+        path: `${evidenceDir}/screenshots/dashboard-live-${size.name}.png`,
+        fullPage: true,
+      });
+    } finally {
+      await screenshotContext.close();
+    }
   }
 });
 

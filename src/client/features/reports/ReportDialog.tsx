@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Snapshot } from '../../../domain/snapshot';
 import { prepareReportPhoto } from './image-processing';
 import {
@@ -95,7 +95,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     };
   }, []);
 
-  const storedDraft = (nextQueueState: StoredReportDraft['queueState']): StoredReportDraft => ({
+  const storedDraft = useCallback((nextQueueState: StoredReportDraft['queueState']): StoredReportDraft => ({
     version: 2,
     idempotencyKey,
     category: draft.category,
@@ -107,7 +107,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     photos: storedPhotos(photos),
     queueState: nextQueueState,
     updatedAt: new Date().toISOString(),
-  });
+  }), [draft, exactConsent, idempotencyKey, location, photos]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -117,7 +117,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
       });
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [draft, exactConsent, hydrated, idempotencyKey, location, photos, queueState]);
+  }, [hydrated, queueState, storedDraft]);
 
   const close = () => {
     onClose();
