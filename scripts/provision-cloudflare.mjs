@@ -47,7 +47,7 @@ const databaseName = 'sos-sf-private';
 const bucketName = 'sos-sf-private-reports';
 let databaseId = '';
 let resourcesReady = false;
-let storageApiState = 'NOT_ATTEMPTED';
+let storageApiState;
 try {
   databaseId = await ensureD1(databaseName);
   await ensureR2(bucketName);
