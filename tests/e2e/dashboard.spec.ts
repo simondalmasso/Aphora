@@ -20,6 +20,16 @@ async function mockPublicApi(page: Page, snapshot: Snapshot = liveSnapshot) {
   await page.route('**/api/session', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
 }
 
+async function removePublicApiMocks(page: Page) {
+  await Promise.all([
+    page.unroute('**/api/snapshot'),
+    page.unroute('**/api/sources'),
+    page.unroute('**/api/messages'),
+    page.unroute('**/api/auth/config'),
+    page.unroute('**/api/session'),
+  ]);
+}
+
 test.beforeAll(async () => { await mkdir('artifacts/v1/screenshots', { recursive: true }); });
 
 test('first viewport exposes live state and separate Paraná/Salado systems without demo claims', async ({ page }) => {
@@ -30,7 +40,9 @@ test('first viewport exposes live state and separate Paraná/Salado systems with
   await expect(hero.getByText('Datos en vivo', { exact: true })).toBeVisible();
   await expect(hero.getByRole('tab', { name: /Sistema Paraná/ })).toBeVisible();
   await expect(hero.getByRole('tab', { name: /Sistema Salado/ })).toBeVisible();
-  await expect(hero.getByText('3.22', { exact: false })).toBeVisible();
+  const level = hero.locator('.hydro-hero__summary > div').filter({ hasText: 'Nivel actual' }).locator('strong');
+  await expect(level).toBeVisible();
+  await expect(level).toContainText('3.22');
   await expect(hero.getByText('+12 cm', { exact: true })).toBeVisible();
   await expect(hero.getByText('Subiendo lentamente', { exact: true })).toBeVisible();
   await expect(hero.getByText('Seguí instrucciones oficiales', { exact: false })).toBeVisible();
@@ -49,8 +61,9 @@ test('three formal modules follow the hero and no unrelated station levels share
   await expect(page.getByRole('heading', { name: 'Evolución prevista' })).toBeVisible();
   const gauges = page.getByRole('img', { name: /Sin umbral|alerta|Sin datos/i });
   await expect(gauges).toHaveCount(2);
-  await expect(page.getByText('Río Paraná · Santa Fe', { exact: true })).toBeVisible();
-  await expect(page.getByText('Río Salado · Santo Tomé', { exact: true })).toBeVisible();
+  const current = page.getByLabel('Estado actual');
+  await expect(current.getByText('Río Paraná · Santa Fe', { exact: true })).toBeVisible();
+  await expect(current.getByText('Río Salado · Santo Tomé', { exact: true })).toBeVisible();
 });
 
 test('main graph supports pointer and keyboard reading', async ({ page }) => {
@@ -60,14 +73,14 @@ test('main graph supports pointer and keyboard reading', async ({ page }) => {
   const svg = chart.locator('svg');
   await svg.focus();
   await page.keyboard.press('Home');
-  await expect(chart.locator('.hydro-chart__readout')).toContainText('observación INA');
+  await expect(chart.locator('.hydro-chart__readout')).toContainText('lectura publicada por INA');
   const first = await chart.locator('.hydro-chart__readout').textContent();
   await page.keyboard.press('ArrowRight');
   await expect(chart.locator('.hydro-chart__readout')).not.toHaveText(first ?? '');
   const box = await svg.boundingBox();
   if (box) await page.mouse.move(box.x + box.width * .8, box.y + box.height * .5);
   await expect(chart.locator('.hydro-chart__crosshair')).toBeVisible();
-  await expect(chart.getByText('Sin proyección validada', { exact: true })).toBeVisible();
+  await expect(chart.getByText('Sin proyección operativa', { exact: true })).toBeVisible();
 });
 
 test('unavailable data renders safe empty charts and gauges', async ({ page }) => {
@@ -177,8 +190,10 @@ test('PWA opens the cached dashboard offline and labels prior data as not curren
   await page.goto('/');
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
+  await removePublicApiMocks(page);
   await context.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await expect(page.getByText('Modo sin conexión', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('No es información actual.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Informar', exact: true }).last().click();
