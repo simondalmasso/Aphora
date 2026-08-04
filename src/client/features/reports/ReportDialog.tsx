@@ -120,20 +120,48 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     finally { setBusy(false); }
   };
 
+  const pendingDraft = (): StoredReportDraft => ({
+    version: 2,
+    idempotencyKey,
+    category: draft.category,
+    description: draft.description,
+    locationLabel: draft.locationLabel,
+    trustedContact: draft.trustedContact,
+    location,
+    exactConsent,
+    photos: storedPhotos(photos),
+    queueState: 'PENDING_SEND',
+    updatedAt: new Date().toISOString(),
+  });
+
   const persistPending = async () => {
+    await saveReportDraft(pendingDraft());
     setQueueState('PENDING_SEND');
-    await saveReportDraft({ version: 2, idempotencyKey, category: draft.category, description: draft.description, locationLabel: draft.locationLabel, trustedContact: draft.trustedContact, location, exactConsent, photos: storedPhotos(photos), queueState: 'PENDING_SEND', updatedAt: new Date().toISOString() });
   };
 
   const submit = async () => {
     if (!draft.description.trim() || draft.description.trim().length > 500) { setStatus('La descripción debe tener entre 1 y 500 caracteres.'); return; }
     if (!online) {
-      await persistPending().catch(() => undefined);
-      setStatus('Guardado en este dispositivo. Pendiente de envío; no fue remitido a SOS-SF.');
+      setBusy(true);
+      setStatus(null);
+      try {
+        await persistPending();
+        setStatus('Borrador guardado en este dispositivo. Pendiente de envío; no fue remitido a SOS-SF.');
+      } catch {
+        setStatus('No se pudo guardar el borrador en este dispositivo. Copiá la información antes de cerrar.');
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     setBusy(true); setStatus(null);
-    await persistPending();
+    try {
+      await persistPending();
+    } catch {
+      setBusy(false);
+      setStatus('No se pudo preparar el reporte para envío porque falló el almacenamiento local.');
+      return;
+    }
     const metadata = {
       category: draft.category,
       description: draft.description.trim(),
@@ -167,4 +195,3 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
   };
 
   return <dialog ref={dialogRef} className="report-dialog" aria-labelledby="report-title" onClose={close} onClick={(event) => { if (event.target === event.currentTarget) close(); }}><div className="report-surface"><header><div><span className="v3-eyebrow">Canal no urgente</span><h2 id="report-title">Informar una situación</h2></div><button type="button" className="ui-icon-button" aria-label="Cerrar formulario" onClick={close}>×</button></header><p className="report-warning">No es un canal de emergencias ni garantiza atención. Ante peligro inmediato llamá a los servicios esenciales.</p><section aria-labelledby="essential-title"><h3 id="essential-title">Teléfonos esenciales</h3><div className="essential-grid">{CONTACTS.map((contact) => <a href={contact.href} key={contact.number}><strong>{contact.number}</strong><span>{contact.label}</span></a>)}</div></section><form onSubmit={(event) => { event.preventDefault(); void submit(); }}><label>Categoría<select value={draft.category} onChange={(event) => { setDraft({ ...draft, category: event.target.value }); setQueueState('SAVED_LOCAL'); }}><option value="ANEGAMIENTO">Anegamiento</option><option value="RIO">Río o costa</option><option value="LLUVIA">Lluvia</option><option value="SERVICIO">Servicio afectado</option><option value="OTRO">Otro</option></select></label><label>Descripción<textarea maxLength={500} rows={5} value={draft.description} onChange={(event) => { setDraft({ ...draft, description: event.target.value }); setQueueState('SAVED_LOCAL'); }} placeholder="Qué ocurre, desde cuándo y qué referencia permite ubicarlo"/><small>{draft.description.length}/500</small></label><fieldset><legend>Ubicación</legend><button className="ui-button ui-button--secondary" type="button" disabled={busy} onClick={locate}>Usar mi ubicación</button><label>Barrio, calle o referencia<input value={draft.locationLabel} onChange={(event) => { setDraft({ ...draft, locationLabel: event.target.value }); setQueueState('SAVED_LOCAL'); }} maxLength={160}/></label>{location && <label className="consent-row"><input type="checkbox" checked={exactConsent} onChange={(event) => { setExactConsent(event.target.checked); setQueueState('SAVED_LOCAL'); }}/>Incluir coordenadas exactas en este reporte ({Math.round(location.accuracy)} m de precisión)</label>}</fieldset><label>Fotos opcionales (máximo 2; se reducen antes de subir)<input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void selectPhotos(event.target.files)}/></label>{photos.length > 0 && <p>{photos.length} foto{photos.length === 1 ? '' : 's'} guardada{photos.length === 1 ? '' : 's'} localmente · {Math.round(photos.reduce((sum, file) => sum + file.size, 0) / 1024)} KiB</p>}<button className="ui-button ui-button--primary" type="submit" disabled={busy || !hydrated}>{busy ? 'Procesando…' : queueState === 'PENDING_SEND' && online ? 'Reintentar envío' : online ? 'Enviar informe' : 'Guardar borrador'}</button></form>{!online && <section className="sms-fallback"><h3>Preparar SMS</h3><p>Elegí un contacto personal de confianza. La aplicación sólo abre el compositor; nunca envía automáticamente.</p><label>Teléfono de confianza<input inputMode="tel" value={draft.trustedContact} onChange={(event) => setDraft({ ...draft, trustedContact: event.target.value })} placeholder="Ej. +54 342 ..."/></label>{smsHref ? <a className="ui-button ui-button--secondary" href={smsHref}>Abrir compositor de SMS</a> : <p>Ingresá un número personal válido. Los números 911, 103, 107, 100 y 106 no se usan como destino SMS.</p>}</section>}{status && <p className="report-status" role="status">{status}</p>}</div></dialog>;
-}
