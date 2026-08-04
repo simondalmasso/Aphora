@@ -1,4 +1,4 @@
-name: Workers First Live Data 012
+name: Workers First Live Data 012 Sync
 
 on:
   push:
@@ -6,42 +6,49 @@ on:
     paths: [.github/workflows/workers-first-live-data-012.yml]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: sos-sf-workers-production
+  group: sos-sf-live-data-source-sync
   cancel-in-progress: false
 
 jobs:
-  runtime-hotfix-deploy:
+  github-second-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
-    env:
-      EVIDENCE_DIR: artifacts/workers-first-live-data-012
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-      SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
-      SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
-      MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
-      REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
-      INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
-      INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
-      PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
-      SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
-      SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
-      DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
 
-      - name: Initialize evidence
+      - name: Reconfirm Worker-first live gate
         run: |
-          rm -rf "$EVIDENCE_DIR"
-          mkdir -p "$EVIDENCE_DIR"
-          printf '%s\n' "$GITHUB_SHA" > "$EVIDENCE_DIR/runtime-control-sha.txt"
+          node <<'NODE'
+          const base = 'https://sos-sf.simondalmasso44.workers.dev';
+          async function read(path) {
+            const response = await fetch(`${base}${path}?source_sync=${Date.now()}-${Math.random()}`, { cache: 'no-store', signal: AbortSignal.timeout(30000) });
+            if (!response.ok) throw new Error(`${path}:HTTP_${response.status}`);
+            return response.headers.get('content-type')?.includes('json') ? response.json() : response.text();
+          }
+          (async () => {
+            const [health, snapshot, sources, lite] = await Promise.all([read('/api/health'), read('/api/snapshot'), read('/api/sources'), read('/lite')]);
+            const santaFe = snapshot?.data?.systems?.find((item) => item.id === 'parana-santa-fe' && item.stationCode === '30');
+            const ina = health?.data?.providers?.find((item) => item.id === 'ina-rest-30');
+            const source = sources?.data?.sources?.find((item) => item.id === 'ina:30');
+            if (snapshot?.data?.mode !== 'LIVE' || santaFe?.available !== true || !Number.isFinite(santaFe?.currentMetres)) throw new Error('WORKER_FIRST_LIVE_GATE_MISSING');
+            if (Date.now() - Date.parse(santaFe.observedAt) > 36 * 60 * 60 * 1000) throw new Error('WORKER_FIRST_OBSERVATION_STALE');
+            if (!ina?.lastSuccessAt || !ina?.lastObservedAt || ina.errorClass !== null || ina.circuitOpenUntil !== null) throw new Error('WORKER_FIRST_HEALTH_INVALID');
+            if (!source?.connected || !String(source.url || '').startsWith('https://alerta.ina.gob.ar/a5/getObservaciones?')) throw new Error('WORKER_FIRST_SOURCE_INVALID');
+            if (String(lite).includes('1970-01-01') || !String(lite).includes(santaFe.currentMetres.toFixed(2))) throw new Error('WORKER_FIRST_LITE_INVALID');
+            console.log(JSON.stringify({ value: santaFe.currentMetres, observedAt: santaFe.observedAt, source: source.url }));
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE
 
-      - name: Apply runtime-only live data correction
-        run: python .github/scripts/workers_first_live_data_012.py
+      - name: Synchronize effective live runtime source
+        run: |
+          python .github/scripts/workers_first_live_data_012.py
+          python .github/scripts/finalize_live_data_012.py
 
       - uses: actions/setup-node@v4
         with:
@@ -56,79 +63,14 @@ jobs:
       - run: npm run build
       - run: npm run test:worker
 
-      - name: Prepare bounded Cloudflare configuration
-        id: provision
-        run: node scripts/provision-cloudflare.mjs
-
-      - name: Wrangler dry run
-        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-dry-run.log"
-
-      - name: Deploy existing Worker
-        run: npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
-
-      - name: Verify live hydrological production
+      - name: Commit synchronized source and trigger terminal pipeline
         run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const path = require('node:path');
-          const base = process.env.DEPLOYMENT_URL;
-          async function get(route) {
-            const separator = route.includes('?') ? '&' : '?';
-            const response = await fetch(`${base}${route}${separator}proof=${Date.now()}-${Math.random()}`, { cache: 'no-store', signal: AbortSignal.timeout(30000) });
-            const body = await response.text();
-            if (!response.ok) throw new Error(`${route}:HTTP_${response.status}`);
-            return { body, json: response.headers.get('content-type')?.includes('json') ? JSON.parse(body) : null };
-          }
-          (async () => {
-            const firstHealth = await get('/api/health');
-            const snapshot = await get('/api/snapshot');
-            const sources = await get('/api/sources');
-            const lite = await get('/lite');
-            const root = await get('/');
-            const secondHealth = await get('/api/health');
-            const data = snapshot.json?.data;
-            const systems = Array.isArray(data?.systems) ? data.systems : [];
-            const santaFe = systems.find((item) => item.id === 'parana-santa-fe' && item.stationCode === '30');
-            if (!santaFe || santaFe.available !== true || !Number.isFinite(santaFe.currentMetres)) throw new Error('SANTA_FE_NUMERIC_OBSERVATION_MISSING');
-            const observed = Date.parse(santaFe.observedAt);
-            if (!Number.isFinite(observed) || Date.now() - observed > 36 * 60 * 60 * 1000) throw new Error('SANTA_FE_OBSERVATION_NOT_CURRENT');
-            if (data.mode !== 'LIVE' || !['LIVE', 'STALE'].includes(data.dataStatus)) throw new Error('SNAPSHOT_NOT_LIVE');
-            const source = sources.json?.data?.sources?.find((item) => item.id === 'ina:30');
-            if (!source?.connected || !String(source.url || '').startsWith('https://alerta.ina.gob.ar/a5/getObservaciones?')) throw new Error('SOURCE_PROVENANCE_INVALID');
-            const providers1 = firstHealth.json?.data?.providers;
-            const providers2 = secondHealth.json?.data?.providers;
-            if (!Array.isArray(providers1) || !Array.isArray(providers2) || providers1.length === 0) throw new Error('PROVIDER_HEALTH_EMPTY');
-            if (providers1.map((item) => item.id).sort().join(',') !== providers2.map((item) => item.id).sort().join(',')) throw new Error('PROVIDER_HEALTH_NONDETERMINISTIC');
-            const ina = providers2.find((item) => item.id === 'ina-rest-30');
-            if (!ina || !ina.lastSuccessAt || !ina.lastObservedAt || ina.errorClass !== null || ina.circuitOpenUntil !== null) throw new Error('INA_PROVIDER_HEALTH_INVALID');
-            if (lite.body.includes('1970-01-01') || !lite.body.includes(santaFe.currentMetres.toFixed(2))) throw new Error('LITE_INVALID');
-            if (!root.body.includes('<title>SOS Santa Fe')) throw new Error('ROOT_INVALID');
-            const proof = {
-              schemaVersion: '1.0',
-              order: 'SOS-SF-OWNER-LIVE-DATA-011',
-              decision: 'SOS-SF-AUD-LIVE-DATA-012',
-              sequence: 'WORKER_FIRST',
-              deploymentUrl: base,
-              station: { id: santaFe.id, code: santaFe.stationCode, name: santaFe.stationName, currentMetres: santaFe.currentMetres, observedAt: santaFe.observedAt },
-              source: { id: source.id, url: source.url, observedAt: source.observedAt, status: source.status },
-              providerHealth: providers2,
-              privateRuntime: firstHealth.json?.data?.privateMessaging,
-              verifiedAt: new Date().toISOString(),
-            };
-            fs.writeFileSync(path.join(process.env.EVIDENCE_DIR, 'worker-first-live-proof.json'), `${JSON.stringify(proof, null, 2)}\n`);
-            console.log(JSON.stringify(proof));
-          })().catch((error) => { console.error(error); process.exit(1); });
-          NODE
-
-      - name: Remove generated sensitive material
-        if: always()
-        run: rm -f .worker-secrets.json wrangler.generated.jsonc
-
-      - name: Upload Worker-first evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: workers-first-live-data-012-${{ github.run_id }}
-          path: artifacts/workers-first-live-data-012/
-          if-no-files-found: error
-          retention-days: 30
+          printf 'live-data-012-source-sync-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" > .github/arq-v3-deploy-trigger
+          git rm .github/workflows/workers-first-live-data-012.yml
+          git rm .github/scripts/workers_first_live_data_012.py
+          git rm .github/scripts/finalize_live_data_012.py
+          git config user.name 'SOS-SF ARQ'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/worker/providers/ina.ts src/worker/providers/core.ts src/worker/live-data.ts src/worker/lite.ts tests/unit/live-data.test.ts scripts/verify-deployment.mjs .github/arq-v3-deploy-trigger
+          git commit -m 'fix: publish current INA Santa Fe hydrological data'
+          git push origin HEAD:arq/visual-dashboard-v3
