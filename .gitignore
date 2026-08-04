@@ -5,7 +5,28 @@ playwright-report/
 test-results/
 .wrangler/
 *.tsbuildinfo
+
+# Environment and Cloudflare local secrets
 .env*
 !.env.example
+.dev.vars*
+!.dev.vars.example
 wrangler.generated.jsonc
 .worker-secrets.json
+
+# Generated evidence and local logs
+artifacts/current-run/
+*.log
+
+# Local persistence
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+
+# Private keys and keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
