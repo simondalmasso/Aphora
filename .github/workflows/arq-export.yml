@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   export:
@@ -20,9 +21,18 @@ jobs:
         run: |
           git rev-parse HEAD > SOURCE_SHA.txt
           tar --exclude=.git --exclude=node_modules --exclude=dist --exclude=artifacts --exclude=playwright-report --exclude=test-results -czf /tmp/sos-sf-source.tgz .
-      - uses: actions/upload-artifact@v4
+      - id: artifact
+        uses: actions/upload-artifact@v4
         with:
           name: sos-sf-source-${{ github.sha }}
           path: /tmp/sos-sf-source.tgz
           if-no-files-found: error
           retention-days: 1
+      - name: Publish export reference
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.artifact.outputs.artifact-digest }}
+        run: |
+          body=$(printf 'ARQ_SOURCE_EXPORT\nRUN_ID=%s\nSHA=%s\nARTIFACT_ID=%s\nARTIFACT_DIGEST=%s\n' "$GITHUB_RUN_ID" "$GITHUB_SHA" "$ARTIFACT_ID" "$ARTIFACT_DIGEST")
+          gh api "repos/${GITHUB_REPOSITORY}/issues/8/comments" --method POST -f body="$body"
