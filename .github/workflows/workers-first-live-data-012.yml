@@ -1,0 +1,277 @@
+name: Workers First Live Data 012
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/workers-first-live-data-012.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sos-sf-workers-production
+  cancel-in-progress: false
+
+jobs:
+  runtime-hotfix-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      EVIDENCE_DIR: artifacts/workers-first-live-data-012
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+      SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+      MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
+      REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+      INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+      INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+      PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+      SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+      SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
+      DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply runtime-only live data correction
+        run: |
+          cat > src/worker/providers/ina.ts <<'TS'
+          import type { RiverPoint } from '../../domain/snapshot';
+          import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core';
+
+          const INA_A5_POLICY: ProviderPolicy = Object.freeze({
+            id: 'ina-a5',
+            hosts: Object.freeze(['alerta.ina.gob.ar']),
+            paths: Object.freeze([/^\/a5\/getObservaciones$/]),
+            contentTypes: Object.freeze(['application/json', 'application/geo+json', 'text/json']),
+            maxBytes: 1_500_000,
+            freshMs: 30 * 60_000,
+            staleMs: 7 * 24 * 60 * 60_000,
+          });
+
+          const INA_WATERML_POLICY: ProviderPolicy = Object.freeze({
+            id: 'ina-waterml',
+            hosts: Object.freeze(['alerta.ina.gob.ar', 'www.ina.gov.ar', 'ina.gob.ar']),
+            paths: Object.freeze([/^\/.*(?:waterml|wateroneflow|cuahsi|hydroserver|GetValues|GetValuesObject).*$/i]),
+            contentTypes: Object.freeze(['application/xml', 'text/xml', 'application/json']),
+            maxBytes: 1_500_000,
+          });
+
+          interface InaA5Observation {
+            readonly tipo: 'puntual';
+            readonly series_id: number;
+            readonly timestart: string;
+            readonly timeend?: string | null;
+            readonly timeupdate?: string | null;
+            readonly valor: number;
+            readonly calidad?: string | number | null;
+            readonly quality?: string | number | null;
+            readonly qualifier?: string | number | null;
+          }
+
+          function isRecord(value: unknown): value is Record<string, unknown> {
+            return typeof value === 'object' && value !== null && !Array.isArray(value);
+          }
+
+          function explicitQuality(record: Record<string, unknown>): RiverPoint['quality'] {
+            const raw = String(record.quality ?? record.calidad ?? record.qualifier ?? '').trim().toLowerCase();
+            return raw.includes('valid') || raw === '1' || raw === 'approved' ? 'PROVIDER_VALIDATED' : 'PUBLISHED_OPERATIONAL';
+          }
+
+          function parseA5Observations(body: string, expectedSeriesId: string): readonly RiverPoint[] {
+            const payload = JSON.parse(body) as unknown;
+            if (!Array.isArray(payload)) throw new Error('INA_A5_SCHEMA');
+            const expected = Number(expectedSeriesId);
+            const points: RiverPoint[] = [];
+            for (const item of payload) {
+              if (!isRecord(item)) throw new Error('INA_A5_SCHEMA');
+              const seriesId = Number(item.series_id);
+              const metres = typeof item.valor === 'number' ? item.valor : Number.NaN;
+              const at = typeof item.timestart === 'string' ? item.timestart : '';
+              if (item.tipo !== 'puntual' || seriesId !== expected || !Number.isFinite(metres) || Math.abs(metres) >= 100 || !Number.isFinite(Date.parse(at))) throw new Error('INA_A5_SCHEMA');
+              const record = item as Record<string, unknown>;
+              points.push(Object.freeze({ at: new Date(at).toISOString(), metres, measured: true, quality: explicitQuality(record) }));
+            }
+            const unique = new Map(points.map((point) => [point.at, point]));
+            return Object.freeze([...unique.values()].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-96));
+          }
+
+          export async function fetchInaSeries(url: string, providerId: string, expectedSeriesId: string): Promise<ProviderResult<readonly RiverPoint[]>> {
+            return fetchProvider(url, { ...INA_A5_POLICY, id: providerId }, (body) => {
+              const points = parseA5Observations(body, expectedSeriesId);
+              const observedAt = points.at(-1)?.at;
+              if (!observedAt) throw new Error('INA_A5_EMPTY');
+              return { value: points, observedAt };
+            });
+          }
+
+          function xmlValues(body: string): readonly RiverPoint[] {
+            const points: RiverPoint[] = [];
+            const pattern = /<(?:\w+:)?value\b([^>]*)>([-+]?\d+(?:[.,]\d+)?)<\/(?:\w+:)?value>/gi;
+            let match: RegExpExecArray | null;
+            while ((match = pattern.exec(body)) !== null && points.length < 500) {
+              const attributes = match[1] ?? '';
+              const dateMatch = attributes.match(/(?:dateTime|time|timestamp)=["']([^"']+)["']/i);
+              const metres = Number((match[2] ?? '').replace(',', '.'));
+              if (!dateMatch || !Number.isFinite(Date.parse(dateMatch[1]!)) || !Number.isFinite(metres) || Math.abs(metres) >= 100) continue;
+              points.push(Object.freeze({ at: new Date(dateMatch[1]!).toISOString(), metres, measured: true, quality: 'PUBLISHED_OPERATIONAL' }));
+            }
+            return Object.freeze(points.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)));
+          }
+
+          export async function fetchInaWaterMl(url: string, providerId: string): Promise<ProviderResult<readonly RiverPoint[]>> {
+            return fetchProvider(url, { ...INA_WATERML_POLICY, id: providerId }, (body, contentType) => {
+              if (contentType.includes('json')) throw new Error('INA_WATERML_JSON_SCHEMA_UNSUPPORTED');
+              const points = xmlValues(body);
+              const observedAt = points.at(-1)?.at;
+              if (!observedAt) throw new Error('INA_WATERML_EMPTY');
+              return { value: Object.freeze(points.slice(-96)), observedAt };
+            });
+          }
+          TS
+
+          python <<'PY'
+          from pathlib import Path
+
+          core = Path('src/worker/providers/core.ts')
+          text = core.read_text()
+          needle = "export function providerHealth(): readonly ProviderHealth[] { return Object.freeze([...health.values()].sort((a, b) => a.id.localeCompare(b.id))); }\n"
+          replacement = needle + "export function restoreProviderHealth(entries: readonly ProviderHealth[]): void {\n  for (const entry of entries) {\n    if (!entry || typeof entry.id !== 'string') continue;\n    health.set(entry.id, Object.freeze({ ...entry }));\n  }\n}\n"
+          assert text.count(needle) == 1
+          core.write_text(text.replace(needle, replacement))
+
+          live = Path('src/worker/live-data.ts')
+          text = live.read_text()
+          replacements = [
+            ("import { providerHealth, type ProviderResult } from './providers/core';", "import { providerHealth, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core';"),
+            ("const INA_BASE = 'https://alerta.ina.gob.ar/pub/datos/datos';\nconst SNAPSHOT_CACHE_MS = 60_000;", "const INA_BASE = 'https://alerta.ina.gob.ar/a5/getObservaciones';\nconst LIVE_DATA_CACHE_VERSION = 'a5-live-v2';\nconst STATION_FRESH_MS = 36 * 60 * 60_000;\nconst SNAPSHOT_CACHE_MS = 60_000;"),
+            ("interface CachedSnapshot { readonly cachedAt: string; readonly snapshot: Snapshot }", "interface CachedSnapshot { readonly cachedAt: string; readonly snapshot: Snapshot; readonly providerHealth: readonly ProviderHealth[] }"),
+            ("  const config = JSON.stringify({\n    waterMlParana:", "  const config = JSON.stringify({\n    version: LIVE_DATA_CACHE_VERSION,\n    waterMlParana:"),
+            ("    const item = await response.json() as CachedSnapshot;\n    return now.getTime() - Date.parse(item.cachedAt) <= SNAPSHOT_CACHE_MS ? item.snapshot : null;", "    const item = await response.json() as CachedSnapshot;\n    if (now.getTime() - Date.parse(item.cachedAt) > SNAPSHOT_CACHE_MS) return null;\n    if (Array.isArray(item.providerHealth)) restoreProviderHealth(item.providerHealth);\n    return item.snapshot;"),
+            ("  const item: CachedSnapshot = { cachedAt: new Date().toISOString(), snapshot };", "  const item: CachedSnapshot = { cachedAt: new Date().toISOString(), snapshot, providerHealth: providerHealth() };"),
+            ("  const url = `${INA_BASE}&timeStart=${start}&timeEnd=${end}&seriesId=${station.seriesId}&format=json`;\n  const result = await fetchInaSeries(url, `ina-rest-${station.seriesId}`);", "  const endpoint = new URL(INA_BASE);\n  endpoint.searchParams.set('tipo', 'puntual');\n  endpoint.searchParams.set('series_id', station.seriesId);\n  endpoint.searchParams.set('timestart', start);\n  endpoint.searchParams.set('timeend', end);\n  const sourceUrl = endpoint.toString();\n  const result = await fetchInaSeries(sourceUrl, `ina-rest-${station.seriesId}`, station.seriesId);"),
+            ("age > 12 * 3_600_000", "age > STATION_FRESH_MS"),
+            ("    url: 'https://alerta.ina.gob.ar/pub/datos/',", "    url: sourceUrl,"),
+          ]
+          for old, new in replacements:
+            assert text.count(old) == 1, old
+            text = text.replace(old, new)
+          live.write_text(text)
+
+          lite = Path('src/worker/lite.ts')
+          text = lite.read_text()
+          needle = "function statusLabel(snapshot: Snapshot): string {\n  if (snapshot.mode === 'OFFLINE' || snapshot.dataStatus === 'OFFLINE') return 'Modo sin conexión';\n  if (snapshot.dataStatus === 'STALE') return 'Datos desactualizados';\n  if (snapshot.dataStatus === 'LIVE') return 'Datos en vivo';\n  return 'Sin datos en vivo';\n}\n"
+          replacement = needle + "\nfunction usableTimestamp(value: string | null | undefined): string | null {\n  if (!value || !Number.isFinite(Date.parse(value)) || Date.parse(value) <= 0) return null;\n  return new Date(value).toISOString();\n}\n\nfunction ageLabel(value: string | null | undefined, generatedAt: string): string {\n  const timestamp = usableTimestamp(value);\n  return timestamp ? sourceAgeLabel(timestamp, generatedAt) : 'sin timestamp';\n}\n"
+          assert text.count(needle) == 1
+          text = text.replace(needle, replacement)
+          text = text.replace("  const systems = snapshot.systems ?? [];\n  const html =", "  const systems = snapshot.systems ?? [];\n  const primaryObservedAt = snapshot.river.available === false ? null : usableTimestamp(snapshot.river.observedAt);\n  const html =")
+          old = '<p class="time">Generado: <time datetime="${snapshot.generatedAt}">${escapeHtml(snapshot.generatedAt)}</time>. Observación principal: <time datetime="${snapshot.river.observedAt}">${escapeHtml(snapshot.river.observedAt)}</time>. Fuente principal: ${escapeHtml(snapshot.river.sourceName ?? snapshot.river.sourceId)}.</p>'
+          new = '<p class="time">Generado: <time datetime="${snapshot.generatedAt}">${escapeHtml(snapshot.generatedAt)}</time>. Observación principal: ${primaryObservedAt ? `<time datetime="${primaryObservedAt}">${escapeHtml(primaryObservedAt)}</time>` : \'sin timestamp\'}. Fuente principal: ${escapeHtml(snapshot.river.sourceName ?? snapshot.river.sourceId)}.</p>'
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+          text = text.replace("sourceAgeLabel(source.observedAt, snapshot.generatedAt)", "ageLabel(source.observedAt, snapshot.generatedAt)")
+          lite.write_text(text)
+
+          test = Path('tests/unit/live-data.test.ts')
+          text = test.read_text()
+          text = text.replace("function points(values: readonly [string, number][]) { return { data: values.map(([timestart, valor]) => ({ timestart, valor })) }; }", "function points(series: number, values: readonly [string, number][]) { return values.map(([timestart, valor]) => ({ tipo: 'puntual', series_id: series, timestart, valor })); }")
+          text = text.replace("searchParams.get('seriesId')", "searchParams.get('series_id')")
+          text = text.replace("json(points([[", "json(points(Number(id), [[")
+          text = text.replace("]]));", "]]));")
+          test.write_text(text)
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint -- --max-warnings=0
+      - run: npm run test:unit
+      - run: npm run test:contract
+      - run: npm run build
+      - run: npm run test:worker
+
+      - name: Prepare bounded Cloudflare configuration
+        id: provision
+        run: |
+          rm -rf "$EVIDENCE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          node scripts/provision-cloudflare.mjs
+
+      - name: Wrangler dry run
+        run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-dry-run.log"
+
+      - name: Deploy existing Worker
+        run: npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+
+      - name: Verify live hydrological production
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const base = process.env.DEPLOYMENT_URL;
+          async function get(route) {
+            const response = await fetch(`${base}${route}${route.includes('?') ? '&' : '?'}proof=${Date.now()}-${Math.random()}`, { cache: 'no-store', signal: AbortSignal.timeout(30000) });
+            const body = await response.text();
+            if (!response.ok) throw new Error(`${route}:HTTP_${response.status}`);
+            return { response, body, json: response.headers.get('content-type')?.includes('json') ? JSON.parse(body) : null };
+          }
+          (async () => {
+            const firstHealth = await get('/api/health');
+            const snapshot = await get('/api/snapshot');
+            const sources = await get('/api/sources');
+            const lite = await get('/lite');
+            const root = await get('/');
+            const secondHealth = await get('/api/health');
+            const data = snapshot.json?.data;
+            const systems = Array.isArray(data?.systems) ? data.systems : [];
+            const santaFe = systems.find((item) => item.id === 'parana-santa-fe' && item.stationCode === '30');
+            if (!santaFe || santaFe.available !== true || !Number.isFinite(santaFe.currentMetres)) throw new Error('SANTA_FE_NUMERIC_OBSERVATION_MISSING');
+            const observed = Date.parse(santaFe.observedAt);
+            if (!Number.isFinite(observed) || Date.now() - observed > 36 * 60 * 60 * 1000) throw new Error('SANTA_FE_OBSERVATION_NOT_CURRENT');
+            if (data.mode !== 'LIVE' || !['LIVE', 'STALE'].includes(data.dataStatus)) throw new Error('SNAPSHOT_NOT_LIVE');
+            const source = sources.json?.data?.sources?.find((item) => item.id === 'ina:30');
+            if (!source?.connected || !String(source.url || '').startsWith('https://alerta.ina.gob.ar/a5/getObservaciones?')) throw new Error('SOURCE_PROVENANCE_INVALID');
+            const providers1 = firstHealth.json?.data?.providers;
+            const providers2 = secondHealth.json?.data?.providers;
+            if (!Array.isArray(providers1) || !Array.isArray(providers2) || providers1.length === 0) throw new Error('PROVIDER_HEALTH_EMPTY');
+            const ids1 = providers1.map((item) => item.id).sort().join(',');
+            const ids2 = providers2.map((item) => item.id).sort().join(',');
+            if (ids1 !== ids2) throw new Error('PROVIDER_HEALTH_NONDETERMINISTIC');
+            const ina = providers2.find((item) => item.id === 'ina-rest-30');
+            if (!ina || !ina.lastSuccessAt || !ina.lastObservedAt || ina.errorClass !== null || ina.circuitOpenUntil !== null) throw new Error('INA_PROVIDER_HEALTH_INVALID');
+            if (lite.body.includes('1970-01-01') || !lite.body.includes(santaFe.currentMetres.toFixed(2))) throw new Error('LITE_INVALID');
+            if (!root.body.includes('<title>SOS Santa Fe')) throw new Error('ROOT_INVALID');
+            const proof = {
+              schemaVersion: '1.0',
+              order: 'SOS-SF-OWNER-LIVE-DATA-011',
+              decision: 'SOS-SF-AUD-LIVE-DATA-012',
+              sequence: 'WORKER_FIRST',
+              deploymentUrl: base,
+              station: { id: santaFe.id, code: santaFe.stationCode, name: santaFe.stationName, currentMetres: santaFe.currentMetres, observedAt: santaFe.observedAt },
+              source: { id: source.id, url: source.url, observedAt: source.observedAt, status: source.status },
+              providerHealth: providers2,
+              privateRuntime: firstHealth.json?.data?.privateMessaging,
+              verifiedAt: new Date().toISOString(),
+            };
+            fs.writeFileSync(path.join(process.env.EVIDENCE_DIR, 'worker-first-live-proof.json'), `${JSON.stringify(proof, null, 2)}\n`);
+            console.log(JSON.stringify(proof));
+          })().catch((error) => { console.error(error); process.exit(1); });
+          NODE
+
+      - name: Remove generated sensitive material
+        if: always()
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc
+
+      - name: Upload Worker-first evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workers-first-live-data-012-${{ github.run_id }}
+          path: artifacts/workers-first-live-data-012/
+          if-no-files-found: error
+          retention-days: 30
