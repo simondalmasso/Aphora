@@ -1,6 +1,6 @@
 import { unavailableSnapshot } from '../data/unavailable-snapshot';
 import type { ChangeItem, DataStatus, HydrologicalSystem, PublicState, RiverPoint, RiverThreshold, Snapshot, Source } from '../domain/snapshot';
-import { providerHealth, type ProviderResult } from './providers/core';
+import { providerHealth, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core';
 import { fetchInaSeries, fetchInaWaterMl } from './providers/ina';
 import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa';
 import { fetchPortsHydrometers, type PortsHydrometerReading } from './providers/ports';
@@ -14,14 +14,16 @@ export interface LiveDataEnv {
   readonly SMN_ALERTS_JSON_URL?: string;
 }
 
-const INA_BASE = 'https://alerta.ina.gob.ar/pub/datos/datos';
+const INA_BASE = 'https://alerta.ina.gob.ar/a5/getObservaciones';
+const LIVE_DATA_CACHE_VERSION = 'a5-live-v2';
+const STATION_FRESH_MS = 36 * 60 * 60_000;
 const SNAPSHOT_CACHE_MS = 60_000;
 const STATIONS = Object.freeze([
   Object.freeze({ id: 'parana-santa-fe', label: 'Sistema Paraná', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', seriesId: '30', low: 2, alert: 5.3, evacuation: 5.7 }),
   Object.freeze({ id: 'salado-santo-tome', label: 'Sistema Salado', watercourse: 'Río Salado', stationName: 'Santo Tomé', stationCode: '1679', seriesId: '3044', low: 0, alert: 4.7, evacuation: null }),
 ]);
 
-interface CachedSnapshot { readonly cachedAt: string; readonly snapshot: Snapshot }
+interface CachedSnapshot { readonly cachedAt: string; readonly snapshot: Snapshot; readonly providerHealth: readonly ProviderHealth[] }
 interface CloudflareCacheStorage extends CacheStorage { readonly default: Cache }
 const inFlight = new Map<string, Promise<Snapshot>>();
 
@@ -32,6 +34,7 @@ function cacheApi(): Cache | null {
 
 async function configKey(env: LiveDataEnv): Promise<string> {
   const config = JSON.stringify({
+    version: LIVE_DATA_CACHE_VERSION,
     waterMlParana: env.INA_WATERML_PARANA_URL ?? null,
     waterMlSalado: env.INA_WATERML_SALADO_URL ?? null,
     ports: env.PORTS_HYDROMETER_JSON_URL ?? null,
@@ -49,14 +52,16 @@ async function readSnapshotCache(key: string, now: Date): Promise<Snapshot | nul
   if (!response) return null;
   try {
     const item = await response.json() as CachedSnapshot;
-    return now.getTime() - Date.parse(item.cachedAt) <= SNAPSHOT_CACHE_MS ? item.snapshot : null;
+    if (now.getTime() - Date.parse(item.cachedAt) > SNAPSHOT_CACHE_MS) return null;
+    if (Array.isArray(item.providerHealth)) restoreProviderHealth(item.providerHealth);
+    return item.snapshot;
   } catch { return null; }
 }
 
 async function writeSnapshotCache(key: string, snapshot: Snapshot): Promise<void> {
   const cache = cacheApi();
   if (!cache) return;
-  const item: CachedSnapshot = { cachedAt: new Date().toISOString(), snapshot };
+  const item: CachedSnapshot = { cachedAt: new Date().toISOString(), snapshot, providerHealth: providerHealth() };
   await cache.put(new Request(`https://cache.sos-sf.invalid/snapshot/${key}`), new Response(JSON.stringify(item), { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60' } }));
 }
 
@@ -112,12 +117,17 @@ function sourceStatus(result: ProviderResult<unknown>): Source['status'] {
 async function stationSystem(station: typeof STATIONS[number], now: Date): Promise<{ system: HydrologicalSystem; source: Source }> {
   const start = new Date(now.getTime() - 72 * 3_600_000).toISOString().slice(0, 10);
   const end = new Date(now.getTime() + 24 * 3_600_000).toISOString().slice(0, 10);
-  const url = `${INA_BASE}&timeStart=${start}&timeEnd=${end}&seriesId=${station.seriesId}&format=json`;
-  const result = await fetchInaSeries(url, `ina-rest-${station.seriesId}`);
+  const endpoint = new URL(INA_BASE);
+  endpoint.searchParams.set('tipo', 'puntual');
+  endpoint.searchParams.set('series_id', station.seriesId);
+  endpoint.searchParams.set('timestart', start);
+  endpoint.searchParams.set('timeend', end);
+  const sourceUrl = endpoint.toString();
+  const result = await fetchInaSeries(sourceUrl, `ina-rest-${station.seriesId}`, station.seriesId);
   const points = result.value ?? Object.freeze([]);
   const latest = points.at(-1);
   const age = latest ? now.getTime() - Date.parse(latest.at) : Number.POSITIVE_INFINITY;
-  const status: DataStatus = !latest ? 'UNAVAILABLE' : result.status === 'STALE' || age > 12 * 3_600_000 ? 'STALE' : 'LIVE';
+  const status: DataStatus = !latest ? 'UNAVAILABLE' : result.status === 'STALE' || age > STATION_FRESH_MS ? 'STALE' : 'LIVE';
   const system: HydrologicalSystem = Object.freeze({
     id: station.id,
     label: station.label,
@@ -148,7 +158,7 @@ async function stationSystem(station: typeof STATIONS[number], now: Date): Promi
     contribution: `${station.watercourse}, estación ${station.stationName}, serie ${station.seriesId}; lectura publicada por la fuente.`,
     official: true,
     connected: Boolean(latest),
-    url: 'https://alerta.ina.gob.ar/pub/datos/',
+    url: sourceUrl,
     qualityNote: validated ? 'La fuente marcó explícitamente esta lectura como validada.' : 'Dato operativo en tiempo real sin garantía de control de calidad o validación definitiva por INA.',
   });
   return { system, source };

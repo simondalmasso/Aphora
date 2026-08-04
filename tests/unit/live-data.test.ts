@@ -5,15 +5,15 @@ const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
 
 function json(value: unknown) { return new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } }); }
-function points(values: readonly [string, number][]) { return { data: values.map(([timestart, valor]) => ({ timestart, valor })) }; }
-function seriesId(input: RequestInfo | URL): string | null { return new URL(String(input)).searchParams.get('seriesId'); }
+function points(series: number, values: readonly [string, number][]) { return values.map(([timestart, valor]) => ({ tipo: 'puntual', series_id: series, timestart, valor })); }
+function seriesId(input: RequestInfo | URL): string | null { return new URL(String(input)).searchParams.get('series_id'); }
 
 describe('live hydrological aggregation', () => {
   it('keeps Paraná and Salado on separate scales with operational provenance', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const id = seriesId(input);
-      if (id === '30') return json(points([['2026-08-02T18:00:00.000Z', 3.1], ['2026-08-03T12:00:00.000Z', 3.18], ['2026-08-03T18:00:00.000Z', 3.2]]));
-      if (id === '3044') return json(points([['2026-08-02T18:00:00.000Z', 4.5], ['2026-08-03T12:00:00.000Z', 4.7], ['2026-08-03T18:00:00.000Z', 4.8]]));
+      if (id === '30') return json(points(Number(id), [['2026-08-02T18:00:00.000Z', 3.1], ['2026-08-03T12:00:00.000Z', 3.18], ['2026-08-03T18:00:00.000Z', 3.2]]));
+      if (id === '3044') return json(points(Number(id), [['2026-08-02T18:00:00.000Z', 4.5], ['2026-08-03T12:00:00.000Z', 4.7], ['2026-08-03T18:00:00.000Z', 4.8]]));
       if (String(input).includes('/identify')) return json({ observedAt: '2026-08-03T17:30:00.000Z', value: 0 });
       throw new Error(`unexpected URL ${String(input)}`);
     }) as typeof fetch;
@@ -36,8 +36,8 @@ describe('live hydrological aggregation', () => {
   it('does not convert an evacuation threshold into an official evacuation order', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const id = seriesId(input);
-      if (id === '30') return json(points([['2026-08-03T12:00:00.000Z', 5.6], ['2026-08-03T18:00:00.000Z', 5.8]]));
-      if (id === '3044') return json(points([['2026-08-03T12:00:00.000Z', 3.1], ['2026-08-03T18:00:00.000Z', 3.2]]));
+      if (id === '30') return json(points(Number(id), [['2026-08-03T12:00:00.000Z', 5.6], ['2026-08-03T18:00:00.000Z', 5.8]]));
+      if (id === '3044') return json(points(Number(id), [['2026-08-03T12:00:00.000Z', 3.1], ['2026-08-03T18:00:00.000Z', 3.2]]));
       if (String(input).includes('/identify')) return json({ observedAt: '2026-08-03T17:30:00.000Z', value: 0 });
       throw new Error(`unexpected URL ${String(input)}`);
     }) as typeof fetch;

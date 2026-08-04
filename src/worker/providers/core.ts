@@ -100,6 +100,12 @@ function publishHealth(policy: ProviderPolicy, result: ProviderResult<unknown>, 
   health.set(policy.id, Object.freeze({ id: policy.id, status: result.status, lastSuccessAt: circuit.lastSuccessAt, lastObservedAt: circuit.lastObservedAt, errorClass: result.errorClass, circuitOpenUntil: circuit.openUntil }));
 }
 export function providerHealth(): readonly ProviderHealth[] { return Object.freeze([...health.values()].sort((a, b) => a.id.localeCompare(b.id))); }
+export function restoreProviderHealth(entries: readonly ProviderHealth[]): void {
+  for (const entry of entries) {
+    if (!entry || typeof entry.id !== 'string') continue;
+    health.set(entry.id, Object.freeze({ ...entry }));
+  }
+}
 
 export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, parse: (body: string, contentType: string) => ParsedProvider<T>): Promise<ProviderResult<T>> {
   const now = new Date();
