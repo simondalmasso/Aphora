@@ -1,5 +1,5 @@
 name: Deploy Workers
-# verification-revision: 10
+# verification-revision: 11
 
 on:
   workflow_dispatch:
@@ -78,6 +78,21 @@ jobs:
       - name: End-to-end tests and screenshots
         run: npm run test:e2e
 
+      - name: Validate protected configuration names
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const required = ['GOOGLE_CLIENT_ID', 'SESSION_SIGNING_KEY', 'SOS_SF_OPERATOR_EMAILS'];
+          const missing = required.filter((name) => !String(process.env[name] || '').trim());
+          fs.mkdirSync('artifacts/v1', { recursive: true });
+          fs.writeFileSync('artifacts/v1/protected-config-preflight.json', JSON.stringify({ schemaVersion: '1.0', requiredNames: required, presentNames: required.filter((name) => !missing.includes(name)), missingNames: missing, valuesExposed: false, generatedAt: new Date().toISOString() }, null, 2) + '\n');
+          if (missing.length) {
+            console.error(`MISSING_PROTECTED_CONFIGURATION_NAMES=${missing.join(',')}`);
+            process.exit(1);
+          }
+          console.log(`PROTECTED_CONFIGURATION_NAMES_PRESENT=${required.join(',')}`);
+          NODE
+
       - name: Provision bounded Cloudflare resources
         id: provision
         run: |
@@ -128,7 +143,7 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
         run: |
-          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",decisionId:"SOS-SF-AUD-V3-CODE-REVIEW-006",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:process.env.JOB_STATUS,deploymentUrl:process.env.DEPLOYMENT_URL||null,generatedAt:new Date().toISOString()},null,2)+"\n")'
+          node -e 'const fs=require("node:fs");fs.mkdirSync("artifacts/v1",{recursive:true});fs.writeFileSync("artifacts/v1/verification.json",JSON.stringify({schemaVersion:"1.0",decisionId:"SOS-SF-AUD-V3-GATE-007",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:process.env.JOB_STATUS,deploymentUrl:process.env.DEPLOYMENT_URL||null,generatedAt:new Date().toISOString()},null,2)+"\n")'
 
       - name: Remove generated secret material
         if: always()
