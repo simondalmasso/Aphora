@@ -1,5 +1,5 @@
 name: Deploy Workers
-# verification-revision: 13
+# verification-revision: 14
 
 on:
   workflow_dispatch:
@@ -87,21 +87,21 @@ jobs:
       - name: End-to-end tests and deterministic screenshots
         run: npm run test:e2e
 
-      - name: Validate protected configuration names
+      - name: Record protected configuration state
+        id: protected
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
           const required = ['GOOGLE_CLIENT_ID', 'SESSION_SIGNING_KEY', 'SOS_SF_OPERATOR_EMAILS'];
-          const missing = required.filter((name) => !String(process.env[name] || '').trim());
+          const present = required.filter((name) => String(process.env[name] || '').trim());
+          const missing = required.filter((name) => !present.includes(name));
+          const privateReady = missing.length === 0 && String(process.env.SESSION_SIGNING_KEY || '').length >= 32;
           const evidenceDir = process.env.EVIDENCE_DIR;
           fs.mkdirSync(evidenceDir, { recursive: true });
-          fs.writeFileSync(path.join(evidenceDir, 'protected-config-preflight.json'), JSON.stringify({ schemaVersion: '1.0', requiredNames: required, presentNames: required.filter((name) => !missing.includes(name)), missingNames: missing, valuesExposed: false, generatedAt: new Date().toISOString() }, null, 2) + '\n');
-          if (missing.length) {
-            console.error(`MISSING_PROTECTED_CONFIGURATION_NAMES=${missing.join(',')}`);
-            process.exit(1);
-          }
-          console.log(`PROTECTED_CONFIGURATION_NAMES_PRESENT=${required.join(',')}`);
+          fs.writeFileSync(path.join(evidenceDir, 'protected-config-preflight.json'), JSON.stringify({ schemaVersion: '1.0', requiredNames: required, presentNames: present, missingNames: missing, privateRuntime: privateReady ? 'ACTIVE' : 'FAIL_CLOSED', valuesExposed: false, generatedAt: new Date().toISOString() }, null, 2) + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `private_ready=${privateReady ? 'true' : 'false'}\n`);
+          console.log(`PRIVATE_RUNTIME=${privateReady ? 'ACTIVE' : 'FAIL_CLOSED'}`);
           NODE
 
       - name: Provision bounded Cloudflare resources
@@ -131,7 +131,7 @@ jobs:
           npx wrangler r2 object delete "sos-sf-private-reports/${probe}" --config wrangler.generated.jsonc
           node -e 'const fs=require("node:fs"),p=require("node:path");fs.writeFileSync(p.join(process.env.EVIDENCE_DIR,"r2-lifecycle.json"),JSON.stringify({schemaVersion:"1.0",runId:process.env.GITHUB_RUN_ID,result:"PASS",generatedAt:new Date().toISOString()},null,2)+"\n")'
 
-      - name: Configure protected Worker secrets
+      - name: Configure Worker secrets
         run: npx wrangler secret bulk .worker-secrets.json --config wrangler.generated.jsonc
 
       - name: Deploy Worker and Static Assets
@@ -147,6 +147,7 @@ jobs:
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
           WRITE_PROOF: "1"
+          EXPECT_PRIVATE_FEATURES: ${{ steps.provision.outputs.private_ready }}
         run: npm run verify:remote -- "$DEPLOYMENT_URL"
 
       - name: Write verification summary
@@ -154,8 +155,9 @@ jobs:
         env:
           JOB_STATUS: ${{ job.status }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          PRIVATE_READY: ${{ steps.provision.outputs.private_ready }}
         run: |
-          node -e 'const fs=require("node:fs"),p=require("node:path");fs.mkdirSync(process.env.EVIDENCE_DIR,{recursive:true});fs.writeFileSync(p.join(process.env.EVIDENCE_DIR,"verification.json"),JSON.stringify({schemaVersion:"1.0",decisionId:"SOS-SF-AUD-V3-EVIDENCE-009",audHold:"ACTIVE",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:process.env.JOB_STATUS,deploymentUrl:process.env.DEPLOYMENT_URL||null,generatedAt:new Date().toISOString()},null,2)+"\n")'
+          node -e 'const fs=require("node:fs"),p=require("node:path");fs.mkdirSync(process.env.EVIDENCE_DIR,{recursive:true});fs.writeFileSync(p.join(process.env.EVIDENCE_DIR,"verification.json"),JSON.stringify({schemaVersion:"1.0",decisionId:"SOS-SF-OWNER-FINAL-DEPLOY-010",audHold:"ACTIVE",runId:process.env.GITHUB_RUN_ID,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,conclusion:process.env.JOB_STATUS,deploymentUrl:process.env.DEPLOYMENT_URL||null,privateRuntime:process.env.PRIVATE_READY==="true"?"ACTIVE":"FAIL_CLOSED",generatedAt:new Date().toISOString()},null,2)+"\n")'
 
       - name: Finalize clean evidence manifest
         if: always()
@@ -184,6 +186,7 @@ jobs:
           ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
           ARTIFACT_DIGEST: ${{ steps.evidence.outputs.artifact-digest }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          PRIVATE_READY: ${{ steps.provision.outputs.private_ready }}
         run: |
-          body=$(printf 'ARQ_V3_GATE_STATUS=%s\nAUD_HOLD=ACTIVE\nRUN_ID=%s\nSHA=%s\nREF=%s\nARTIFACT_ID=%s\nARTIFACT_DIGEST=%s\nDEPLOYMENT_URL=%s\n' "$JOB_STATUS" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$GITHUB_REF" "${ARTIFACT_ID:-NONE}" "${ARTIFACT_DIGEST:-NONE}" "${DEPLOYMENT_URL:-NOT_DEPLOYED}")
+          body=$(printf 'ARQ_V3_GATE_STATUS=%s\nAUD_HOLD=ACTIVE\nRUN_ID=%s\nSHA=%s\nREF=%s\nPRIVATE_RUNTIME=%s\nARTIFACT_ID=%s\nARTIFACT_DIGEST=%s\nDEPLOYMENT_URL=%s\n' "$JOB_STATUS" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$GITHUB_REF" "${PRIVATE_READY:-false}" "${ARTIFACT_ID:-NONE}" "${ARTIFACT_DIGEST:-NONE}" "${DEPLOYMENT_URL:-NOT_DEPLOYED}")
           gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${CHECKPOINT_COMMENT_ID}" --method PATCH -f body="$body"
