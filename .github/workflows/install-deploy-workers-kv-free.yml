@@ -1,4 +1,4 @@
-name: Install Canonical KV Free Deploy Workflow
+name: Export Canonical KV Free Deploy Workflow
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
     paths: [.github/install-deploy-workers-kv-free-trigger]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: sos-sf-install-kv-free-deploy-workflow
   cancel-in-progress: false
 
 jobs:
-  install:
+  export:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -22,10 +22,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify and install canonical workflow
+      - name: Verify and export canonical workflow
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p /tmp/canonical-kv-free-workflow
           python - <<'PY'
           from pathlib import Path
           import base64, gzip, hashlib
@@ -40,17 +41,23 @@ jobs:
           expected_content = 'b51e0bd37fea1d0304165657e3170eb4384c66e26cd75fd48f6b852bee7c104b'
           if actual_content != expected_content:
               raise SystemExit(f'DEPLOY_WORKFLOW_CONTENT_HASH_MISMATCH:{actual_content}')
-          Path('.github/workflows/deploy-workers.yml').write_bytes(content)
+          Path('/tmp/canonical-kv-free-workflow/deploy-workers.yml').write_bytes(content)
+          Path('/tmp/canonical-kv-free-workflow/sha256.txt').write_text(
+              f'transport_sha256={actual_transport}\ncontent_sha256={actual_content}\n',
+              encoding='utf-8',
+          )
           PY
-          git diff --check
-          grep -q 'Prove Workers Free and D1/KV authority before any mutation' .github/workflows/deploy-workers.yml
-          grep -q 'Deploy exact Worker once with D1 KV and protected secrets' .github/workflows/deploy-workers.yml
-          if grep -nE 'Configure and verify R2|r2 bucket|r2 object|Provision or verify D1 and R2' .github/workflows/deploy-workers.yml; then
+          grep -q 'Prove Workers Free and D1/KV authority before any mutation' /tmp/canonical-kv-free-workflow/deploy-workers.yml
+          grep -q 'Deploy exact Worker once with D1 KV and protected secrets' /tmp/canonical-kv-free-workflow/deploy-workers.yml
+          if grep -nE 'Configure and verify R2|r2 bucket|r2 object|Provision or verify D1 and R2' /tmp/canonical-kv-free-workflow/deploy-workers.yml; then
             echo 'R2_DEPLOY_STEP_PRESENT' >&2
             exit 1
           fi
-          git config user.name 'sos-sf-automation'
-          git config user.email 'sos-sf-automation@users.noreply.github.com'
-          git add .github/workflows/deploy-workers.yml
-          git commit -m 'ci: install canonical KV Free completion pipeline'
-          git push origin HEAD:arq/visual-dashboard-v3
+
+      - name: Upload canonical workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-kv-free-deploy-workflow-${{ github.sha }}-${{ github.run_id }}
+          path: /tmp/canonical-kv-free-workflow/
+          if-no-files-found: error
+          retention-days: 7
