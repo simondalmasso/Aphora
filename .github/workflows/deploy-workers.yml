@@ -17,6 +17,8 @@ concurrency:
 
 env:
   EVIDENCE_DIR: artifacts/v3-full-014
+  OWNER_VISUAL_CONFIRMATION: WORKERS_FREE_CONFIRMED
+  BUDGET_MAX_USD: '0'
   DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -132,6 +134,34 @@ jobs:
               f'provision_fix_base64_sha256={fix_transport}',
               f'provision_fix_patch_sha256={fix_hash}',
           ])
+
+          kv_encoded = Path('.github/v3-full-014-kv-free.patch.gz.b64').read_text().strip()
+          kv_transport = hashlib.sha256(kv_encoded.encode()).hexdigest()
+          if kv_transport != 'bce53f835ef4ce8770a1bd1464ebcc2d420ef18cd031a035fb8b7e30be023b89':
+              raise SystemExit(f'KV_FREE_TRANSPORT_HASH_MISMATCH:{kv_transport}')
+          kv_patch = gzip.decompress(base64.b64decode(kv_encoded, validate=True))
+          kv_hash = hashlib.sha256(kv_patch).hexdigest()
+          if kv_hash != 'a3b10732ca4c6d4f4cd6649c162ae589c28641c74b050eb0acfa6cd8fd79d220':
+              raise SystemExit(f'KV_FREE_CONTENT_HASH_MISMATCH:{kv_hash}')
+          Path('/tmp/v3-full-014-kv-free.patch').write_bytes(kv_patch)
+          report.extend([
+              f'kv_free_base64_sha256={kv_transport}',
+              f'kv_free_patch_sha256={kv_hash}',
+          ])
+
+          owner_encoded = Path('.github/v3-full-014-owner-free.patch.gz.b64').read_text().strip()
+          owner_transport = hashlib.sha256(owner_encoded.encode()).hexdigest()
+          if owner_transport != 'd73cf0eccb264c72fe7c5cab152de1863a342078db831955a7ca6d145fc30c4f':
+              raise SystemExit(f'OWNER_FREE_TRANSPORT_HASH_MISMATCH:{owner_transport}')
+          owner_patch = gzip.decompress(base64.b64decode(owner_encoded, validate=True))
+          owner_hash = hashlib.sha256(owner_patch).hexdigest()
+          if owner_hash != '038c7c2ce368a320029c76ecfaba3c532e325a3f6a91a63c3222ac2b3791c5e3':
+              raise SystemExit(f'OWNER_FREE_CONTENT_HASH_MISMATCH:{owner_hash}')
+          Path('/tmp/v3-full-014-owner-free.patch').write_bytes(owner_patch)
+          report.extend([
+              f'owner_free_base64_sha256={owner_transport}',
+              f'owner_free_patch_sha256={owner_hash}',
+          ])
           Path('artifacts/v3-full-014/patch-verification.txt').write_text(
               '\n'.join(report) + '\n',
               encoding='utf-8',
@@ -139,6 +169,8 @@ jobs:
           PY
           git apply --index /tmp/v3-full-014.patch
           git apply --index /tmp/v3-full-014-provision-fix.patch
+          git apply --index /tmp/v3-full-014-kv-free.patch
+          git apply --index /tmp/v3-full-014-owner-free.patch
           git diff --cached --check
           git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
 
@@ -149,9 +181,21 @@ jobs:
           set -euo pipefail
           test -z "$(git status --porcelain --untracked-files=no)"
           test -f migrations/0004_session_csrf_photo_access.sql
+          test -f migrations/0005_report_photo_kv_storage.sql
           test -f src/client/security/csrf.ts
           test -f public/source-provenance.json
           grep -q "SESSION_SIGNING_KEY_PRESENT" scripts/provision-cloudflare.mjs
+          grep -q "REPORTS_KV" src/worker/reports.ts
+          grep -q "WORKERS_KV_FREE" scripts/provision-cloudflare.mjs
+          test ! -e .github/v3-full-014-kv-free.patch.gz.b64
+          test ! -e .github/v3-full-014-owner-free.patch.gz.b64
+          test ! -e .github/v3-full-014.patch.gz.b64
+          test ! -e .github/v3-full-014-provision-fix.patch.b64
+          if grep -RInE "REPORTS_BUCKET|r2_buckets|/r2/" \
+            src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc; then
+            echo 'R2_OPERATIONAL_DEPENDENCY_PRESENT' >&2
+            exit 1
+          fi
 
       - name: Generate deterministic deployed-source provenance
         if: steps.mode.outputs.apply_patch == 'true'
@@ -228,7 +272,7 @@ jobs:
       - name: Build and budgets
         run: npm run build
 
-      - name: Worker tests with real local D1 and R2
+      - name: Worker tests with real local D1 and KV
         run: npm run test:worker
 
       - name: E2E desktop mobile offline and privacy
@@ -253,6 +297,10 @@ jobs:
           NODE
           printf 'google_client_id_present=true\noperator_allowlist_present=true\n' \
             > "$EVIDENCE_DIR/protected-config-presence.txt"
+
+      - name: Prove Workers Free and D1/KV authority before any mutation
+        id: zero_cost
+        run: node scripts/verify-cloudflare-zero-cost.mjs
 
       - name: Ensure persistent session signing secret
         if: steps.mode.outputs.mutate_cloudflare == 'true'
@@ -281,7 +329,7 @@ jobs:
               > "$EVIDENCE_DIR/session-secret-state.txt"
           fi
 
-      - name: Provision or verify D1 and R2
+      - name: Provision or verify D1 and KV Free
         if: steps.mode.outputs.mutate_cloudflare == 'true'
         id: provision
         run: node scripts/provision-cloudflare.mjs
@@ -310,6 +358,9 @@ jobs:
           npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc \
             --command "PRAGMA table_info(auth_sessions)" \
             --json > "$EVIDENCE_DIR/d1-auth-session-columns.json"
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc \
+            --command "PRAGMA table_info(report_photos)" \
+            --json > "$EVIDENCE_DIR/d1-report-photo-columns.json"
           node - <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
@@ -339,47 +390,21 @@ jobs:
           for (const name of ['csrf_hash', 'last_seen_at', 'rotated_from', 'revoked_at']) {
             if (!columns.has(name)) throw new Error(`D1_COLUMN_MISSING:${name}`);
           }
+          const photoColumns = new Set(
+            rows('d1-report-photo-columns.json').map((value) => value.name),
+          );
+          if (!photoColumns.has('storage_backend')) {
+            throw new Error('D1_COLUMN_MISSING:storage_backend');
+          }
           NODE
 
-      - name: Configure and verify R2 retention lifecycle
+      - name: Verify bounded remote KV binary operations
         if: steps.mode.outputs.mutate_cloudflare == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          days="${REPORT_RETENTION_DAYS:-30}"
-          npx wrangler r2 bucket lifecycle remove sos-sf-private-reports \
-            --id sos-sf-report-retention \
-            --config wrangler.generated.jsonc >/dev/null 2>&1 || true
-          npx wrangler r2 bucket lifecycle add sos-sf-private-reports \
-            sos-sf-report-retention reports/ \
-            --expire-days "$days" \
-            --config wrangler.generated.jsonc
-          npx wrangler r2 bucket lifecycle list sos-sf-private-reports \
-            --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/r2-lifecycle.txt"
-          grep -q 'sos-sf-report-retention' "$EVIDENCE_DIR/r2-lifecycle.txt"
+        env:
+          KV_NAMESPACE_ID: ${{ steps.provision.outputs.kv_namespace_id }}
+        run: node scripts/verify-kv-namespace.mjs
 
-      - name: Verify bounded remote R2 object operations
-        if: steps.mode.outputs.mutate_cloudflare == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          probe="__v3_014_probe/${GITHUB_RUN_ID}.txt"
-          printf 'sos-sf-v3-014-r2-probe' > /tmp/probe.txt
-          npx wrangler r2 object put "sos-sf-private-reports/${probe}" \
-            --file /tmp/probe.txt \
-            --remote \
-            --config wrangler.generated.jsonc
-          npx wrangler r2 object get "sos-sf-private-reports/${probe}" \
-            --file /tmp/read.txt \
-            --remote \
-            --config wrangler.generated.jsonc
-          cmp /tmp/probe.txt /tmp/read.txt
-          npx wrangler r2 object delete "sos-sf-private-reports/${probe}" \
-            --remote \
-            --config wrangler.generated.jsonc
-          printf 'r2_put_get_delete=PASS\n' > "$EVIDENCE_DIR/r2-object-test.txt"
-
-      - name: Deploy exact Worker with D1 R2 and protected secrets
+      - name: Deploy exact Worker once with D1 KV and protected secrets
         if: steps.mode.outputs.deploy == 'true'
         shell: bash
         run: |
@@ -495,9 +520,16 @@ jobs:
           set -euo pipefail
           git rm -f \
             .github/v3-full-014.patch.gz.b64 \
-            .github/v3-full-014-provision-fix.patch.b64
+            .github/v3-full-014-provision-fix.patch.b64 \
+            .github/v3-full-014-kv-free.patch.gz.b64 \
+            .github/v3-full-014-owner-free.patch.gz.b64 \
+            .github/cloudflare-auth-diagnostic-trigger \
+            .github/export-effective-v3-trigger \
+            .github/validate-kv-free-v3-trigger \
+            .github/deploy-workers-kv-free.yml.gz.b64 \
+            .github/install-deploy-workers-kv-free-trigger
           git rm -rf .github/v3-full-014-parts
-          printf 'MODE=TERMINAL_V3_FULL_014\n' > .github/arq-v3-deploy-trigger
+          printf 'MODE=TERMINAL_V3_FULL_014\nOWNER_VISUAL_CONFIRMATION=WORKERS_FREE_CONFIRMED\nBUDGET_MAX_USD=0\n' > .github/arq-v3-deploy-trigger
           git add .github/arq-v3-deploy-trigger public/source-provenance.json
           git diff --cached --check
           git config user.name 'sos-sf-automation'
@@ -527,6 +559,8 @@ jobs:
             printf -- '- Job status: `%s`\n' "$conclusion"
             echo '- `main`: untouched'
             echo '- Issue: remains open'
+            echo '- Storage: `D1 + Workers KV Free`; R2 disabled by design'
+            echo '- Budget: `USD 0`; zero-cost gate required before mutation'
             echo '- `AUD_HOLD`: ACTIVE'
             echo
             echo 'Evidence is attached to the workflow artifact. This comment does not declare owner or AUD acceptance.'
@@ -535,7 +569,7 @@ jobs:
 
       - name: Remove generated sensitive material
         if: always()
-        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/session.json /tmp/private.json /tmp/auth-negative.json /tmp/worker-secrets-list.json /tmp/v3-full-014.patch /tmp/v3-full-014-provision-fix.patch /tmp/local-product-tree.json /tmp/remote-source-provenance.json
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/session.json /tmp/private.json /tmp/auth-negative.json /tmp/worker-secrets-list.json /tmp/v3-full-014.patch /tmp/v3-full-014-provision-fix.patch /tmp/v3-full-014-kv-free.patch /tmp/v3-full-014-owner-free.patch /tmp/local-product-tree.json /tmp/remote-source-provenance.json
 
       - name: Upload V3 completion evidence
         if: always()
