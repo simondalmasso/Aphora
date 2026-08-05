@@ -1,21 +1,20 @@
-# Arquitectura V1
+# Arquitectura de seguridad pública
 
-SOS Santa Fe es una PWA React/Vite servida por un Cloudflare Worker con Static Assets sobre `workers.dev`, sin Pages, dominio propio ni Workers Routes. El Worker intercepta `/api/*` y `/lite`, aplica headers de seguridad también a los assets y mantiene abierta toda la lectura pública.
+SOS Santa Fe es una PWA mobile-first servida por un Cloudflare Worker. La lectura pública no requiere cuenta. El Worker agrega fuentes allowlisted, normaliza vigencia y alertas, publica contratos JSON y aplica headers de seguridad también a assets y modo lite.
 
-Los límites son: `data` aporta fixtures demo inmutables; `domain` deriva estado, TTL, contradicciones, mensajería y compatibilidad; `worker` publica contratos, autenticación y autorización; `client` representa una superficie única mobile-first. El service worker precachea el HTML y descubre/cachea sus assets de build antes de activarse. Si una navegación falla, sirve una shell offline autónoma —sin depender del bundle— con snapshot demo, timestamp y aviso explícito de que no es información actual.
+## Capas
 
-## Render progresivo del Pulso
+- `worker/providers`: adaptadores con allowlist, timeout, tamaño máximo, validación de content type, cache, circuit breaker y timestamps preservados.
+- `domain/public-safety`: frescura, clasificación de feeds, verificación de alertas y timeline de 72 horas.
+- `worker/live-data`: inventario de organismos/feeds, estaciones reales, CAP, señales suplementarias y estado técnico separado.
+- `client`: alertas primero, síntesis territorial, hidrometría, timeline, acciones, preparación y transparencia.
+- `worker/reports` + D1 + KV: reportes ciudadanos privados y fotos con TTL.
+- `service-worker`: shell offline, contactos y guía; nunca presenta datos cacheados como actuales.
 
-`ParanaPulse.tsx` entrega primero semántica, métricas y SVG. Al entrar en viewport importa dinámicamente `client/three/pulse-three.ts`, que expone sólo las piezas de Three.js utilizadas. La escena no usa luces, sombras ni postprocesado. Sus mallas están limitadas a 48×10 segmentos observados y 24×16 proyectados, con 18 partículas, DPR ≤1,5 y scheduler ≤30 FPS.
+## Rendimiento y accesibilidad
 
-`IntersectionObserver` detiene el loop fuera de viewport; `ResizeObserver` ajusta el canvas sin sobrerender. Reduced motion deja un frame estático, un error o pérdida de contexto conserva el SVG, y `/lite` no contiene scripts. El manifest de Vite permite medir por separado el entry inicial y el chunk visual dinámico: el presupuesto inicial histórico de 120 KiB gzip permanece intacto; el chunk visual diferido tiene un límite explícito adicional de 180 KiB gzip.
+No existe Three.js, canvas decorativo, vídeo, tracker ni fuente externa. Los gráficos hidrométricos son SVG con escala, unidad, periodo, discontinuidades y tabla equivalente. El diseño usa system-ui, base clara, una sola cabecera, controles de 44 px, reflow, zoom 200 %, reduced motion, navegación por teclado y estados que no dependen sólo del color.
 
-## Centro de mensajes
+## Degradación
 
-Las comunicaciones públicas son read-only, visibles sin cuenta y limitadas a cinco. La bandeja privada queda tras `PRIVATE_MESSAGING_ENABLED`, Google Identity Services directo, firma de sesión propia y binding D1 `MESSAGES_DB`. En el deployment inicial la bandera está en `false`: no existe login ficticio ni dependencia de credenciales ausentes.
-
-D1 es la fuente primaria consultable para conversaciones, mensajes, idempotencia, rate events y auditoría sin contenido. El cliente usa polling acotado de 15 segundos sólo mientras la bandeja está abierta; no usa sockets ni scroll infinito. El servicio elimina mensajes vencidos y eventos históricos en mantenimiento oportunista con retención de 30 días.
-
-## Confianza
-
-La jerarquía de fuentes no convierte señales de modelo en órdenes. Sólo una comunicación oficial validada podría producir `EVACUACION_OFICIAL`; la V1 contiene exclusivamente fixtures demo. Autenticarse no convierte una comunicación privada en un canal de emergencias ni garantiza entrega, lectura o respuesta.
+El Worker operativo no implica datos vigentes. Cuando la fuente de alertas está caída o vencida, la portada muestra degradación o indisponibilidad; nunca afirma ausencia de alertas. Cuando no existen geometrías verificadas, el mapa se reemplaza por una lista territorial accesible y una explicación explícita.

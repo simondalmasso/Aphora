@@ -1,132 +1,120 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-import type { Snapshot } from '../../src/domain/snapshot';
+import type { Snapshot, Source } from '../../src/domain/snapshot';
 
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
-const generatedAt = '2026-08-03T18:00:00.000Z';
-const storageKey = 'sos-sf:last-live-snapshot:v3';
-const points = (base: number) => Array.from({ length: 13 }, (_, index) => ({ at: new Date(Date.parse(generatedAt) - (12 - index) * 2 * 3_600_000).toISOString(), metres: base + index * .01, measured: true }));
+const generatedAt = '2026-08-05T10:00:00.000Z';
+const storageKey = 'sos-sf:last-public-safety-snapshot:v4';
+const points = (base: number) => Array.from({ length: 24 }, (_, index) => ({
+  at: new Date(Date.parse(generatedAt) - (23 - index) * 60 * 60_000).toISOString(),
+  metres: base + index * .01,
+  measured: true,
+  quality: 'PUBLISHED_OPERATIONAL' as const,
+}));
+
 const systems = [
-  { id: 'parana-santa-fe', label: 'Sistema Paraná', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', available: true, dataStatus: 'LIVE' as const, currentMetres: 3.22, observedAt: generatedAt, sourceId: 'ina:30', sourceName: 'INA · Sistema de Información Hidrológica', points: points(3.1), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia baja', metres: 2 }, { id: 'ALERTA' as const, label: 'Alerta', metres: 5.3 }, { id: 'EVACUACION' as const, label: 'Evacuación', metres: 5.7 }], trend: 'RISING_SLOWLY' as const, delta1h: .01, delta6h: .03, delta24h: .12 },
-  { id: 'salado-santo-tome', label: 'Sistema Salado', watercourse: 'Río Salado', stationName: 'Santo Tomé', stationCode: '1679', available: true, dataStatus: 'LIVE' as const, currentMetres: 4.8, observedAt: generatedAt, sourceId: 'ina:3044', sourceName: 'INA · Sistema de Información Hidrológica', points: points(4.68), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia baja', metres: 0 }, { id: 'ALERTA' as const, label: 'Alerta', metres: 4.7 }], trend: 'RISING' as const, delta1h: .02, delta6h: .06, delta24h: .12 },
+  {
+    id: 'parana-santa-fe', label: 'Río Paraná — Santa Fe', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', available: true, dataStatus: 'LIVE' as const, freshness: 'ACTUALIZADO' as const, currentMetres: 3.22, observedAt: generatedAt, fetchedAt: generatedAt, validUntil: '2026-08-06T10:00:00.000Z', sourceId: 'ina-rest-30', sourceName: 'Instituto Nacional del Agua · INA REST', points: points(2.99), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia inferior', metres: 2 }, { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 5.3 }, { id: 'EVACUACION' as const, label: 'Nivel de evacuación de referencia', metres: 5.7 }], trend: 'RISING_SLOWLY' as const, delta1h: .01, delta6h: .06, delta24h: .23,
+  },
+  {
+    id: 'salado-santo-tome', label: 'Río Salado — Santo Tomé', watercourse: 'Río Salado', stationName: 'Santo Tomé', stationCode: '1679', available: true, dataStatus: 'STALE' as const, freshness: 'ACTUALIZACION_DEMORADA' as const, currentMetres: 4.8, observedAt: '2026-08-05T00:00:00.000Z', fetchedAt: '2026-08-05T09:55:00.000Z', validUntil: '2026-08-06T00:00:00.000Z', sourceId: 'ina-rest-3044', sourceName: 'Instituto Nacional del Agua · INA REST', points: points(4.57), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia inferior', metres: 0 }, { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 4.7 }], trend: 'RISING' as const, delta1h: .01, delta6h: .06, delta24h: .23,
+  },
 ] as const;
+
+type SourceInput = Partial<Source> & { id: string; name: string; organizationId: string; organizationName: string; feedName: string; classification: NonNullable<Source['classification']> };
+
+function source(input: SourceInput): Source {
+  return {
+    kind: 'OFFICIAL_OBSERVATION', status: input.classification === 'OPERATIONAL_FRESH' ? 'FRESH' : input.classification === 'OPERATIONAL_STALE' ? 'STALE' : 'UNAVAILABLE', observedAt: generatedAt, fetchedAt: generatedAt, lastCheckedAt: generatedAt, validUntil: '2026-08-06T10:00:00.000Z', contribution: 'Fuente pública inventariada.', official: true, connected: ['OPERATIONAL_FRESH','OPERATIONAL_STALE','SUPPLEMENTARY'].includes(input.classification), feedId: input.id, freshness: input.classification === 'OPERATIONAL_FRESH' ? 'ACTUALIZADO' : input.classification === 'OPERATIONAL_STALE' ? 'ACTUALIZACION_DEMORADA' : 'NO_DISPONIBLE', determinesPrimaryState: false, url: 'https://example.test/official', ...input,
+  };
+}
+
+const sources: Source[] = [
+  source({ id: 'ina-rest-30', name: 'INA REST Paraná', organizationId: 'ina', organizationName: 'Instituto Nacional del Agua', feedName: 'INA REST · Río Paraná, Santa Fe', classification: 'OPERATIONAL_FRESH', determinesPrimaryState: true }),
+  source({ id: 'ina-rest-3044', name: 'INA REST Salado', organizationId: 'ina', organizationName: 'Instituto Nacional del Agua', feedName: 'INA REST · Río Salado, Santo Tomé', classification: 'OPERATIONAL_STALE', determinesPrimaryState: true }),
+  source({ id: 'ina-waterml-parana', name: 'INA WaterML Paraná', organizationId: 'ina', organizationName: 'Instituto Nacional del Agua', feedName: 'INA WaterML · Paraná', classification: 'OPERATIONAL_FRESH' }),
+  source({ id: 'ina-waterml-salado', name: 'INA WaterML Salado', organizationId: 'ina', organizationName: 'Instituto Nacional del Agua', feedName: 'INA WaterML · Salado', classification: 'OPERATIONAL_STALE' }),
+  source({ id: 'smn-alerts', name: 'Alertas SMN CAP', organizationId: 'smn', organizationName: 'Servicio Meteorológico Nacional', feedName: 'Alertas oficiales SMN · CAP', classification: 'OPERATIONAL_FRESH', kind: 'OFFICIAL_ALERT', determinesPrimaryState: true }),
+  source({ id: 'smn-observations', name: 'Observaciones SMN', organizationId: 'smn', organizationName: 'Servicio Meteorológico Nacional', feedName: 'Observaciones meteorológicas', classification: 'BLOCKED_CREDENTIAL', connected: false }),
+  source({ id: 'nasa-gpm-imerg-early', name: 'NASA GPM', organizationId: 'nasa', organizationName: 'NASA', feedName: 'GPM IMERG Early', classification: 'SUPPLEMENTARY', kind: 'SATELLITE_OBSERVATION' }),
+  source({ id: 'ports-hydrometers', name: 'Puertos', organizationId: 'ports', organizationName: 'Agencia Nacional de Puertos y Navegación', feedName: 'Hidrómetros portuarios', classification: 'BLOCKED_NO_MACHINE_ENDPOINT', connected: false }),
+  source({ id: 'province-early-warning-page', name: 'Protección Civil', organizationId: 'province', organizationName: 'Gobierno de la Provincia de Santa Fe · Protección Civil', feedName: 'Canal humano provincial', classification: 'BLOCKED_NO_MACHINE_ENDPOINT', kind: 'OFFICIAL_ALERT', connected: false }),
+  source({ id: 'cobem-public-page', name: 'COBEM', organizationId: 'city', organizationName: 'Municipalidad de Santa Fe · COBEM', feedName: 'Canal humano municipal', classification: 'BLOCKED_NO_MACHINE_ENDPOINT', kind: 'OFFICIAL_ALERT', connected: false }),
+];
+
+const activeAlert = {
+  identifier: 'smn-test-1', sender: 'Servicio Meteorológico Nacional', sent: '2026-08-05T09:30:00.000Z', status: 'Actual', messageType: 'Alert', scope: 'Public', category: 'Met', event: 'Tormentas fuertes', urgency: 'Immediate', severity: 'Severe', certainty: 'Likely', effective: '2026-08-05T09:30:00.000Z', onset: '2026-08-05T10:00:00.000Z', expires: '2026-08-05T16:00:00.000Z', headline: 'Alerta por tormentas fuertes', description: 'Se esperan tormentas fuertes.', instruction: 'Permanecé en un lugar seguro y evitá circular.', area: 'Departamento La Capital, Santa Fe', sourceUrl: 'https://example.test/alert', lifecycle: 'ACTIVE' as const, appliesToSantaFe: true,
+};
+
 const liveSnapshot: Snapshot = {
-  schemaVersion: '1.0', id: 'live-e2e', mode: 'LIVE', dataStatus: 'LIVE', generatedAt, previousSnapshotAt: '2026-08-03T17:45:00.000Z', state: 'ALERTA', stateLabel: 'Umbral de alerta alcanzado', summary: 'Dos estaciones oficiales se presentan en escalas separadas.', dominantSourceId: 'ina:3044', validUntil: '2026-08-03T18:15:00.000Z', recommendedAction: 'Seguí instrucciones oficiales y evitá zonas ribereñas o anegadas.', emergencyDisclaimer: 'SOS Santa Fe agrega fuentes públicas y no reemplaza a los servicios de emergencia.', changes: [{ id: 'change', label: 'Río Paraná · Santa Fe', direction: 'UP', detail: '+12 cm en 24 horas' }], systems, river: { systemId: 'parana-santa-fe', available: true, dataStatus: 'LIVE', stationName: 'Santa Fe', currentMetres: 3.22, delta1h: .01, delta6h: .03, delta24h: .12, trend: 'RISING_SLOWLY', observedAt: generatedAt, sourceId: 'ina:30', sourceName: systems[0].sourceName, points: systems[0].points, forecastPoints: [], thresholds: systems[0].thresholds }, rain: { available: false, dataStatus: 'UNAVAILABLE', accumulated1hMm: 0, accumulated24hMm: 0, forecast: 'Sin estimación local publicada.', observedAt: generatedAt, sourceId: 'nasa-gpm-imerg-early', points: [] }, sources: systems.map((system) => ({ id: system.sourceId, name: system.sourceName, kind: 'OFFICIAL_OBSERVATION' as const, status: 'FRESH' as const, observedAt: generatedAt, validUntil: '2026-08-04T06:00:00.000Z', contribution: `${system.watercourse}, estación ${system.stationName}`, official: true })), contradictions: [], shelters: [], actions: ['Consultá alertas y recomendaciones oficiales.', 'Tené disponibles los teléfonos esenciales.'], messages: [],
+  schemaVersion: '1.0', id: 'public-safety-e2e', mode: 'LIVE', dataStatus: 'STALE', freshness: 'ACTUALIZACION_DEMORADA', generatedAt, previousSnapshotAt: '2026-08-05T09:45:00.000Z', state: 'ALERTA', stateLabel: 'Nivel por encima del umbral de alerta de referencia', summary: 'Río Paraná — Santa Fe: 3,22 m. Río Salado — Santo Tomé conserva una medición con actualización demorada.', dominantSourceId: 'ina-rest-30', validUntil: '2026-08-05T10:15:00.000Z', recommendedAction: activeAlert.instruction, emergencyDisclaimer: 'SOS Santa Fe es un servicio independiente y no reemplaza a los organismos competentes.', alertStatus: 'ALERTA_OFICIAL_ACTIVA', alerts: [activeAlert], timeline: [{ id: 'a', at: activeAlert.sent, type: 'ALERT_ISSUED', title: activeAlert.headline, detail: activeAlert.area, sourceId: 'smn-alerts', official: true }, { id: 'm', at: generatedAt, type: 'MEASUREMENT', title: 'Nueva medición: Río Paraná — Santa Fe', detail: '3,22 m', sourceId: 'ina-rest-30', official: true }], sourceOrganizations: [{ id: 'ina', name: 'Instituto Nacional del Agua', official: true, url: 'https://example.test/ina' }, { id: 'smn', name: 'Servicio Meteorológico Nacional', official: true, url: 'https://example.test/smn' }, { id: 'province', name: 'Gobierno de la Provincia de Santa Fe · Protección Civil', official: true, url: 'https://example.test/province' }, { id: 'city', name: 'Municipalidad de Santa Fe · COBEM', official: true, url: 'https://example.test/city' }, { id: 'ports', name: 'Agencia Nacional de Puertos y Navegación', official: true, url: 'https://example.test/ports' }, { id: 'nasa', name: 'NASA', official: true, url: 'https://example.test/nasa' }], serviceStatus: { worker: 'OPERATIONAL', api: 'OPERATIONAL', checkedAt: generatedAt, note: 'El estado técnico no garantiza vigencia ni ausencia de peligro.' }, changes: [{ id: 'change', label: 'Río Paraná — Santa Fe', direction: 'UP', detail: '+0,23 m en 24 horas' }], systems, river: { systemId: systems[0].id, available: true, dataStatus: 'LIVE', stationName: 'Santa Fe', currentMetres: 3.22, delta1h: .01, delta6h: .06, delta24h: .23, trend: 'RISING_SLOWLY', observedAt: generatedAt, fetchedAt: generatedAt, validUntil: '2026-08-05T10:15:00.000Z', sourceId: 'ina-rest-30', sourceName: systems[0].sourceName, points: systems[0].points, forecastPoints: [], thresholds: systems[0].thresholds }, rain: { available: false, dataStatus: 'UNAVAILABLE', accumulated1hMm: 0, accumulated24hMm: 0, forecast: 'Sin muestra válida.', observedAt: generatedAt, fetchedAt: generatedAt, validUntil: '2026-08-05T10:15:00.000Z', sourceId: 'nasa-gpm-imerg-early', points: [] }, sources, contradictions: [{ id: 'stale', title: 'Medición demorada', signals: ['Salado'], result: 'UNKNOWN', explanation: 'La medición del Río Salado tiene actualización demorada y no permite inferir ausencia de riesgo.' }], shelters: [], actions: ['Consultá la alerta oficial.', 'Llamá ante peligro inmediato.'], messages: [],
 };
 
 async function mockPublicApi(page: Page, snapshot: Snapshot = liveSnapshot) {
-  await page.route('**/api/snapshot', (route) => route.fulfill({ headers: { 'Cache-Control': 'public, max-age=60' }, json: { ok: true, data: snapshot, meta: { schemaVersion: '1.0', generatedAt, mode: snapshot.mode, official: false } } }));
-  await page.route('**/api/sources', (route) => route.fulfill({ headers: { 'Cache-Control': 'public, max-age=60' }, json: { ok: true, data: { snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, contradictions: [] } } }));
-  await page.route('**/api/messages', (route) => route.fulfill({ headers: { 'Cache-Control': 'public, max-age=60' }, json: { ok: true, data: { snapshotId: snapshot.id, messages: [], deliveryClaims: 'NONE' } } }));
-  await page.route('**/api/auth/config', (route) => route.fulfill({ headers: { 'Cache-Control': 'private, no-store' }, json: { ok: true, data: { enabled: false, reportingEnabled: false, googleClientId: null } } }));
-  await page.route('**/api/session', (route) => route.fulfill({ headers: { 'Cache-Control': 'private, no-store' }, json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
+  await page.route('**/api/snapshot*', (route) => route.fulfill({ headers: { 'Cache-Control': 'no-store' }, json: { ok: true, data: snapshot, meta: { schemaVersion: '1.0', generatedAt, mode: snapshot.mode, official: false } } }));
+  await page.route('**/api/sources*', (route) => route.fulfill({ headers: { 'Cache-Control': 'no-store' }, json: { ok: true, data: { snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, sourceOrganizations: snapshot.sourceOrganizations ?? [], alertStatus: snapshot.alertStatus, alerts: snapshot.alerts ?? [], timeline: snapshot.timeline ?? [], contradictions: snapshot.contradictions } } }));
+  await page.route('**/api/messages*', (route) => route.fulfill({ headers: { 'Cache-Control': 'no-store' }, json: { ok: true, data: { snapshotId: snapshot.id, messages: [], deliveryClaims: 'NONE' } } }));
+  await page.route('**/api/auth/config*', (route) => route.fulfill({ headers: { 'Cache-Control': 'private, no-store' }, json: { ok: true, data: { enabled: false, reportingEnabled: false, googleClientId: null } } }));
+  await page.route('**/api/session*', (route) => route.fulfill({ headers: { 'Cache-Control': 'private, no-store' }, json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
 }
 
 async function removePublicApiMocks(page: Page) {
-  await Promise.all([
-    page.unroute('**/api/snapshot'), page.unroute('**/api/sources'), page.unroute('**/api/messages'),
-    page.unroute('**/api/auth/config'), page.unroute('**/api/session'),
-  ]);
+  await Promise.all(['snapshot','sources','messages','auth/config','session'].map((path) => page.unroute(`**/api/${path}*`)));
 }
 
 test.beforeAll(async () => {
   await mkdir(`${evidenceDir}/screenshots`, { recursive: true });
-  await writeFile(`${evidenceDir}/screenshot-scenario.json`, `${JSON.stringify({
-    schemaVersion: '1.0',
-    scenario: 'LIVE_FIXED',
-    snapshotId: liveSnapshot.id,
-    generatedAt,
-    widths: [360, 390, 768, 1024, 1440],
-    serviceWorkers: 'BLOCKED_FOR_SCREENSHOT_DETERMINISM',
-  }, null, 2)}\n`);
+  await writeFile(`${evidenceDir}/public-safety-scenario.json`, `${JSON.stringify({ schemaVersion: '1.0', orderId: 'SOS-SF-OWNER-GLOBAL-PUBLIC-SAFETY-REFOUNDATION-015', snapshotId: liveSnapshot.id, generatedAt, widths: ['360x800','390x844','768x1024','1024x768','1440x900'] }, null, 2)}\n`);
 });
 
-test('first viewport exposes live state and separate Paraná/Salado systems without demo claims', async ({ page }) => {
-  await mockPublicApi(page);
-  await page.goto('/');
-  const hero = page.getByTestId('hydro-hero');
-  await expect(page.getByRole('heading', { name: 'Estado hídrico de Santa Fe' })).toBeVisible();
-  await expect(hero.getByText('Datos en vivo', { exact: true })).toBeVisible();
-  await expect(hero.getByRole('tab', { name: /Sistema Paraná/ })).toBeVisible();
-  await expect(hero.getByRole('tab', { name: /Sistema Salado/ })).toBeVisible();
-  const level = hero.getByTestId('hydro-current-level');
-  await expect(level).toBeVisible();
-  await expect(level).toContainText('3.22');
-  await expect(hero.getByText('+12 cm', { exact: true })).toBeVisible();
-  await expect(hero.getByText('Subiendo lentamente', { exact: true })).toBeVisible();
-  await expect(hero.getByText('Seguí instrucciones oficiales', { exact: false })).toBeVisible();
-  await expect(page.getByText('DEMO / NO OFICIAL', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Compartir' })).toHaveCount(0);
-  const box = await hero.boundingBox();
-  expect(box?.y).toBeLessThan(80);
-  if ((page.viewportSize()?.width ?? 0) >= 1024) expect(box?.width).toBeGreaterThan(650);
-});
-
-test('three formal modules follow the hero and no unrelated station levels share one gauge', async ({ page }) => {
-  await mockPublicApi(page);
-  await page.goto('/');
-  await expect(page.locator('[data-primary-section="true"]')).toHaveCount(3);
-  await expect(page.getByRole('heading', { name: 'Estado actual' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Recomendaciones operativas' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Evolución prevista' })).toBeVisible();
-  await expect(page.getByRole('img', { name: /Sin umbral|alerta|Sin datos/i })).toHaveCount(2);
-  const current = page.getByTestId('current-state-panel');
-  const parana = current.getByTestId('current-system-parana-santa-fe');
-  const salado = current.getByTestId('current-system-salado-santo-tome');
-  await expect(parana).toBeVisible();
-  await expect(parana).toContainText('Río Paraná · Santa Fe');
-  await expect(salado).toBeVisible();
-  await expect(salado).toContainText('Río Salado · Santo Tomé');
-});
-
-test('main graph supports pointer and keyboard reading', async ({ page }) => {
-  await mockPublicApi(page);
-  await page.goto('/');
-  const chart = page.getByTestId('main-hydro-chart');
-  const svg = chart.locator('svg');
-  const readout = chart.getByTestId('hydro-chart-active-readout');
-  await svg.focus();
-  await page.keyboard.press('Home');
-  await expect(readout).toHaveAttribute('data-active', 'true');
-  await expect(readout).toContainText('lectura publicada por INA');
-  const first = await readout.textContent();
-  await page.keyboard.press('ArrowRight');
-  await expect(readout).not.toHaveText(first ?? '');
-  const box = await svg.boundingBox();
-  expect(box).not.toBeNull();
-  if (box) await page.mouse.move(box.x + box.width * .75, box.y + box.height * .5);
-  await expect(chart.locator('.hydro-chart__crosshair')).toBeVisible();
-  await expect(readout).toHaveAttribute('data-active', 'true');
-  await expect(readout).toContainText('m · lectura publicada por INA');
-  await expect(chart.getByText('Sin proyección operativa', { exact: true })).toBeVisible();
-});
-
-test('unavailable data renders safe empty charts and gauges', async ({ page }) => {
-  const unavailable: Snapshot = { ...liveSnapshot, id: 'unavailable-e2e', mode: 'UNAVAILABLE', dataStatus: 'UNAVAILABLE', state: 'UNKNOWN', stateLabel: 'Sin datos en vivo', systems: liveSnapshot.systems?.map((system) => ({ ...system, available: false, dataStatus: 'UNAVAILABLE', currentMetres: null, observedAt: null, points: [], thresholds: [] })), river: { ...liveSnapshot.river, available: false, dataStatus: 'UNAVAILABLE', currentMetres: 0, points: [], thresholds: [] }, summary: 'No hay una lectura hídrica publicada disponible.' };
-  await mockPublicApi(page, unavailable);
-  await page.goto('/');
-  await expect(page.getByText('Sin datos en vivo', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('.sparkline--empty')).toHaveCount(2);
-  await expect(page.locator('.level-gauge--empty')).toHaveCount(2);
-  await expect(page.locator('path[d=""]')).toHaveCount(0);
-});
-
-test('evidence returns focus to the exact mobile dock opener', async ({ page }) => {
+test('first viewport answers the five critical public-safety questions', async ({ page }) => {
   await mockPublicApi(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  const dock = page.locator('.mobile-action-dock');
-  const opener = dock.getByRole('button', { name: 'Evidencia' });
-  await opener.click();
-  const dialog = page.getByRole('dialog', { name: 'Evidencia y vigencia' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('INA · Sistema de Información Hidrológica').first()).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(opener).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Alerta oficial activa' })).toBeVisible();
+  await expect(page.getByText('Departamento La Capital, Santa Fe')).toBeVisible();
+  await expect(page.getByText(/Emitida/)).toBeVisible();
+  await expect(page.getByText('Permanecé en un lugar seguro y evitá circular.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ver aviso en la fuente oficial' })).toBeVisible();
+  await expect(page.getByText('Servicio independiente que integra y organiza fuentes públicas oficiales.')).toBeVisible();
+  const alertBox = await page.locator('.official-alert').boundingBox();
+  expect(alertBox?.y).toBeLessThan(150);
 });
 
-test('Informar does not request location on load and exposes manual, consented and essential-contact paths', async ({ page }) => {
+test('uses real station names, horizontal rulers and observed series with tables', async ({ page }) => {
+  await mockPublicApi(page);
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Situación hidrométrica' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Río Paraná — Santa Fe' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Río Salado — Santo Tomé' })).toBeVisible();
+  await expect(page.getByText('Sistema Paraná')).toHaveCount(0);
+  await expect(page.getByText('Sistema Salado')).toHaveCount(0);
+  await expect(page.locator('.level-ruler')).toHaveCount(2);
+  await expect(page.locator('.level-gauge')).toHaveCount(0);
+  await expect(page.getByText('Diferencia respecto del nivel de alerta de referencia: 2,08 m')).toBeVisible();
+  await expect(page.getByRole('img', { name: /Serie observada de Río Paraná/ })).toBeVisible();
+  await page.getByText('Ver tabla de mediciones').first().click();
+  await expect(page.getByRole('table', { name: /Últimas mediciones de Río Paraná/ })).toBeVisible();
+  await expect(page.getByText('Evolución prevista')).toHaveCount(0);
+});
+
+test('separates emergency calls, citizen report and source transparency', async ({ page }) => {
+  await mockPublicApi(page);
+  await page.goto('/');
+  const actions = page.getByRole('heading', { name: 'Qué hacer ahora' }).locator('..').locator('..');
+  await expect(actions.getByRole('link', { name: /911/ })).toHaveAttribute('href', 'tel:911');
+  await expect(actions.getByRole('button', { name: 'Reportar una situación' })).toHaveCount(1);
+  await actions.getByRole('button', { name: 'Reportar una situación' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reportar una situación' });
+  await expect(dialog).toContainText('no inicia un despacho de emergencia');
+  await expect(dialog.getByRole('link', { name: /103/ })).toHaveAttribute('href', 'tel:103');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Fuentes, vigencia y metodología' })).toBeVisible();
+  await expect(page.getByText('BLOCKED CREDENTIAL')).toBeVisible();
+  await expect(page.getByText('BLOCKED NO MACHINE ENDPOINT').first()).toBeVisible();
+});
+
+test('location is never requested before explicit consent', async ({ page }) => {
   await mockPublicApi(page);
   await page.addInitScript(() => {
     let calls = 0;
@@ -135,172 +123,157 @@ test('Informar does not request location on load and exposes manual, consented a
   });
   await page.goto('/');
   expect(await page.evaluate(() => (window as unknown as { __geoCalls: number }).__geoCalls)).toBe(0);
-  await page.getByRole('button', { name: 'Informar', exact: true }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Informar una situación' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('link', { name: /911/ })).toHaveAttribute('href', 'tel:911');
-  await expect(dialog.getByRole('link', { name: /0800-777-5000/ })).toHaveAttribute('href', 'tel:08007775000');
+  await page.getByRole('button', { name: 'Reportar una situación' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Reportar una situación' });
   await dialog.getByRole('button', { name: 'Usar mi ubicación' }).click();
   expect(await page.evaluate(() => (window as unknown as { __geoCalls: number }).__geoCalls)).toBe(1);
-  await expect(dialog.getByText('Permiso denegado', { exact: false })).toBeVisible();
-  await expect(dialog.getByLabel('Barrio, calle o referencia')).toBeVisible();
-  await page.keyboard.press('Escape');
+  await expect(dialog.getByText(/Permiso denegado/)).toBeVisible();
 });
 
-test('free KV quota exhaustion is controlled, retains the idempotent attempt and never suggests an upgrade', async ({ page }) => {
+test('free KV quota exhaustion fails closed without upgrade language', async ({ page }) => {
   await mockPublicApi(page);
-  await page.route('**/api/private/reports', async (route) => {
-    if (route.request().method() !== 'POST') return route.fallback();
-    await route.fulfill({
-      status: 503,
-      headers: { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' },
-      json: {
-        ok: false,
-        error: {
-          code: 'REPORT_STORAGE_UNAVAILABLE',
-          message: 'El almacenamiento privado alcanzó temporalmente su límite gratuito.',
-        },
-      },
-    });
-  });
+  await page.route('**/api/private/reports', (route) => route.fulfill({ status: 503, headers: { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' }, json: { ok: false, error: { code: 'REPORT_STORAGE_UNAVAILABLE', message: 'El almacenamiento privado alcanzó temporalmente su límite gratuito.' } } }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Informar', exact: true }).first().click();
-  const dialog = page.getByRole('dialog', { name: 'Informar una situación' });
+  await page.getByRole('button', { name: 'Reportar una situación' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Reportar una situación' });
   await dialog.getByLabel('Descripción').fill('Agua acumulada en una esquina.');
   await dialog.getByRole('button', { name: 'Enviar informe' }).click();
-  const status = dialog.getByRole('status');
-  await expect(status).toContainText('límite gratuito');
-  await expect(status).toContainText('quedó pendiente');
-  await expect(status).toContainText('evitar duplicados');
-  await expect(status).not.toContainText(/upgrade|pago|tarjeta|factur/i);
-  await expect(dialog.getByRole('button', { name: 'Reintentar envío' })).toBeVisible();
+  await expect(dialog.getByRole('status')).toContainText('quedó pendiente');
+  await expect(dialog.getByRole('status')).not.toContainText(/upgrade|pago|tarjeta|factur/i);
 });
 
-test('messages remain closed by default and private features fail closed without protected config', async ({ page }) => {
+test('automated accessibility structure has no serious semantic failures', async ({ page }) => {
   await mockPublicApi(page);
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: 'Abrir mensajes' });
-  await expect(page.getByRole('dialog', { name: 'Comunicaciones y reportes' })).toBeHidden();
-  await trigger.click();
-  const dialog = page.getByRole('dialog', { name: 'Comunicaciones y reportes' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('Funciones privadas no activadas.', { exact: false })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(trigger).toBeFocused();
-});
-
-test('required widths use one deterministic live scenario without overlap', async ({ browser }) => {
-  const sizes = [
-    { width: 360, height: 800, name: '360' },
-    { width: 390, height: 844, name: '390' },
-    { width: 768, height: 1024, name: '768' },
-    { width: 1024, height: 900, name: '1024' },
-    { width: 1440, height: 1000, name: '1440' },
-  ];
-
-  for (const size of sizes) {
-    const screenshotContext = await browser.newContext({
-      viewport: { width: size.width, height: size.height },
-      serviceWorkers: 'block',
-    });
-    const screenshotPage = await screenshotContext.newPage();
-    try {
-      await mockPublicApi(screenshotPage, liveSnapshot);
-      await screenshotPage.goto('/');
-      const hero = screenshotPage.getByTestId('hydro-hero');
-      await expect(hero.getByText('Datos en vivo', { exact: true })).toBeVisible();
-      await expect(hero.getByTestId('hydro-current-level')).toContainText('3.22');
-      await expect(screenshotPage.getByText('Sin datos en vivo', { exact: true })).toHaveCount(0);
-
-      const dimensions = await screenshotPage.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-      }));
-      expect(dimensions.scrollWidth, `${size.width}px overflow`).toBeLessThanOrEqual(dimensions.clientWidth);
-      const heroWidth = (await hero.boundingBox())?.width ?? 0;
-      expect(heroWidth, `${size.width}px hero width`).toBeGreaterThan(size.width >= 1024 ? size.width * .48 : size.width * .84);
-
-      if (size.width <= 390) {
-        const dock = screenshotPage.getByTestId('mobile-action-dock');
-        await dock.scrollIntoViewIfNeeded();
-        await expect(dock).toHaveCSS('position', 'static');
-        const dockBox = await dock.boundingBox();
-        const chartBox = await screenshotPage.getByTestId('main-hydro-chart').boundingBox();
-        const readoutBox = await screenshotPage.getByTestId('hydro-chart-active-readout').boundingBox();
-        expect(dockBox).not.toBeNull();
-        expect(chartBox).not.toBeNull();
-        expect(readoutBox).not.toBeNull();
-        if (dockBox && chartBox && readoutBox) {
-          expect(dockBox.y, `${size.width}px dock after chart`).toBeGreaterThanOrEqual(chartBox.y + chartBox.height);
-          expect(dockBox.y, `${size.width}px dock after readout`).toBeGreaterThanOrEqual(readoutBox.y + readoutBox.height);
-        }
-      }
-
-      await screenshotPage.screenshot({
-        path: `${evidenceDir}/screenshots/dashboard-live-${size.name}.png`,
-        fullPage: true,
-      });
-    } finally {
-      await screenshotContext.close();
+  const audit = await page.evaluate(() => {
+    const violations: Array<{ rule: string; target: string }> = [];
+    const selector = (element: Element) => {
+      const id = element.getAttribute('id');
+      return id ? `#${id}` : element.tagName.toLowerCase();
+    };
+    const accessibleName = (element: Element) =>
+      element.getAttribute('aria-label')?.trim()
+      || element.getAttribute('aria-labelledby')?.trim()
+      || element.textContent?.trim()
+      || element.getAttribute('title')?.trim()
+      || '';
+    for (const element of document.querySelectorAll('button,a[href],input,select,textarea,[role="button"]')) {
+      if (!accessibleName(element)) violations.push({ rule: 'accessible-name', target: selector(element) });
     }
-  }
+    for (const element of document.querySelectorAll('img')) {
+      if (!element.hasAttribute('alt')) violations.push({ rule: 'image-alt', target: selector(element) });
+    }
+    for (const element of document.querySelectorAll('[tabindex]')) {
+      if (Number(element.getAttribute('tabindex')) > 0) violations.push({ rule: 'positive-tabindex', target: selector(element) });
+    }
+    const headings = [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')].map((element) => Number(element.tagName.slice(1)));
+    for (let index = 1; index < headings.length; index += 1) {
+      if (headings[index]! - headings[index - 1]! > 1) violations.push({ rule: 'heading-order', target: `h${headings[index]}` });
+    }
+    return {
+      violations,
+      landmarks: {
+        main: document.querySelectorAll('main').length,
+        header: document.querySelectorAll('header').length,
+        footer: document.querySelectorAll('footer').length,
+      },
+      language: document.documentElement.lang,
+    };
+  });
+  expect(audit.violations).toEqual([]);
+  expect(audit.landmarks.main).toBe(1);
+  expect(audit.landmarks.header).toBe(1);
+  expect(audit.language).toBe('es-AR');
+  await writeFile(`${evidenceDir}/accessibility-automated.json`, `${JSON.stringify(audit, null, 2)}\n`);
 });
 
-test('reduced motion remains complete and stable', async ({ page }) => {
+test('keyboard, reduced motion and focus return remain complete', async ({ page }) => {
   await mockPublicApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  const duration = await page.locator('.ui-button').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).transitionDuration));
+  const opener = page.getByRole('button', { name: 'Fuentes y actualización' }).first();
+  await opener.click();
+  const dialog = page.getByRole('dialog', { name: 'Fuentes y actualización' });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(opener).toBeFocused();
+  const duration = await page.locator('.button').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).transitionDuration));
   expect(duration).toBeLessThan(.02);
 });
 
-test('page makes no provider or external font requests from the browser', async ({ page }) => {
+test('required viewports have no clipping, overlap or horizontal page scroll', async ({ browser }) => {
+  const sizes = [
+    { width: 360, height: 800, name: '360x800' },
+    { width: 390, height: 844, name: '390x844' },
+    { width: 768, height: 1024, name: '768x1024' },
+    { width: 1024, height: 768, name: '1024x768' },
+    { width: 1440, height: 900, name: '1440x900' },
+  ];
+  for (const size of sizes) {
+    const context = await browser.newContext({ viewport: { width: size.width, height: size.height }, serviceWorkers: 'block' });
+    const page = await context.newPage();
+    await mockPublicApi(page);
+    await page.goto('/');
+    const geometry = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth, fixed: [...document.querySelectorAll('*')].filter((node) => getComputedStyle(node).position === 'fixed').length }));
+    expect(geometry.scrollWidth, `${size.name} horizontal overflow`).toBeLessThanOrEqual(geometry.clientWidth);
+    expect(geometry.fixed, `${size.name} fixed overlays`).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: `${evidenceDir}/screenshots/public-safety-${size.name}.png`, fullPage: true });
+    await context.close();
+  }
+});
+
+test('200 percent zoom and 320px reflow preserve access to critical actions', async ({ page }) => {
+  await mockPublicApi(page);
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
+  const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+  await expect(page.getByRole('heading', { name: 'Alerta oficial activa' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /911/ })).toBeVisible();
+});
+
+test('browser makes no third-party or font requests', async ({ page }) => {
   const thirdParty: string[] = [];
-  const fontRequests: string[] = [];
+  const fonts: string[] = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (!['127.0.0.1', 'localhost'].includes(url.hostname)) thirdParty.push(url.href);
-    if (request.resourceType() === 'font') fontRequests.push(url.href);
+    if (!['127.0.0.1','localhost'].includes(url.hostname)) thirdParty.push(url.href);
+    if (request.resourceType() === 'font') fonts.push(url.href);
   });
   await mockPublicApi(page);
   await page.goto('/');
   await page.waitForLoadState('networkidle');
   expect(thirdParty).toEqual([]);
-  expect(fontRequests).toEqual([]);
+  expect(fonts).toEqual([]);
 });
 
-test('lite stays textual, script-free and contains essential contacts', async ({ page }) => {
-  await page.goto('/lite');
-  await expect(page.getByRole('heading', { name: 'Estado hídrico de Santa Fe' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Teléfonos esenciales' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /103/ })).toHaveAttribute('href', 'tel:103');
-  await expect(page.locator('script, textarea, form, canvas')).toHaveCount(0);
-});
-
-test('PWA opens the cached dashboard offline and labels prior data as not current', async ({ page, context }) => {
+test('offline state never claims updated data or absence of alerts', async ({ page, context }) => {
   await mockPublicApi(page);
   await page.goto('/');
-  await expect.poll(() => page.evaluate((key) => {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const stored = JSON.parse(raw) as { snapshot?: { id?: string; mode?: string } };
-    return `${stored.snapshot?.id}:${stored.snapshot?.mode}`;
-  }, storageKey)).toBe('live-e2e:LIVE');
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), storageKey)).not.toBeNull();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
-  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
   await removePublicApiMocks(page);
   await context.setOffline(true);
-  await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
-  await expect(page.getByText('Modo sin conexión', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('No es información actual.', { exact: false })).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByText('Modo sin conexión', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('No es información actual.', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Informar', exact: true }).last().click();
-  const dialog = page.getByRole('dialog', { name: 'Informar una situación' });
-  await dialog.getByLabel('Descripción').fill('Agua acumulada en una esquina.');
+  await expect(page.getByText('Sin conexión', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Fuentes de alertas no disponibles')).toBeVisible();
+  await expect(page.getByText('Sin alertas oficiales detectadas')).toHaveCount(0);
+  await expect(page.getByText('Actualizado', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Reportar una situación' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Reportar una situación' });
+  await dialog.getByLabel('Descripción').fill('Agua acumulada.');
   await dialog.getByRole('button', { name: 'Guardar borrador' }).click();
-  await expect(dialog.getByText('Borrador guardado', { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('status')).toContainText('Borrador guardado');
   await context.setOffline(false);
+});
+
+test('lite is script-free and preserves alert, freshness and emergency semantics', async ({ page }) => {
+  await page.goto('/lite');
+  await expect(page.getByRole('heading', { name: 'Información pública para emergencias' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /alerta|alertas|Fuentes/i }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Situación hidrométrica' })).toBeVisible();
+  await expect(page.getByText('Reportar una situación no inicia un despacho', { exact: false })).toBeVisible();
+  await expect(page.locator('script, canvas, video')).toHaveCount(0);
 });

@@ -1,20 +1,28 @@
-# Sistema visual
+# Sistema visual institucional
 
-Dirección `APPLE_WHITE_LOW`: fondo off-white, superficies blancas, bordes suaves, jerarquía tipográfica fuerte y color reservado para estado. Usa sólo la tipografía del sistema.
+Base clara, azul institucional, grises neutros y color semántico reservado:
 
-La base es 360–412 px. En móvil, estado y acción aparecen en el primer viewport y la superficie completa se mantiene alrededor de tres pantallas. Desde 720 px se activa una grilla de 12 columnas refinada para 1440×900.
+- azul: información;
+- gris: neutral o no disponible;
+- amarillo: atención;
+- naranja: acción preventiva urgente;
+- rojo: peligro o alerta oficial de máxima prioridad.
 
-## Pulso del Paraná
+No se usa verde como declaración general de seguridad. Todo estado combina texto, forma y color.
 
-La orden visual del 3 de agosto de 2026 reemplaza únicamente las restricciones anteriores de “sin loops ni parallax” para el hero. La página conserva `APPLE_WHITE_LOW`; dentro de ella, una tarjeta oscura concentra nivel, variación de 24 horas, tendencia, estado, estación, timestamp y acción recomendada antes de la explicación tridimensional.
+## Jerarquía
 
-- celeste: observaciones demo de las últimas 48 horas;
-- ámbar/violeta: proyección demo de 24 horas y ancho de incertidumbre;
-- altura: nivel/riesgo;
-- cuatro planos: normal, vigilancia, alerta y evacuación, todos rotulados como demo;
-- punto luminoso: momento actual;
-- SVG inferior: variación horaria accesible.
+1. alerta oficial y estado de verificación;
+2. situación territorial y vigencia;
+3. estaciones hidrométricas separadas;
+4. territorio y timeline;
+5. acciones y contactos;
+6. preparación;
+7. fuentes y metodología;
+8. estado técnico secundario.
 
-La corriente, 18 partículas, pulso, morph de actualización y brillo de proximidad se ejecutan a un máximo de 30 FPS. El paralaje táctil queda acotado a ±0,08 radianes y nunca hay rotación automática. La escena se pausa fuera del viewport; `prefers-reduced-motion` produce un frame estático. Si WebGL falla, el SVG completo permanece visible.
+La cabecera usa “SOS Santa Fe — Información pública para emergencias” y declara que es un servicio independiente. No existe estética de centro de comando, fondo oscuro dominante, ondas decorativas, gauges semicirculares ni hero sobredimensionado.
 
-El foco visible, landmarks, headings, texto además del color y controles nativos sostienen WCAG AA. Las frases “MÁS ALTO = MÁS RIESGO”, “CELESTE = OBSERVADO” y “ÁMBAR = PROYECCIÓN” son parte estable del contrato de comprensión.
+## Componentes de datos
+
+La regla horizontal de nivel muestra lectura, umbrales y diferencia en metros. La serie observada usa SVG con ejes y tabla. Si faltan puntos o geometrías, se muestra un fallback textual honesto. No se inventan pronósticos, polígonos, refugios ni puntos de encuentro.

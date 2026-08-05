@@ -17,7 +17,7 @@ const CONTACTS = Object.freeze([
   { number: '103', label: 'COBEM', href: 'tel:103' },
   { number: '107', label: 'Emergencias médicas', href: 'tel:107' },
   { number: '100', label: 'Bomberos', href: 'tel:100' },
-  { number: '106', label: 'Prefectura / emergencia náutica', href: 'tel:106' },
+  { number: '106', label: 'Emergencias náuticas', href: 'tel:106' },
   { number: '0800-777-5000', label: 'Atención Ciudadana municipal', href: 'tel:08007775000' },
 ]);
 
@@ -133,7 +133,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     if (!number) return null;
     const locationText = draft.locationLabel
       || (location ? `ubicación aproximada con precisión ${Math.round(location.accuracy)} m` : 'ubicación no indicada');
-    const body = `SOS Santa Fe. Reporte pendiente: ${draft.category}. ${draft.description.slice(0, 220)}. ${locationText}. Estado hídrico guardado: ${snapshot.stateLabel}. Este SMS lo envía la persona de forma manual.`;
+    const body = `SOS Santa Fe. Reporte pendiente: ${draft.category}. ${draft.description.slice(0, 220)}. ${locationText}. Situación guardada: ${snapshot.stateLabel}. Este SMS lo envía la persona de forma manual.`;
     return `sms:${number}?body=${encodeURIComponent(body)}`;
   }, [draft, location, snapshot.stateLabel]);
 
@@ -309,13 +309,13 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
       <div className="report-surface">
         <header>
           <div>
-            <span className="v3-eyebrow">Canal no urgente</span>
-            <h2 id="report-title">Informar una situación</h2>
+            <span className="section-kicker">Canal no urgente</span>
+            <h2 id="report-title">Reportar una situación</h2>
           </div>
           <button type="button" className="ui-icon-button" aria-label="Cerrar formulario" onClick={close}>×</button>
         </header>
         <p className="report-warning">
-          No es un canal de emergencias ni garantiza atención. Ante peligro inmediato llamá a los servicios esenciales.
+          Reportar una situación no inicia un despacho de emergencia. Cuando exista peligro inmediato: llamá al servicio de emergencias correspondiente.
         </p>
         <section aria-labelledby="essential-title">
           <h3 id="essential-title">Teléfonos esenciales</h3>
@@ -361,7 +361,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
           </label>
           <fieldset>
             <legend>Ubicación</legend>
-            <button className="ui-button ui-button--secondary" type="button" disabled={busy} onClick={locate}>
+            <button className="button button--secondary" type="button" disabled={busy} onClick={locate}>
               Usar mi ubicación
             </button>
             <label>
@@ -404,7 +404,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
               {Math.round(photos.reduce((sum, file) => sum + file.size, 0) / 1024)} KiB
             </p>
           )}
-          <button className="ui-button ui-button--primary" type="submit" disabled={busy || !hydrated}>
+          <button className="button button--primary" type="submit" disabled={busy || !hydrated}>
             {busy
               ? 'Procesando…'
               : queueState === 'PENDING_SEND' && online
@@ -428,7 +428,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
               />
             </label>
             {smsHref
-              ? <a className="ui-button ui-button--secondary" href={smsHref}>Abrir compositor de SMS</a>
+              ? <a className="button button--secondary" href={smsHref}>Abrir compositor de SMS</a>
               : <p>Ingresá un número personal válido. Los números 911, 103, 107, 100 y 106 no se usan como destino SMS.</p>}
           </section>
         )}

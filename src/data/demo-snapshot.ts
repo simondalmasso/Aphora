@@ -36,6 +36,8 @@ export const demoSnapshot: Snapshot = Object.freeze({
     delta24h: 0.19,
     trend: 'RISING_SLOWLY',
     observedAt: '2026-08-03T01:20:00.000Z',
+    fetchedAt: '2026-08-03T01:25:00.000Z',
+    validUntil: '2026-08-03T02:20:00.000Z',
     sourceId: 'estacion-demo-costanera',
     points: Object.freeze([
       { at: '2026-08-01T01:20:00.000Z', metres: 3.08, measured: true },
@@ -73,6 +75,8 @@ export const demoSnapshot: Snapshot = Object.freeze({
     accumulated24hMm: 18.6,
     forecast: 'Modelo demo: probabilidad de chaparrones aislados en las próximas horas.',
     observedAt: '2026-08-03T01:15:00.000Z',
+    fetchedAt: '2026-08-03T01:25:00.000Z',
+    validUntil: '2026-08-03T02:15:00.000Z',
     sourceId: 'pluviometro-demo-centro',
     points: Object.freeze([
       { at: '2026-08-02T19:00:00.000Z', millimetres: 0.8 },

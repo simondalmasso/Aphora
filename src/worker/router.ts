@@ -26,11 +26,11 @@ const PRIVATE_PREFIX = '/api/private/';
 const AUTH_WINDOW_MS = 15 * 60_000;
 const AUTH_NETWORK_LIMIT = 20;
 const ESSENTIAL_CONTACTS = Object.freeze([
-  Object.freeze({ id: '911', label: 'Central de Emergencias', number: '911', href: 'tel:911' }),
+  Object.freeze({ id: '911', label: 'Emergencias', number: '911', href: 'tel:911' }),
   Object.freeze({ id: '103', label: 'COBEM', number: '103', href: 'tel:103' }),
   Object.freeze({ id: '107', label: 'Emergencias médicas', number: '107', href: 'tel:107' }),
   Object.freeze({ id: '100', label: 'Bomberos', number: '100', href: 'tel:100' }),
-  Object.freeze({ id: '106', label: 'Prefectura / emergencia náutica', number: '106', href: 'tel:106' }),
+  Object.freeze({ id: '106', label: 'Emergencias náuticas', number: '106', href: 'tel:106' }),
   Object.freeze({ id: 'municipal', label: 'Atención Ciudadana municipal', number: '0800-777-5000', href: 'tel:08007775000' }),
 ]);
 
@@ -52,14 +52,14 @@ async function publicApiResponse(pathname: string, env: WorkerEnv): Promise<Resp
     return jsonResponse({
       service: 'sos-sf', status: 'healthy', dataMode: 'LIVE_AGGREGATION',
       privateMessaging: privateMessagingEnabled(env) ? 'ENABLED' : 'FEATURE_DISABLED', reporting: reportingEnabled(env) ? 'ENABLED' : 'FEATURE_DISABLED',
-      snapshot: { id: snapshot.id, dataStatus: snapshot.dataStatus, generatedAt: snapshot.generatedAt },
+      snapshot: { id: snapshot.id, dataStatus: snapshot.dataStatus, freshness: snapshot.freshness, alertStatus: snapshot.alertStatus, generatedAt: snapshot.generatedAt },
       providers,
       connectedProviders: providers.filter((provider) => provider.status !== 'UNAVAILABLE').map((provider) => provider.id),
     }, { cacheControl: 'no-store' });
   }
   const mode = publicMode(snapshot.mode);
   if (pathname === '/api/snapshot') return jsonResponse(snapshot, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
-  if (pathname === '/api/sources') return jsonResponse({ snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, contradictions: snapshot.contradictions }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
+  if (pathname === '/api/sources') return jsonResponse({ snapshotId: snapshot.id, systems: snapshot.systems ?? [], sources: snapshot.sources, sourceOrganizations: snapshot.sourceOrganizations ?? [], alertStatus: snapshot.alertStatus, alerts: snapshot.alerts ?? [], timeline: snapshot.timeline ?? [], contradictions: snapshot.contradictions }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
   if (pathname === '/api/messages') return jsonResponse({ snapshotId: snapshot.id, messages: snapshot.messages, deliveryClaims: 'NONE' }, { generatedAt: snapshot.generatedAt, cacheControl: 'no-store', mode });
   return errorResponse('NOT_FOUND', 'Ruta API inexistente', 404);
 }
@@ -234,7 +234,7 @@ export async function routeRequest(request: Request, env: WorkerEnv): Promise<Re
   try {
     if (url.pathname === '/lite') {
       if (request.method !== 'GET' && !isHead) return errorResponse('METHOD_NOT_ALLOWED', 'Sólo se admite lectura por GET o HEAD', 405);
-      const response = liteResponse(await buildLiveSnapshot(env), ESSENTIAL_CONTACTS);
+      const response = liteResponse(await buildLiveSnapshot(env));
       return isHead ? new Response(null, response) : response;
     }
     if (PUBLIC_API_PATHS.has(url.pathname)) {

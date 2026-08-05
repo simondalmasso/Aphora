@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "SOS Santa Fe — Estado hídrico",
-  "short_name": "SOS SF",
-  "description": "Estado hídrico, fuentes públicas, recomendaciones y canales de información para Santa Fe.",
+  "name": "SOS Santa Fe — Información pública para emergencias",
+  "short_name": "SOS Santa Fe",
+  "description": "Alertas oficiales, situación territorial, mediciones hidrométricas, contactos y preparación para Santa Fe.",
   "lang": "es-AR",
   "start_url": "/",
   "scope": "/",
@@ -10,7 +10,11 @@
   "orientation": "any",
   "background_color": "#f4f6f8",
   "theme_color": "#f4f6f8",
-  "categories": ["utilities", "weather", "government"],
+  "categories": [
+    "utilities",
+    "weather",
+    "government"
+  ],
   "icons": [
     {
       "src": "/icons/icon.svg",
@@ -20,6 +24,10 @@
     }
   ],
   "shortcuts": [
-    { "name": "Modo lite", "short_name": "Lite", "url": "/lite" }
+    {
+      "name": "Modo lite",
+      "short_name": "Lite",
+      "url": "/lite"
+    }
   ]
 }

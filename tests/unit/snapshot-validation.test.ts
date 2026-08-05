@@ -4,8 +4,8 @@ import type { HydrologicalSystem, Snapshot, Source } from '../../src/domain/snap
 import { validateSnapshot } from '../../src/domain/validation';
 
 const at = '2026-08-03T12:00:00.000Z';
-const source: Source = { id: 'ina:test', name: 'INA test', kind: 'OFFICIAL_OBSERVATION', status: 'FRESH', observedAt: at, validUntil: '2026-08-03T18:00:00.000Z', contribution: 'Lectura publicada.', official: true, connected: true };
-const system: HydrologicalSystem = { id: 'parana-test', label: 'Sistema Paraná', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', available: true, dataStatus: 'LIVE', currentMetres: 3.2, observedAt: at, sourceId: source.id, sourceName: source.name, points: [{ at, metres: 3.2, measured: true, quality: 'PUBLISHED_OPERATIONAL' }], thresholds: [], trend: 'STABLE', delta1h: null, delta6h: null, delta24h: null };
+const source: Source = { id: 'ina-rest-30', name: 'INA REST · Río Paraná, Santa Fe', kind: 'OFFICIAL_OBSERVATION', status: 'FRESH', observedAt: at, fetchedAt: at, lastCheckedAt: at, validUntil: '2026-08-03T18:00:00.000Z', contribution: 'Lectura publicada.', official: true, connected: true, organizationId: 'ina', organizationName: 'Instituto Nacional del Agua', feedId: 'ina-rest-30', feedName: 'INA REST · Río Paraná, Santa Fe', classification: 'OPERATIONAL_FRESH', freshness: 'ACTUALIZADO', determinesPrimaryState: true };
+const system: HydrologicalSystem = { id: 'parana-test', label: 'Río Paraná — Santa Fe', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', available: true, dataStatus: 'LIVE', freshness: 'ACTUALIZADO', currentMetres: 3.2, observedAt: at, fetchedAt: at, validUntil: '2026-08-03T18:00:00.000Z', sourceId: source.id, sourceName: source.name, points: [{ at, metres: 3.2, measured: true, quality: 'PUBLISHED_OPERATIONAL' }], thresholds: [], trend: 'STABLE', delta1h: null, delta6h: null, delta24h: null };
 
 function live(overrides: Partial<Snapshot> = {}): Snapshot {
   return {
@@ -13,16 +13,17 @@ function live(overrides: Partial<Snapshot> = {}): Snapshot {
     id: 'live-test',
     mode: 'LIVE',
     dataStatus: 'LIVE',
+    freshness: 'ACTUALIZADO',
     generatedAt: at,
     previousSnapshotAt: '2026-08-03T11:45:00.000Z',
     validUntil: '2026-08-03T12:15:00.000Z',
     state: 'NORMAL',
-    stateLabel: 'Sin umbral de alerta alcanzado',
+    stateLabel: 'Nivel por debajo del umbral de alerta',
     summary: 'Lectura operativa.',
     dominantSourceId: source.id,
     systems: [system],
     sources: [source],
-    river: { systemId: system.id, available: true, dataStatus: 'LIVE', stationName: system.stationName, currentMetres: 3.2, delta1h: 0, delta6h: 0, delta24h: 0, trend: 'STABLE', observedAt: at, sourceId: source.id, sourceName: source.name, points: system.points, forecastPoints: [], thresholds: [] },
+    river: { systemId: system.id, available: true, dataStatus: 'LIVE', stationName: system.stationName, currentMetres: 3.2, delta1h: 0, delta6h: 0, delta24h: 0, trend: 'STABLE', observedAt: at, fetchedAt: at, validUntil: '2026-08-03T18:00:00.000Z', sourceId: source.id, sourceName: source.name, points: system.points, forecastPoints: [], thresholds: [] },
     ...overrides,
   };
 }

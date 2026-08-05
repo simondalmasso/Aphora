@@ -1,36 +1,48 @@
 # SOS Santa Fe
 
-Web/PWA pública, demostrativa y no oficial para comprender un escenario hídrico ficticio de Santa Fe en menos de tres segundos: estado, cambios, fuentes, contradicciones y próxima acción.
+PWA pública e independiente que organiza alertas oficiales, situación territorial, mediciones hidrométricas, contactos esenciales y preparación para emergencias en Santa Fe.
 
-El hero **Pulso del Paraná** explica el nivel con una superficie observada de 48 horas, una proyección de 24 horas con incertidumbre y umbrales demo. Three.js se carga sólo al entrar en viewport; SVG mantiene la lectura si WebGL no está disponible y `/lite` no ejecuta JavaScript ni WebGL.
+No pertenece al Gobierno ni reemplaza a los organismos competentes. La portada separa estrictamente:
 
-## Ejecutar
+- alertas oficiales;
+- observaciones instrumentales;
+- recomendaciones preventivas;
+- reportes ciudadanos privados;
+- estado técnico del servicio.
+
+## Arquitectura
+
+- React + TypeScript + Vite.
+- Cloudflare Worker con Static Assets.
+- D1 Free para sesiones, mensajería, reportes, moderación y metadata.
+- Workers KV Free (`REPORTS_KV`) para fotos privadas sanitizadas con TTL.
+- Sin R2, checkout, servicios pagos, trackers, fuentes externas ni Three.js.
+- Service worker con shell, contactos y guía offline; las APIs privadas son network-only.
+
+## Desarrollo y gates
 
 ```bash
 npm ci
 npm run typecheck
-npm run lint
+npm run lint -- --max-warnings=0
 npm run test:unit
 npm run test:contract
 npm run build
+npm run test:worker
 npm run test:e2e
 npm run deploy:dry
 ```
 
-`npm run preview` inicia una previsualización equivalente del Worker con Static Assets. Rutas públicas: `/`, `/lite`, `/api/health`, `/api/snapshot`, `/api/sources`, `/api/messages`, `/api/auth/config`, `/api/session` y `/manifest.webmanifest`.
+Rutas públicas principales: `/`, `/lite`, `/api/health`, `/api/snapshot`, `/api/sources`, `/api/messages`, `/api/essential-contacts`, `/api/auth/config` y `/api/session`.
 
-La superficie principal permanece abierta y sin login. Los dos controles del encabezado actualizan en paralelo snapshot/fuentes/mensajes y abren un centro con comunicaciones públicas. La bandeja privada es optativa, está desactivada de forma segura en el deployment inicial y no afecta la lectura pública.
+## Interpretación
 
-## Activar la bandeja privada
+`observedAt`, `fetchedAt`, `generatedAt` y `validUntil` nunca son equivalentes. Una medición vencida queda como última medición disponible y no permite inferir ausencia de riesgo. Un nivel por encima de un umbral de referencia no constituye una orden de evacuación.
 
-La implementación usa Google Identity Services directo, sesión propia firmada y D1. No usa Auth0, One Tap, tokens Google persistidos, KV como fuente primaria ni WebSockets.
+Las alertas oficiales se normalizan conceptualmente según CAP 1.2. La ausencia de alertas sólo se comunica cuando el canal automático relevante está disponible y vigente. Los canales oficiales sin endpoint estable se enlazan para verificación humana y no se simulan como integraciones automáticas.
 
-1. Crear una base con `npx wrangler d1 create sos-sf-messages` y agregar a `wrangler.jsonc` el binding `MESSAGES_DB` con el `database_id` devuelto.
-2. Aplicar `npx wrangler d1 migrations apply sos-sf-messages --remote`.
-3. Registrar como secretos del Worker `GOOGLE_CLIENT_ID` y `SESSION_SIGNING_KEY` (aleatorio, mínimo 32 bytes), más `SOS_SF_OPERATOR_EMAILS` como allowlist separada por comas. No colocarlos en el código ni como variables públicas.
-4. Cambiar `PRIVATE_MESSAGING_ENABLED` a `true` y ejecutar el workflow manual `Deploy Workers`.
-5. Verificar `/api/auth/config` (`enabled: true`), login, aislamiento entre conversaciones, logout y que `/`, `/lite` y APIs públicas sigan abiertas.
+## Funciones privadas
 
-## Límites
+Google Identity Services directo y sesión propia firmada habilitan mensajería y reportes. Los reportes ciudadanos nunca cambian automáticamente el estado público. Máximo dos fotos privadas, sanitización, TTL, acceso corto de un solo uso, moderación, idempotencia y límites de tasa.
 
-Todos los datos públicos de V1 son `DEMO / NO OFICIAL`. No es una autoridad de alerta ni despacho de emergencias. El único texto libre previsto es privado, autenticado, limitado a 800 caracteres y dirigido asincrónicamente al equipo SOS verificado cuando la función se activa; nunca es un chat público. No usa trackers, fuentes externas de contenido o geolocalización y no promete transporte, lectura ni entrega de mensajes.
+Reportar una situación no inicia un despacho de emergencia. Ante peligro inmediato se debe llamar al servicio correspondiente.

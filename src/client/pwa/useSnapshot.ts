@@ -3,7 +3,7 @@ import { unavailableSnapshot } from '../../data/unavailable-snapshot';
 import type { Snapshot } from '../../domain/snapshot';
 import { validateSnapshot } from '../../domain/validation';
 
-const STORAGE_KEY = 'sos-sf:last-live-snapshot:v3';
+const STORAGE_KEY = 'sos-sf:last-public-safety-snapshot:v4';
 
 interface StoredSnapshot { readonly snapshot: Snapshot; readonly savedAt: string }
 interface ApiEnvelope { readonly data?: unknown }
@@ -27,7 +27,7 @@ function loadStored(): StoredSnapshot | null {
 }
 
 function noStoredOfflineSnapshot(): Snapshot {
-  return { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', stateLabel: 'Modo sin conexión', summary: 'No existe un snapshot previo guardado. No es información actual.' };
+  return { ...unavailableSnapshot, mode: 'OFFLINE', dataStatus: 'OFFLINE', freshness: 'NO_DISPONIBLE', alertStatus: 'FUENTES_DE_ALERTAS_NO_DISPONIBLES', stateLabel: 'Sin conexión', summary: 'No existe un snapshot previo guardado. No se puede confirmar la situación ni la ausencia de alertas.' };
 }
 
 function offlineSnapshot(stored: StoredSnapshot): Snapshot {
@@ -35,9 +35,11 @@ function offlineSnapshot(stored: StoredSnapshot): Snapshot {
     ...stored.snapshot,
     mode: 'OFFLINE',
     dataStatus: 'OFFLINE',
-    stateLabel: 'Modo sin conexión',
+    freshness: 'NO_DISPONIBLE',
+    alertStatus: 'FUENTES_DE_ALERTAS_NO_DISPONIBLES',
+    stateLabel: 'Sin conexión',
     summary: `${stored.snapshot.summary} No es información actual.`,
-    systems: stored.snapshot.systems?.map((system) => ({ ...system, dataStatus: 'OFFLINE' })),
+    systems: stored.snapshot.systems?.map((system) => ({ ...system, dataStatus: 'OFFLINE', freshness: 'NO_DISPONIBLE' })),
     river: { ...stored.snapshot.river, dataStatus: 'OFFLINE' },
     rain: { ...stored.snapshot.rain, dataStatus: 'OFFLINE' },
   };
@@ -48,9 +50,11 @@ function backendFailureSnapshot(stored: StoredSnapshot): Snapshot {
     ...stored.snapshot,
     mode: 'LIVE',
     dataStatus: 'STALE',
-    stateLabel: 'Datos desactualizados',
+    freshness: 'DESACTUALIZADO',
+    alertStatus: 'VERIFICACION_DE_ALERTAS_DEGRADADA',
+    stateLabel: 'Última información disponible',
     summary: `${stored.snapshot.summary} El servicio no pudo actualizarse; no es información actual.`,
-    systems: stored.snapshot.systems?.map((system) => ({ ...system, dataStatus: system.available ? 'STALE' : 'UNAVAILABLE' })),
+    systems: stored.snapshot.systems?.map((system) => ({ ...system, dataStatus: system.available ? 'STALE' : 'UNAVAILABLE', freshness: system.available ? 'DESACTUALIZADO' : 'NO_DISPONIBLE' })),
     river: { ...stored.snapshot.river, dataStatus: stored.snapshot.river.available ? 'STALE' : 'UNAVAILABLE' },
     rain: { ...stored.snapshot.rain, dataStatus: stored.snapshot.rain.available ? 'STALE' : 'UNAVAILABLE' },
   };
@@ -127,7 +131,7 @@ export function useSnapshot() {
           setSavedAt(validated.dataStatus === 'UNAVAILABLE' ? initialStored?.savedAt ?? null : now);
           setLastSuccessAt(now);
           setSource(validated.dataStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : 'NETWORK');
-          setRefreshError(validated.dataStatus === 'UNAVAILABLE' ? 'El servicio responde, pero no hay datos en vivo disponibles.' : null);
+          setRefreshError(validated.dataStatus === 'UNAVAILABLE' ? 'El servicio responde, pero no hay datos públicos disponibles.' : null);
         }
         return true;
       } catch (error) {

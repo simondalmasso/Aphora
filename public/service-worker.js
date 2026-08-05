@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'sos-sf-v3-live-20260803c';
+const CACHE_VERSION = 'sos-sf-public-safety-015-20260805a';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PUBLIC_DATA_CACHE = `${CACHE_VERSION}-public-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css', '/essential-contacts.json', '/offline-guidance.json'];
@@ -69,7 +69,7 @@ async function navigationNetworkFirst(request) {
     return (await cache.match(request, { ignoreVary: true }))
       || (await cache.match('/', { ignoreVary: true }))
       || (await cache.match('/offline.html', { ignoreVary: true }))
-      || new Response('Modo sin conexión. No es información actual.', { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+      || new Response('Sin conexión. No se puede confirmar la situación ni la ausencia de alertas.', { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
   }
 }
 

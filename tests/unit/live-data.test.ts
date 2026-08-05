@@ -37,8 +37,13 @@ describe('live hydrological aggregation', () => {
     expect(snapshot.stateLabel).not.toContain('demostrativa');
     expect(snapshot.river.systemId).toBe('parana-santa-fe');
     expect(snapshot.sources.every((source) => source.kind !== 'DEMO_FIXTURE')).toBe(true);
-    expect(snapshot.sources.find((source) => source.id === 'ina:30')).toMatchObject({ connected: true, qualityNote: expect.stringContaining('operativo') });
-    expect(snapshot.summary).toContain('sin validación definitiva');
+    expect(snapshot.sources.find((source) => source.id === 'ina-rest-30')).toMatchObject({ connected: true, qualityNote: expect.stringContaining('operativa') });
+    expect(snapshot.summary).toContain('Se muestran por separado la observación');
+    expect(snapshot.sourceOrganizations).toHaveLength(6);
+    expect(snapshot.sources).toHaveLength(10);
+    expect(snapshot.sources.filter((source) => source.organizationId === 'ina')).toHaveLength(4);
+    expect(snapshot.sources.find((source) => source.id === 'smn-observations')).toMatchObject({ classification: 'BLOCKED_CREDENTIAL', connected: false });
+    expect(snapshot.sources.find((source) => source.id === 'ports-hydrometers')).toMatchObject({ classification: 'BLOCKED_NO_MACHINE_ENDPOINT', connected: false });
   });
 
   it('does not convert an evacuation threshold into an official evacuation order', async () => {
@@ -63,6 +68,7 @@ describe('live hydrological aggregation', () => {
     expect(snapshot.state).toBe('UNKNOWN');
     expect(snapshot.river.available).toBe(false);
     expect(snapshot.id).not.toMatch(/^demo-/);
-    expect(snapshot.summary).toContain('No hay una lectura hídrica publicada');
+    expect(snapshot.summary).toContain('No hay una lectura hidrométrica publicada');
+    expect(snapshot.alertStatus).not.toBe('SIN_ALERTAS_OFICIALES_DETECTADAS');
   });
 });

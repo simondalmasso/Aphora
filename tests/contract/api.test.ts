@@ -65,8 +65,8 @@ describe('public read-only API contract', () => {
     const response = await request('/lite');
     const html = await response.text();
     expect(response.headers.get('content-type')).toContain('text/html');
-    expect(html).toContain('Estado hídrico de Santa Fe');
-    expect(html).toContain('Esta pantalla no necesita JavaScript');
+    expect(html).toContain('Situación hidrométrica');
+    expect(html).toContain('Esta versión funciona sin JavaScript');
     expect(html).toContain('Un umbral numérico no constituye una orden oficial');
     expect(html).not.toContain('DEMO / NO OFICIAL');
     expect(html).not.toContain('<script');
