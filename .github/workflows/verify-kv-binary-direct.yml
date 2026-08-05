@@ -1,0 +1,169 @@
+name: Verify KV Binary Direct
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/verify-kv-binary-direct-trigger]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sos-sf-kv-binary-direct
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/kv-binary-direct
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  OWNER_VISUAL_CONFIRMATION: WORKERS_FREE_CONFIRMED
+  BUDGET_MAX_USD: '0'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Bounded KV binary metadata and delete proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$OWNER_VISUAL_CONFIRMATION" = WORKERS_FREE_CONFIRMED
+          test "$BUDGET_MAX_USD" = 0
+          mkdir -p "$EVIDENCE_DIR"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          (async () => {
+            const account = String(process.env.CLOUDFLARE_ACCOUNT_ID ?? '').trim();
+            const token = String(process.env.CLOUDFLARE_API_TOKEN ?? '').trim();
+            if (!account || !token) throw new Error('KV_DIRECT_CONFIGURATION_REQUIRED');
+            const api = 'https://api.cloudflare.com/client/v4';
+            const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+
+            async function json(pathname, init = {}) {
+              const response = await fetch(`${api}${pathname}`, {
+                ...init,
+                headers: { ...headers, ...(init.headers ?? {}) },
+              });
+              const payload = await response.json().catch(() => ({}));
+              if (!response.ok || payload.success === false) {
+                const error = new Error(`KV_DIRECT_API_FAILED:${response.status}`);
+                error.status = response.status;
+                error.details = Array.isArray(payload.errors)
+                  ? payload.errors.map((entry) => ({ code: entry?.code ?? null, message: String(entry?.message ?? '').slice(0, 240) }))
+                  : [];
+                throw error;
+              }
+              return payload.result;
+            }
+
+            const namespaces = await json(
+              `/accounts/${encodeURIComponent(account)}/storage/kv/namespaces?per_page=100`,
+            );
+            const namespace = (Array.isArray(namespaces) ? namespaces : []).find((entry) =>
+              entry?.title === 'sos-sf-private-reports' || entry?.name === 'sos-sf-private-reports'
+            );
+            if (!namespace?.id) throw new Error('KV_DIRECT_NAMESPACE_NOT_FOUND');
+
+            const base = `/accounts/${encodeURIComponent(account)}/storage/kv/namespaces/${encodeURIComponent(namespace.id)}`;
+            const key = `__v3_014_direct_probe/${process.env.GITHUB_RUN_ID}`;
+            const bytes = new Uint8Array([0, 1, 2, 3, 127, 128, 254, 255]);
+            const metadata = {
+              purpose: 'zero-cost-kv-binary-proof',
+              reportId: 'probe',
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            };
+            let deleteState = 'NOT_ATTEMPTED';
+            let primaryError = null;
+
+            try {
+              const written = await json(`${base}/bulk`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([{
+                  key,
+                  value: Buffer.from(bytes).toString('base64'),
+                  base64: true,
+                  expiration_ttl: 60,
+                  metadata,
+                }]),
+              });
+              if (Array.isArray(written?.unsuccessful_keys) && written.unsuccessful_keys.length) {
+                throw new Error('KV_DIRECT_BULK_WRITE_UNSUCCESSFUL');
+              }
+
+              const valueResponse = await fetch(`${api}${base}/values/${encodeURIComponent(key)}`, { headers });
+              if (!valueResponse.ok) throw new Error(`KV_DIRECT_VALUE_READ_FAILED:${valueResponse.status}`);
+              const received = new Uint8Array(await valueResponse.arrayBuffer());
+              if (received.length !== bytes.length || !received.every((value, index) => value === bytes[index])) {
+                throw new Error('KV_DIRECT_BINARY_MISMATCH');
+              }
+
+              const receivedMetadata = await json(`${base}/metadata/${encodeURIComponent(key)}`);
+              const expectedEntries = Object.entries(metadata).sort(([left], [right]) => left.localeCompare(right));
+              const receivedEntries = Object.entries(receivedMetadata ?? {}).sort(([left], [right]) => left.localeCompare(right));
+              if (JSON.stringify(receivedEntries) !== JSON.stringify(expectedEntries)) {
+                throw new Error('KV_DIRECT_METADATA_MISMATCH');
+              }
+            } catch (error) {
+              primaryError = error;
+            }
+
+            try {
+              await json(`${base}/values/${encodeURIComponent(key)}`, { method: 'DELETE' });
+              deleteState = 'PASS';
+            } catch (error) {
+              deleteState = 'FAIL';
+              if (!primaryError) primaryError = error;
+            }
+
+            const result = {
+              schemaVersion: 1,
+              namespaceFound: true,
+              binaryBytes: bytes.length,
+              metadataRoundTrip: primaryError === null,
+              expirationTtlSeconds: 60,
+              deleteState,
+              result: primaryError === null && deleteState === 'PASS' ? 'PASS' : 'FAIL_CLOSED',
+              error: primaryError instanceof Error ? primaryError.message : primaryError ? String(primaryError) : null,
+              billingEndpointsQueried: 0,
+              r2EndpointsQueried: 0,
+              deployActions: 0,
+              valuesExposed: false,
+            };
+            fs.writeFileSync(
+              path.join(process.env.EVIDENCE_DIR, 'kv-binary-direct.json'),
+              `${JSON.stringify(result, null, 2)}\n`,
+            );
+            console.log(JSON.stringify(result));
+            if (result.result !== 'PASS') process.exitCode = 1;
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Require bounded gate pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/kv-binary-direct.json`, 'utf8'));
+          if (result.result !== 'PASS' || result.deleteState !== 'PASS' || result.metadataRoundTrip !== true) {
+            throw new Error('KV_BINARY_DIRECT_GATE_FAILED');
+          }
+          NODE
+          printf 'KV_BINARY_REMOTE_GATE=PASS\nMUTATION_SCOPE=ONE_TEMPORARY_PUT_GET_METADATA_DELETE\nBILLING_ENDPOINTS=0\nR2_ENDPOINTS=0\nDEPLOY=0\n' \
+            > "$EVIDENCE_DIR/result.txt"
+
+      - name: Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kv-binary-direct-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
