@@ -51,8 +51,22 @@ const results = checks.map((item) => {
     semantic = item.status === 200 && item.contentType.includes('text/html') && item.permissionsPolicy.includes('geolocation=(self)') && item.permissionsPolicy.includes('camera=()') && item.body.includes('<title>SOS Santa Fe') && !item.body.includes('DEMO / NO OFICIAL');
     detail = 'shell + same-origin geolocation policy';
   } else if (item.path === '/lite') {
-    semantic = item.status === 200 && item.contentType.includes('text/html') && item.body.includes('Estado hídrico de Santa Fe') && item.body.includes('Teléfonos esenciales') && item.body.includes('no constituye una orden oficial') && item.body.includes('Datos en vivo') && /3\.\d{2} m/.test(item.body) && !item.body.includes('1970-01-01');
-    detail = 'lite + current numeric observation + quality/threshold disclaimer';
+    const statusLabelIsTruthful = item.body.includes('Datos en vivo') || item.body.includes('Datos desactualizados');
+    const observationMatch = item.body.match(/Observación principal:\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)/);
+    const observationAt = observationMatch ? Date.parse(observationMatch[1]) : Number.NaN;
+    semantic = item.status === 200
+      && item.contentType.includes('text/html')
+      && item.body.includes('Estado hídrico de Santa Fe')
+      && item.body.includes('Teléfonos esenciales')
+      && item.body.includes('no constituye una orden oficial')
+      && statusLabelIsTruthful
+      && /3\.\d{2} m/.test(item.body)
+      && Number.isFinite(observationAt)
+      && Date.now() - observationAt <= 36 * 60 * 60 * 1000
+      && item.body.includes('Fuente principal: INA · Sistema de Información Hidrológica')
+      && item.body.includes('sin validación definitiva salvo marca expresa')
+      && !item.body.includes('1970-01-01');
+    detail = 'lite + truthful freshness label + current numeric observation + provenance/quality disclaimer';
   } else if (item.path === '/api/health') {
     const data = payload(item);
     const privateState = expectPrivateFeatures ? data?.privateMessaging === 'ENABLED' && data?.reporting === 'ENABLED' : data?.privateMessaging === 'FEATURE_DISABLED' && data?.reporting === 'FEATURE_DISABLED';
