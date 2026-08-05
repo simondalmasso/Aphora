@@ -1,0 +1,56 @@
+name: Install Canonical KV Free Deploy Workflow
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/install-deploy-workers-kv-free-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sos-sf-install-kv-free-deploy-workflow
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify and install canonical workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib
+
+          encoded = Path('.github/deploy-workers-kv-free.yml.gz.b64').read_text().strip()
+          actual_transport = hashlib.sha256(encoded.encode()).hexdigest()
+          expected_transport = '04393202d6e7f8d5ad40aeb23c46c97467c154242d9041e890eb74198ce4e763'
+          if actual_transport != expected_transport:
+              raise SystemExit(f'DEPLOY_WORKFLOW_TRANSPORT_HASH_MISMATCH:{actual_transport}')
+          content = gzip.decompress(base64.b64decode(encoded, validate=True))
+          actual_content = hashlib.sha256(content).hexdigest()
+          expected_content = 'b51e0bd37fea1d0304165657e3170eb4384c66e26cd75fd48f6b852bee7c104b'
+          if actual_content != expected_content:
+              raise SystemExit(f'DEPLOY_WORKFLOW_CONTENT_HASH_MISMATCH:{actual_content}')
+          Path('.github/workflows/deploy-workers.yml').write_bytes(content)
+          PY
+          git diff --check
+          grep -q 'Prove Workers Free and D1/KV authority before any mutation' .github/workflows/deploy-workers.yml
+          grep -q 'Deploy exact Worker once with D1 KV and protected secrets' .github/workflows/deploy-workers.yml
+          if grep -nE 'Configure and verify R2|r2 bucket|r2 object|Provision or verify D1 and R2' .github/workflows/deploy-workers.yml; then
+            echo 'R2_DEPLOY_STEP_PRESENT' >&2
+            exit 1
+          fi
+          git config user.name 'sos-sf-automation'
+          git config user.email 'sos-sf-automation@users.noreply.github.com'
+          git add .github/workflows/deploy-workers.yml
+          git commit -m 'ci: install canonical KV Free completion pipeline'
+          git push origin HEAD:arq/visual-dashboard-v3
