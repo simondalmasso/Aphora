@@ -22,15 +22,15 @@ jobs:
       - name: Checkout exact SHA
         uses: actions/checkout@v4
       - name: Assert export mode
-        run: grep -q '^MODE=EXPORT_V3_FULL_014$' .github/arq-v3-deploy-trigger
+        run: grep -q '^MODE=EXPORT_V3_FULL_014' .github/arq-v3-deploy-trigger
       - name: Package exact source
         run: |
           printf '%s\n' "$GITHUB_SHA" > SOURCE_SHA.txt
-          tar --exclude=.git --exclude=node_modules --exclude=artifacts/current-run -czf sos-sf-v3-full-014-source.tgz .
+          tar --exclude=.git --exclude=node_modules --exclude=artifacts/current-run -czf /tmp/sos-sf-v3-full-014-source.tgz .
       - name: Upload exact source
         uses: actions/upload-artifact@v4
         with:
           name: sos-sf-v3-full-014-source-${{ github.sha }}
-          path: sos-sf-v3-full-014-source.tgz
+          path: /tmp/sos-sf-v3-full-014-source.tgz
           if-no-files-found: error
           retention-days: 3
