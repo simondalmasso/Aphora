@@ -29,11 +29,43 @@ jobs:
             for (const pathname of ['/api/health','/api/auth/config','/api/session','/api/private/reports','/source-provenance.json']) {
               const response = await fetch(`${base}${pathname}?inspect=${process.env.GITHUB_RUN_ID}`, { headers: { Accept: 'application/json' } });
               const body = await response.json().catch(() => null);
-              if (pathname === '/api/health') output[pathname] = { status: response.status, service: body?.service ?? null, healthStatus: body?.status ?? null, privateMessaging: body?.privateMessaging ?? null, reporting: body?.reporting ?? null, dataMode: body?.dataMode ?? null };
-              else if (pathname === '/api/auth/config') output[pathname] = { status: response.status, enabled: body?.enabled ?? null, reportingEnabled: body?.reportingEnabled ?? null, googleClientIdPresent: typeof body?.googleClientId === 'string' && body.googleClientId.length > 0, activationState: body?.activationState ?? null };
-              else if (pathname === '/api/session') output[pathname] = { status: response.status, enabled: body?.enabled ?? null, authenticated: body?.authenticated ?? null, errorCode: body?.error?.code ?? body?.code ?? null };
-              else if (pathname === '/api/private/reports') output[pathname] = { status: response.status, errorCode: body?.error?.code ?? body?.code ?? null };
-              else output[pathname] = { status: response.status, schemaVersion: body?.schemaVersion ?? null, orderId: body?.orderId ?? null, productTreeSha256: body?.productTreeSha256 ?? null, includedFileCount: body?.includedFileCount ?? null, deploymentRunId: body?.deploymentRunId ?? null };
+              const data = body && typeof body === 'object' && 'data' in body ? body.data : body;
+              if (pathname === '/api/health') output[pathname] = {
+                status: response.status,
+                service: data?.service ?? null,
+                healthStatus: data?.status ?? null,
+                privateMessaging: data?.privateMessaging ?? null,
+                reporting: data?.reporting ?? null,
+                dataMode: data?.dataMode ?? null,
+                providers: Array.isArray(data?.providers) ? data.providers.map((entry) => ({ id: entry?.id ?? null, status: entry?.status ?? null, errorClass: entry?.errorClass ?? null })) : [],
+              };
+              else if (pathname === '/api/auth/config') output[pathname] = {
+                status: response.status,
+                enabled: data?.enabled ?? null,
+                reportingEnabled: data?.reportingEnabled ?? null,
+                googleClientIdPresent: typeof data?.googleClientId === 'string' && data.googleClientId.length > 0,
+                activationState: data?.activationState ?? null,
+              };
+              else if (pathname === '/api/session') output[pathname] = {
+                status: response.status,
+                enabled: data?.enabled ?? null,
+                authenticated: data?.authenticated ?? null,
+                errorCode: body?.error?.code ?? body?.code ?? null,
+                cacheControl: response.headers.get('cache-control') ?? null,
+              };
+              else if (pathname === '/api/private/reports') output[pathname] = {
+                status: response.status,
+                errorCode: body?.error?.code ?? body?.code ?? null,
+                cacheControl: response.headers.get('cache-control') ?? null,
+              };
+              else output[pathname] = {
+                status: response.status,
+                schemaVersion: data?.schemaVersion ?? null,
+                orderId: data?.orderId ?? null,
+                productTreeSha256: data?.productTreeSha256 ?? null,
+                includedFileCount: data?.includedFileCount ?? null,
+                deploymentRunId: data?.deploymentRunId ?? null,
+              };
             }
             fs.writeFileSync('evidence/production-state.json', `${JSON.stringify(output, null, 2)}\n`);
             console.log(JSON.stringify(output));
