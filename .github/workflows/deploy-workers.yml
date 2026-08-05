@@ -1,5 +1,5 @@
 name: Deploy Workers
-# V3-014 preflight: exact segmented patch, full gates and storage provisioning; no deploy.
+# Canonical V3-014 Workers-first completion and terminal drift-elimination pipeline.
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
     paths: [.github/arq-v3-deploy-trigger]
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EVIDENCE_DIR: artifacts/v3-full-014-preflight
+  EVIDENCE_DIR: artifacts/v3-full-014
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
@@ -31,26 +32,40 @@ env:
   SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
 
 jobs:
-  preflight:
+  workers-first:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 65
     steps:
-      - name: Checkout exact SHA
+      - name: Checkout exact branch SHA
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Assert bounded preflight mode
+      - name: Resolve bounded execution mode
+        id: mode
+        shell: bash
         run: |
-          grep -q '^MODE=PREFLIGHT_V3_FULL_014_R2$' .github/arq-v3-deploy-trigger
+          set -euo pipefail
+          mode="$(sed -n 's/^MODE=//p' .github/arq-v3-deploy-trigger | head -n1)"
+          case "$mode" in
+            FINAL_V3_FULL_014) apply_patch=true; sync_source=true ;;
+            TERMINAL_V3_FULL_014) apply_patch=false; sync_source=false ;;
+            *) echo "UNSUPPORTED_V3_014_MODE:$mode" >&2; exit 1 ;;
+          esac
           test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
-
-      - name: Verify and apply exact segmented product patch
-        run: |
+          printf 'mode=%s\napply_patch=%s\nsync_source=%s\n' "$mode" "$apply_patch" "$sync_source" | tee -a "$GITHUB_OUTPUT"
           mkdir -p "$EVIDENCE_DIR"
+          printf 'mode=%s\nsource_sha=%s\n' "$mode" "$GITHUB_SHA" > "$EVIDENCE_DIR/execution-mode.txt"
+
+      - name: Verify and stage exact product patches
+        if: steps.mode.outputs.apply_patch == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           import base64, gzip, hashlib
+
           expected_parts = [
               'b419d7560457640f637118680a38d4ffadc4788f0eadd328b560575be4781fa0',
               '2840b4dddf6674c1fd166da1cb26d7b614c7b6e09ba387206d920a5716decdba',
@@ -61,17 +76,16 @@ jobs:
               '254e05a4b0205134e29e842505325e44703f85c341202c4be62f76248e9ecbe3',
               'a616c5134f6dc1924472bee8f7725396eb3c96b2ae4e5026cee5bc33544df894',
           ]
-          parts = []
+          chunks = []
           report = []
           for index, expected in enumerate(expected_parts):
-              path = Path(f'.github/v3-full-014-parts/part{index:02d}')
-              data = path.read_text().strip()
+              data = Path(f'.github/v3-full-014-parts/part{index:02d}').read_text().strip()
               actual = hashlib.sha256(data.encode()).hexdigest()
               if actual != expected:
                   raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
-              parts.append(data)
+              chunks.append(data)
               report.append(f'part{index:02d}_sha256={actual}')
-          encoded = ''.join(parts)
+          encoded = ''.join(chunks)
           actual_b64 = hashlib.sha256(encoded.encode()).hexdigest()
           expected_b64 = '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd'
           if actual_b64 != expected_b64:
@@ -83,11 +97,33 @@ jobs:
               raise SystemExit(f'PATCH_CONTENT_HASH_MISMATCH:{actual_patch}')
           Path('/tmp/v3-full-014.patch').write_bytes(patch)
           report.extend([f'base64_sha256={actual_b64}', f'patch_sha256={actual_patch}'])
-          Path('artifacts/v3-full-014-preflight/patch-verification.txt').write_text('\n'.join(report)+'\n', encoding='utf-8')
+
+          fix_encoded = Path('.github/v3-full-014-provision-fix.patch.b64').read_text().strip()
+          fix_transport = hashlib.sha256(fix_encoded.encode()).hexdigest()
+          if fix_transport != 'bf4117c00120a1118737d8568d10202515610d1dc78b5384da8ce49e95e4bf98':
+              raise SystemExit(f'PROVISION_FIX_TRANSPORT_HASH_MISMATCH:{fix_transport}')
+          fix_patch = base64.b64decode(fix_encoded, validate=True)
+          fix_hash = hashlib.sha256(fix_patch).hexdigest()
+          if fix_hash != 'e89bdaef77e5e8c9111a6bfc506e2fb63995869fa5d65d09819a92d41313ae4c':
+              raise SystemExit(f'PROVISION_FIX_CONTENT_HASH_MISMATCH:{fix_hash}')
+          Path('/tmp/v3-full-014-provision-fix.patch').write_bytes(fix_patch)
+          report.extend([f'provision_fix_base64_sha256={fix_transport}', f'provision_fix_patch_sha256={fix_hash}'])
+          Path('artifacts/v3-full-014/patch-verification.txt').write_text('\n'.join(report) + '\n', encoding='utf-8')
           PY
           git apply --index /tmp/v3-full-014.patch
+          git apply --index /tmp/v3-full-014-provision-fix.patch
           git diff --cached --check
           git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
+
+      - name: Assert clean terminal source
+        if: steps.mode.outputs.apply_patch == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+          test -f migrations/0004_session_csrf_photo_access.sql
+          test -f src/client/security/csrf.ts
+          grep -q "SESSION_SIGNING_KEY_PRESENT" scripts/provision-cloudflare.mjs
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -97,34 +133,83 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+
       - name: Typecheck
         run: npm run typecheck
+
       - name: Lint clean
         run: npm run lint -- --max-warnings=0
+
       - name: Unit tests
         run: npm run test:unit
+
       - name: Contract tests
         run: npm run test:contract
+
       - name: Build and budgets
         run: npm run build
+
       - name: Worker tests with real local D1 and R2
         run: npm run test:worker
-      - name: E2E desktop mobile offline and no-third-party
+
+      - name: E2E desktop mobile offline and privacy
         run: npm run test:e2e
+
+      - name: Validate owner configuration names
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$ ]] || { echo 'GOOGLE_CLIENT_ID_REQUIRED_OR_INVALID' >&2; exit 2; }
+          node - <<'NODE'
+          const values=String(process.env.SOS_SF_OPERATOR_EMAILS||'').split(',').map(v=>v.trim()).filter(Boolean);
+          if (!values.length || !values.every(v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) throw new Error('SOS_SF_OPERATOR_EMAILS_REQUIRED_OR_INVALID');
+          NODE
+          printf 'google_client_id_present=true\noperator_allowlist_present=true\n' > "$EVIDENCE_DIR/protected-config-presence.txt"
+
+      - name: Ensure persistent session signing secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${SESSION_SIGNING_KEY:-}" ]; then
+            test "${#SESSION_SIGNING_KEY}" -ge 32
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=github_actions_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+            exit 0
+          fi
+          npx wrangler secret list --config wrangler.jsonc > /tmp/worker-secrets-list.json
+          if node -e "const x=require('/tmp/worker-secrets-list.json');process.exit(x.some(v=>v.name==='SESSION_SIGNING_KEY')?0:1)"; then
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=existing_cloudflare_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+          else
+            generated="$(openssl rand -base64 48 | tr -d '\n')"
+            echo "::add-mask::$generated"
+            echo "SESSION_SIGNING_KEY=$generated" >> "$GITHUB_ENV"
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=generated_once_for_cloudflare_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+          fi
 
       - name: Provision or verify D1 and R2
         id: provision
         run: node scripts/provision-cloudflare.mjs
 
+      - name: Require storage authority and private readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat "$EVIDENCE_DIR/deployment-mode.json"
+          test '${{ steps.provision.outputs.resources_ready }}' = 'true'
+          test '${{ steps.provision.outputs.private_ready }}' = 'true'
+
       - name: Apply remote D1 migrations
-        if: steps.provision.outputs.resources_ready == 'true'
         run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/d1-migrations.log"
 
-      - name: Verify remote D1 schema
-        if: steps.provision.outputs.resources_ready == 'true'
+      - name: Verify remote D1 schema and security columns
+        shell: bash
         run: |
+          set -euo pipefail
           npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows') ORDER BY name" --json > "$EVIDENCE_DIR/d1-schema.json"
           npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "PRAGMA table_info(auth_sessions)" --json > "$EVIDENCE_DIR/d1-auth-session-columns.json"
           node - <<'NODE'
@@ -137,41 +222,107 @@ jobs:
           NODE
 
       - name: Configure and verify R2 retention lifecycle
-        if: steps.provision.outputs.resources_ready == 'true'
+        shell: bash
         run: |
-          npx wrangler r2 bucket lifecycle remove sos-sf-private-reports --name sos-sf-report-retention --force --config wrangler.generated.jsonc >/dev/null 2>&1 || true
-          npx wrangler r2 bucket lifecycle add sos-sf-private-reports sos-sf-report-retention reports/ --expire-days "${REPORT_RETENTION_DAYS:-30}" --force --config wrangler.generated.jsonc
+          set -euo pipefail
+          days="${REPORT_RETENTION_DAYS:-30}"
+          npx wrangler r2 bucket lifecycle remove sos-sf-private-reports --id sos-sf-report-retention --config wrangler.generated.jsonc >/dev/null 2>&1 || true
+          npx wrangler r2 bucket lifecycle add sos-sf-private-reports sos-sf-report-retention reports/ --expire-days "$days" --config wrangler.generated.jsonc
           npx wrangler r2 bucket lifecycle list sos-sf-private-reports --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/r2-lifecycle.txt"
           grep -q 'sos-sf-report-retention' "$EVIDENCE_DIR/r2-lifecycle.txt"
 
-      - name: Verify bounded R2 object operations
-        if: steps.provision.outputs.resources_ready == 'true'
+      - name: Verify bounded remote R2 object operations
+        shell: bash
         run: |
+          set -euo pipefail
           probe="__v3_014_probe/${GITHUB_RUN_ID}.txt"
           printf 'sos-sf-v3-014-r2-probe' > /tmp/probe.txt
-          npx wrangler r2 object put "sos-sf-private-reports/${probe}" --file /tmp/probe.txt --remote --force --config wrangler.generated.jsonc
+          npx wrangler r2 object put "sos-sf-private-reports/${probe}" --file /tmp/probe.txt --remote --config wrangler.generated.jsonc
           npx wrangler r2 object get "sos-sf-private-reports/${probe}" --file /tmp/read.txt --remote --config wrangler.generated.jsonc
           cmp /tmp/probe.txt /tmp/read.txt
           npx wrangler r2 object delete "sos-sf-private-reports/${probe}" --remote --config wrangler.generated.jsonc
+          printf 'r2_put_get_delete=PASS\n' > "$EVIDENCE_DIR/r2-object-test.txt"
 
-      - name: Require independent infrastructure completion
+      - name: Deploy exact Worker with D1 R2 and protected secrets
+        shell: bash
         run: |
-          test '${{ steps.provision.outputs.resources_ready }}' = 'true'
-          printf 'private_ready=%s\nresources_ready=%s\n' '${{ steps.provision.outputs.private_ready }}' '${{ steps.provision.outputs.resources_ready }}' > "$EVIDENCE_DIR/preflight-state.txt"
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .worker-secrets.json 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+          npx wrangler versions list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-versions.json" || true
+          npx wrangler deployments list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-deployments.json" || true
 
-      - name: Finalize evidence
+      - name: Verify production public private and source matrix
+        env:
+          EXPECT_PRIVATE_FEATURES: 'true'
+          WRITE_PROOF: '1'
+        run: npm run verify:remote -- "$DEPLOYMENT_URL"
+
+      - name: Verify production auth and privacy negative paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="$DEPLOYMENT_URL"
+          session_status="$(curl -fsS -o /tmp/session.json -w '%{http_code}' "$origin/api/session?verify=$GITHUB_RUN_ID")"
+          test "$session_status" = 200
+          node -e "const x=require('/tmp/session.json');const d=x.data||x;if(d.enabled!==true||d.authenticated!==false)process.exit(1)"
+          private_status="$(curl -sS -o /tmp/private.json -w '%{http_code}' "$origin/api/private/reports?verify=$GITHUB_RUN_ID")"
+          test "$private_status" = 401
+          auth_status="$(curl -sS -o /tmp/auth-negative.json -w '%{http_code}' -X POST "$origin/api/auth/google?verify=$GITHUB_RUN_ID" -H "Origin: $origin" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' --data '{"credential":"invalid"}')"
+          test "$auth_status" = 401
+          printf 'session_anonymous=200\nprivate_unauthenticated=401\ninvalid_google_credential=401\n' > "$EVIDENCE_DIR/auth-negative-production.txt"
+
+      - name: Synchronize deployed product source to GitHub
+        if: steps.mode.outputs.sync_source == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -f .github/v3-full-014.patch.gz.b64 .github/v3-full-014-provision-fix.patch.b64
+          git rm -rf .github/v3-full-014-parts
+          printf 'MODE=SYNCED_V3_FULL_014\n' > .github/arq-v3-deploy-trigger
+          git add .github/arq-v3-deploy-trigger
+          git diff --cached --check
+          git config user.name 'sos-sf-automation'
+          git config user.email 'sos-sf-automation@users.noreply.github.com'
+          git commit -m 'feat: complete SOS SF V3 private runtime 014'
+          git push origin HEAD:arq/visual-dashboard-v3
+          git rev-parse HEAD | tee "$EVIDENCE_DIR/synchronized-source-sha.txt"
+
+      - name: Finalize evidence manifest
         if: always()
         run: node scripts/finalize-evidence.mjs || true
 
+      - name: Publish non-closing issue checkpoint
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          conclusion='${{ job.status }}'
+          cat > /tmp/issue-comment.md <<EOF
+          ## SOS-SF-OWNER-V3-FULL-COMPLETION-014 — workflow checkpoint
+
+          - Mode: `${{ steps.mode.outputs.mode }}`
+          - Run: `${GITHUB_RUN_ID}`
+          - Source SHA at start: `${GITHUB_SHA}`
+          - Job status: `${conclusion}`
+          - `main`: untouched
+          - Issue: remains open
+          - `AUD_HOLD`: ACTIVE
+
+          Evidence is attached to the workflow artifact. This comment does not declare owner or AUD acceptance.
+          EOF
+          gh issue comment 8 --repo "$GITHUB_REPOSITORY" --body-file /tmp/issue-comment.md || true
+
       - name: Remove generated sensitive material
         if: always()
-        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/v3-full-014.patch
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/session.json /tmp/private.json /tmp/auth-negative.json /tmp/worker-secrets-list.json /tmp/v3-full-014.patch /tmp/v3-full-014-provision-fix.patch
 
-      - name: Upload preflight evidence
+      - name: Upload V3 completion evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sos-sf-v3-full-014-preflight-${{ github.sha }}-${{ github.run_id }}
+          name: sos-sf-v3-full-014-${{ steps.mode.outputs.mode }}-${{ github.sha }}-${{ github.run_id }}
           path: ${{ env.EVIDENCE_DIR }}/
-          if-no-files-found: warn
-          retention-days: 14
+          if-no-files-found: error
+          retention-days: 30
