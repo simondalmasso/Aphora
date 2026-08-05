@@ -1,8 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildLiveSnapshot } from '../../src/worker/live-data';
 
 const originalFetch = globalThis.fetch;
-afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-08-03T18:00:00.000Z'));
+});
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 function json(value: unknown) { return new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } }); }
 function points(series: number, values: readonly [string, number][]) { return values.map(([timestart, valor]) => ({ tipo: 'puntual', series_id: series, timestart, valor })); }
