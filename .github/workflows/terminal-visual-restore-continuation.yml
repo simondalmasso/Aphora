@@ -1,0 +1,122 @@
+name: Terminal Visual Restore Continuation
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/terminal-visual-restore-continuation-trigger]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sos-sf-015-visual-restore-terminal
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/terminal-visual-restore-continuation
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  ORDER_ID: SOS-SF-015-VISUAL-PRODUCT-RESTORE-A-CONTINUATION-01
+
+jobs:
+  terminal-get-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert terminal and GET-only contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          mode="$(sed -n 's/^MODE=//p' .github/terminal-visual-restore-continuation-trigger | head -n1)"
+          test "$mode" = TERMINAL_VISUAL_RESTORE_CONTINUATION_01
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          grep -q '^DEPLOYMENT_VERSION_ID=' .github/terminal-visual-restore-continuation-trigger
+          ! grep -Eqi 'wrangler[[:space:]]+deploy|wrangler[[:space:]]+secret|d1[[:space:]].*--remote|kv[[:space:]]+(key|namespace).*(put|delete|create)|cloudflare.*(create|update|delete)|curl[^\n]*-[^-]*X[[:space:]]*(POST|PUT|PATCH|DELETE)' .github/workflows/terminal-visual-restore-continuation.yml
+          printf 'ORDER=%s\nMODE=%s\nGET_ONLY=true\nCLOUDFLARE_MUTATIONS=0\nBRANCH_SHA=%s\n' "$ORDER_ID" "$mode" "$GITHUB_SHA" > "$EVIDENCE_DIR/terminal-contract.txt"
+
+      - name: Recompute synchronized product tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess
+          excluded=('.github/','artifacts/','dist/')
+          marker='public/source-provenance.json'
+          paths=subprocess.check_output(['git','ls-files','-z']).split(b'\0')
+          digest=hashlib.sha256(); included=0
+          for raw in sorted(path for path in paths if path):
+              path=raw.decode()
+              if path == marker or path.startswith(excluded):
+                  continue
+              data=Path(path).read_bytes()
+              digest.update(path.encode()); digest.update(b'\0'); digest.update(len(data).to_bytes(8,'big')); digest.update(data); included+=1
+          local=json.loads(Path(marker).read_text())
+          actual=digest.hexdigest()
+          if local.get('productTreeSha256') != actual:
+              raise SystemExit(f'LOCAL_PRODUCT_TREE_DRIFT:{local.get("productTreeSha256")}:{actual}')
+          if int(local.get('includedFileCount',-1)) != included:
+              raise SystemExit('LOCAL_INCLUDED_FILE_COUNT_DRIFT')
+          Path(os.environ['EVIDENCE_DIR'],'local-product-tree.txt').write_text(f'PRODUCT_TREE_SHA256={actual}\nINCLUDED_FILE_COUNT={included}\n')
+          PY
+
+      - name: GET-only production verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/api/health?terminal=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/health.json"
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/api/snapshot?terminal=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/snapshot.json"
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/api/sources?terminal=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/sources.json"
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/lite?terminal=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/lite.html"
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/source-provenance.json?terminal=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/remote-source-provenance.json"
+          node <<'NODE'
+          const fs=require('node:fs');
+          const health=JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/health.json`,'utf8'));
+          const snapshot=JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/snapshot.json`,'utf8'));
+          const sources=JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/sources.json`,'utf8'));
+          const lite=fs.readFileSync(`${process.env.EVIDENCE_DIR}/lite.html`,'utf8');
+          const healthData=health.data||health;
+          const snapshotData=snapshot.data||snapshot;
+          const sourcesData=sources.data||sources;
+          if(!healthData||typeof healthData!=='object') throw new Error('HEALTH_INVALID');
+          if(!snapshotData||typeof snapshotData!=='object'||!snapshotData.alertStatus) throw new Error('SNAPSHOT_INVALID');
+          if(!sourcesData||typeof sourcesData!=='object'||!Array.isArray(sourcesData.sources)) throw new Error('SOURCES_INVALID');
+          if(!lite.includes('Situación hidrométrica')||!lite.includes('Reportar una situación no inicia un despacho')) throw new Error('LITE_INVALID');
+          NODE
+
+      - name: Prove Cloudflare GitHub drift false
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const local=JSON.parse(fs.readFileSync('public/source-provenance.json','utf8'));
+          const remote=JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/remote-source-provenance.json`,'utf8'));
+          for(const field of ['schemaVersion','orderId','productTreeSha256','includedFileCount','deploymentRunId']) {
+            if(String(local[field])!==String(remote[field])) throw new Error(`PROVENANCE_MISMATCH:${field}:${local[field]}:${remote[field]}`);
+          }
+          const version=(fs.readFileSync('.github/terminal-visual-restore-continuation-trigger','utf8').match(/^DEPLOYMENT_VERSION_ID=(.+)$/m)||[])[1];
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/terminal-result.txt`,[
+            'STATUS=VERIFIED_NOT_ACCEPTED',
+            `ORDER=${process.env.ORDER_ID}`,
+            `TERMINAL_RUN=${process.env.GITHUB_RUN_ID}`,
+            `SYNCHRONIZED_PRODUCT_SHA=${process.env.GITHUB_SHA}`,
+            `DEPLOYMENT_VERSION_ID=${version}`,
+            `PRODUCT_TREE_SHA256=${local.productTreeSha256}`,
+            'CLOUDFLARE_GITHUB_DRIFT=false',
+            'GET_ONLY=true',
+            'CLOUDFLARE_MUTATIONS=0',
+            'AUD_HOLD=ACTIVE',''].join('\n'));
+          NODE
+
+      - name: Upload terminal evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-visual-restore-continuation-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
