@@ -36,8 +36,9 @@ jobs:
           mkdir -p "$EVIDENCE_DIR/comparison/previous-with-graph" "$EVIDENCE_DIR/comparison/current-015" "$EVIDENCE_DIR/comparison/corrected"
           test -f OWNER_CORRECTION_SOS_SF_015_VISUAL_PRODUCT_RESTORE_A.md
           grep -q 'SOS-SF-015-VISUAL-PRODUCT-RESTORE-A' AGENTS.md
-          grep -q 'Río Paraná — Santa Fe' src/client/features/hydro/HydrometricMonitoring.tsx
-          grep -q 'Río Salado — Santo Tomé' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -q 'aria-label="Elegir estación hidrométrica"' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -q 'Río Paraná — Santa Fe' tests/e2e/dashboard.spec.ts
+          grep -q 'Río Salado — Santo Tomé' tests/e2e/dashboard.spec.ts
           grep -q 'Sin datos' src/client/components/ui/HydroSeriesChart.tsx
           grep -q 'Ver tabla de mediciones' src/client/components/ui/HydroSeriesChart.tsx
           grep -q 'onPointerDown' src/client/components/ui/HydroSeriesChart.tsx
