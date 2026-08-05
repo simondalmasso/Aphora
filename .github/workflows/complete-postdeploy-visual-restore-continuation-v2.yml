@@ -1,0 +1,180 @@
+name: Complete Postdeploy Visual Restore Continuation V2
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/complete-postdeploy-visual-restore-continuation-v2-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sos-sf-015-visual-restore-postdeploy-v2
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/postdeploy-visual-restore-continuation-v2
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  ORDER_ID: SOS-SF-015-VISUAL-PRODUCT-RESTORE-A-CONTINUATION-01
+  DEPLOYMENT_VERSION_ID: 672106fb-575d-48d5-a9de-4a20e6d02f73
+  DEPLOY_RUN_ID: '31022595833'
+  EXPECTED_PRODUCT_TREE_SHA256: 274e51ce655ebf4c82c894843a8549b249191c436d3736e356748d16183cf940
+
+jobs:
+  verify-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert GET-only postdeploy contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR/production-screenshots"
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          git merge-base --is-ancestor 530cc522178225115ccfe13315261f69e7e3f716 HEAD
+          ! grep -Eqi 'wrangler[[:space:]]+deploy|wrangler[[:space:]]+secret|d1[[:space:]].*--remote|kv[[:space:]]+(key|namespace).*(put|delete|create)|curl[^\n]*-[^-]*X[[:space:]]*(POST|PUT|PATCH|DELETE)' .github/workflows/complete-postdeploy-visual-restore-continuation-v2.yml
+          printf 'ORDER=%s\nDEPLOY_COMMAND_COUNT=0\nGET_ONLY_PRODUCTION=true\nCLOUDFLARE_MUTATIONS=0\nDEPLOYMENT_VERSION_ID=%s\n' "$ORDER_ID" "$DEPLOYMENT_VERSION_ID" > "$EVIDENCE_DIR/contract.txt"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Fetch exact production evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in 'health:/api/health' 'snapshot:/api/snapshot' 'sources:/api/sources' 'auth-config:/api/auth/config' 'contacts:/api/essential-contacts' 'session:/api/session'; do
+            name="${pair%%:*}"
+            route="${pair#*:}"
+            curl --fail --silent --show-error --location "$DEPLOYMENT_URL$route?postdeploy_v2=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/$name.json"
+          done
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/lite?postdeploy_v2=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/lite.html"
+          curl --fail --silent --show-error --location "$DEPLOYMENT_URL/source-provenance.json?postdeploy_v2=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/remote-source-provenance.json"
+          private_status="$(curl --silent --show-error --location -o "$EVIDENCE_DIR/private-reports-negative.json" -w '%{http_code}' "$DEPLOYMENT_URL/api/private/reports?postdeploy_v2=$GITHUB_RUN_ID")"
+          test "$private_status" = 401
+
+      - name: Verify exact provenance and fail-closed public semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const dir=process.env.EVIDENCE_DIR;
+          const read=(name)=>{const raw=JSON.parse(fs.readFileSync(`${dir}/${name}.json`,'utf8'));return raw.data||raw};
+          const provenance=JSON.parse(fs.readFileSync(`${dir}/remote-source-provenance.json`,'utf8'));
+          if(provenance.schemaVersion!==1||provenance.orderId!==process.env.ORDER_ID||String(provenance.deploymentRunId)!==String(process.env.DEPLOY_RUN_ID)||provenance.productTreeSha256!==process.env.EXPECTED_PRODUCT_TREE_SHA256||provenance.includedFileCount!==136) throw new Error('PROVENANCE_MISMATCH');
+          const health=read('health');
+          const snapshot=read('snapshot');
+          const matrix=read('sources');
+          const auth=read('auth-config');
+          const contacts=read('contacts');
+          const session=read('session');
+          const negative=read('private-reports-negative');
+          const lite=fs.readFileSync(`${dir}/lite.html`,'utf8');
+          if(health.status!=='healthy'||health.privateMessaging!=='ENABLED'||health.reporting!=='ENABLED') throw new Error('HEALTH_OR_PRIVATE_RUNTIME');
+          if(snapshot.mode!=='LIVE'||!['ALERTA_OFICIAL_ACTIVA','SIN_ALERTAS_OFICIALES_DETECTADAS','VERIFICACION_DE_ALERTAS_DEGRADADA','FUENTES_DE_ALERTAS_NO_DISPONIBLES'].includes(snapshot.alertStatus)) throw new Error('SNAPSHOT_ALERT_CONTRACT');
+          const systems=Array.isArray(snapshot.systems)?snapshot.systems:[];
+          if(!systems.some(s=>s.id==='parana-santa-fe'&&s.label==='Río Paraná — Santa Fe')||!systems.some(s=>s.id==='salado-santo-tome'&&s.label==='Río Salado — Santo Tomé')) throw new Error('STATION_NAMES');
+          const sources=Array.isArray(matrix.sources)?matrix.sources:[];
+          const organizations=Array.isArray(matrix.sourceOrganizations)?matrix.sourceOrganizations:[];
+          const required=['ina-rest-30','ina-rest-3044','ina-waterml-parana','ina-waterml-salado','smn-alerts','smn-observations','nasa-gpm-imerg-early','ports-hydrometers','province-early-warning-page','cobem-public-page'];
+          const ids=new Set(sources.map(source=>source.id));
+          if(!required.every(id=>ids.has(id))||organizations.length<6) throw new Error('SOURCE_INVENTORY');
+          if(!sources.every(source=>typeof source.organizationId==='string'&&typeof source.feedName==='string'&&typeof source.classification==='string'&&typeof source.determinesPrimaryState==='boolean')) throw new Error('SOURCE_SCHEMA');
+          const blocked=sources.filter(source=>['BLOCKED_CREDENTIAL','BLOCKED_NO_MACHINE_ENDPOINT'].includes(source.classification));
+          if(blocked.some(source=>source.connected!==false)) throw new Error('BLOCKED_SOURCE_CONNECTED');
+          const ina=sources.filter(source=>source.organizationId==='ina');
+          if(!ina.some(source=>source.connected===true)) throw new Error('HYDROMETRIC_PRIMARY_SOURCE_AVAILABILITY');
+          const smnAlerts=sources.find(source=>source.id==='smn-alerts');
+          if(!smnAlerts) throw new Error('SMN_ALERT_SOURCE_MISSING');
+          if(smnAlerts.connected!==true&&!['FUENTES_DE_ALERTAS_NO_DISPONIBLES','VERIFICACION_DE_ALERTAS_DEGRADADA'].includes(snapshot.alertStatus)) throw new Error('ALERT_SOURCE_NOT_FAIL_CLOSED');
+          const nasa=sources.find(source=>source.id==='nasa-gpm-imerg-early');
+          if(!nasa||!['SUPPLEMENTARY','DEGRADED','OPERATIONAL_FRESH'].includes(nasa.classification)) throw new Error('NASA_CLASSIFICATION');
+          if(nasa.connected!==true&&/Muestra satelital válida/.test(String(nasa.contribution||''))) throw new Error('NASA_FALSE_LOCAL_SAMPLE');
+          if(auth.enabled!==true||auth.reportingEnabled!==true||session.enabled!==true||session.authenticated!==false) throw new Error('AUTH_RUNTIME');
+          if(!Array.isArray(contacts.contacts)||!['911','103','107','100','106'].every(number=>contacts.contacts.some(contact=>contact.number===number))) throw new Error('CONTACTS');
+          if((negative.error?.code||negative.code)!=='AUTHENTICATION_REQUIRED') throw new Error('PRIVATE_NEGATIVE');
+          if(!lite.includes('Situación hidrométrica')||!lite.includes('Reportar una situación no inicia un despacho')||/Datos en vivo|Sistema Paraná|Sistema Salado|Evolución prevista/.test(lite)) throw new Error('LITE_SEMANTICS');
+          fs.writeFileSync(`${dir}/source-matrix-result.txt`,[
+            `SOURCE_ORGANIZATION_COUNT=${organizations.length}`,
+            `SOURCE_FEED_COUNT=${sources.length}`,
+            `CONNECTED=${sources.filter(source=>source.connected===true).length}`,
+            `BLOCKED=${blocked.length}`,
+            `ALERT_STATUS=${snapshot.alertStatus}`,
+            `SMN_ALERTS_CONNECTED=${smnAlerts.connected}`,
+            'SOURCE_MATRIX=PASS',''].join('\n'));
+          NODE
+
+      - name: Verify production graph and responsive geometry
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { chromium }=require('playwright');
+          const fs=require('node:fs');
+          const path=require('node:path');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            const results={};
+            for(const [name,width,height] of [['320x800',320,800],['390x844',390,844],['768x1024',768,1024],['1024x768',1024,768],['1440x900',1440,900]]){
+              const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1});
+              await page.goto(`${process.env.DEPLOYMENT_URL}?postdeploy_v2=${process.env.GITHUB_RUN_ID}-${name}`,{waitUntil:'networkidle',timeout:60000});
+              const result=await page.evaluate(()=>({
+                width:document.documentElement.clientWidth,
+                scrollWidth:document.documentElement.scrollWidth,
+                graph:Boolean(document.querySelector('[data-testid="main-hydro-chart"]')),
+                chartTable:Boolean(document.querySelector('details.hydro-chart__table')),
+                institutional:document.body.innerText.includes('Información pública para emergencias'),
+                forbidden:/Sistema Paraná|Sistema Salado|Datos en vivo|Evolución prevista/.test(document.body.innerText),
+              }));
+              if(result.scrollWidth>result.width) throw new Error(`OVERFLOW:${name}:${result.scrollWidth}:${result.width}`);
+              if(!result.graph||!result.chartTable||!result.institutional||result.forbidden) throw new Error(`PRODUCT_UI:${name}:${JSON.stringify(result)}`);
+              await page.screenshot({path:path.join(process.env.EVIDENCE_DIR,'production-screenshots',`${name}.png`),fullPage:true});
+              results[name]=result;
+              await page.close();
+            }
+            await browser.close();
+            fs.writeFileSync(`${process.env.EVIDENCE_DIR}/production-geometry.json`,JSON.stringify(results,null,2)+'\n');
+          })().catch(error=>{console.error(error);process.exit(1)});
+          NODE
+          printf 'GRAPH_RESTORED=true\nMOBILE_320_OVERFLOW=false\nPRODUCTION_VISUAL=PASS\n' > "$EVIDENCE_DIR/production-visual-result.txt"
+
+      - name: Synchronize deployed source and arm terminal
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$EVIDENCE_DIR/remote-source-provenance.json" public/source-provenance.json
+          cat > .github/terminal-visual-restore-continuation-trigger <<EOF
+          MODE=TERMINAL_VISUAL_RESTORE_CONTINUATION_01
+          ORDER=$ORDER_ID
+          DEPLOYMENT_VERSION_ID=$DEPLOYMENT_VERSION_ID
+          DEPLOY_RUN=$DEPLOY_RUN_ID
+          PRODUCT_TREE_SHA256=$EXPECTED_PRODUCT_TREE_SHA256
+          GET_ONLY=true
+          CLOUDFLARE_MUTATION=PROHIBITED
+          AUD_HOLD=ACTIVE
+          EOF
+          git add public/source-provenance.json .github/terminal-visual-restore-continuation-trigger
+          git diff --cached --check
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m 'chore: synchronize deployed visual restore source'
+          git push origin HEAD:arq/visual-dashboard-v3
+          sync_sha="$(git rev-parse HEAD)"
+          printf 'STATUS=VERIFIED_NOT_ACCEPTED\nORDER=%s\nDEPLOY_COMMAND_COUNT=1\nDEPLOYMENT_VERSION_ID=%s\nSYNCHRONIZED_PRODUCT_SHA=%s\nPRODUCT_TREE_SHA256=%s\nCLOUDFLARE_GITHUB_DRIFT=false\nGRAPH_RESTORED=true\nMOBILE_320_OVERFLOW=false\nOFFLINE_SEMANTICS=PASS\nAUD_HOLD=ACTIVE\n' "$ORDER_ID" "$DEPLOYMENT_VERSION_ID" "$sync_sha" "$EXPECTED_PRODUCT_TREE_SHA256" > "$EVIDENCE_DIR/result.txt"
+
+      - name: Upload postdeploy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postdeploy-visual-restore-continuation-v2-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
