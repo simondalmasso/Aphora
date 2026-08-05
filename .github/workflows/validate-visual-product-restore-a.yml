@@ -30,7 +30,6 @@ jobs:
           fetch-depth: 0
 
       - name: Assert correction scope and no-mutation contract
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$EVIDENCE_DIR/comparison/previous-with-graph" "$EVIDENCE_DIR/comparison/current-015" "$EVIDENCE_DIR/comparison/corrected"
@@ -62,15 +61,13 @@ jobs:
       - name: Download previous product screenshots with main graph
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
           gh run download "$PREVIOUS_VISUAL_RUN" --repo "$GITHUB_REPOSITORY" --name "$PREVIOUS_VISUAL_ARTIFACT" --dir "$EVIDENCE_DIR/comparison/previous-with-graph"
           test -f "$EVIDENCE_DIR/comparison/previous-with-graph/mobile-390x844.png"
           test -f "$EVIDENCE_DIR/comparison/previous-with-graph/desktop-1440x900.png"
 
-      - name: Capture current deployed 015 before any correction deploy
-        shell: bash
+      - name: Capture current deployed 015 before correction deploy
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -92,26 +89,56 @@ jobs:
           NODE
 
       - name: Typecheck
-        run: npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
       - name: Lint
-        run: npm run lint -- --max-warnings=0 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+        run: |
+          set -o pipefail
+          npm run lint -- --max-warnings=0 2>&1 | tee "$EVIDENCE_DIR/lint.log"
       - name: Unit
-        run: npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/unit.log"
+        run: |
+          set -o pipefail
+          npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/unit.log"
       - name: Contract
-        run: npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/contract.log"
+        run: |
+          set -o pipefail
+          npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/contract.log"
       - name: Build and budgets
-        run: npm run build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee "$EVIDENCE_DIR/build.log"
       - name: Worker local D1 and KV
-        run: npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/worker.log"
+        run: |
+          set -o pipefail
+          npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/worker.log"
       - name: E2E product visual accessibility mobile offline
-        run: npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/e2e.log"
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/e2e.log"
 
-      - name: Assemble visual comparison evidence
-        shell: bash
+      - name: Assemble and verify visual comparison evidence
         run: |
           set -euo pipefail
           cp "$EVIDENCE_DIR/screenshots/public-safety-390x844.png" "$EVIDENCE_DIR/comparison/corrected/mobile-390x844.png"
           cp "$EVIDENCE_DIR/screenshots/public-safety-1440x900.png" "$EVIDENCE_DIR/comparison/corrected/desktop-1440x900.png"
+          node <<'NODE'
+          const fs = require('node:fs');
+          function pngDimensions(file) {
+            const value = fs.readFileSync(file);
+            if (value.toString('ascii', 1, 4) !== 'PNG') throw new Error(`NOT_PNG:${file}`);
+            return { width: value.readUInt32BE(16), height: value.readUInt32BE(20) };
+          }
+          const root = process.env.EVIDENCE_DIR;
+          const expected = [
+            [`${root}/comparison/corrected/mobile-390x844.png`, 390],
+            [`${root}/comparison/corrected/desktop-1440x900.png`, 1440],
+          ];
+          for (const [file, width] of expected) {
+            const dimensions = pngDimensions(file);
+            if (dimensions.width !== width || dimensions.height < 844) throw new Error(`SCREENSHOT_DIMENSIONS:${file}:${dimensions.width}x${dimensions.height}`);
+          }
+          NODE
           cat > "$EVIDENCE_DIR/comparison/README.md" <<TXT
           # Visual comparison — $ORDER_ID
 
@@ -127,12 +154,12 @@ jobs:
           - corrected/mobile-390x844.png
           - corrected/desktop-1440x900.png
 
-          Gate: preserve 015 transparency, restore the useful main chart, avoid technical-document appearance, walls of text, raw enums and invalid dates. Deployment remains prohibited until explicit owner visual approval.
+          Gate: preserve 015 transparency, restore the useful main chart, avoid technical-document appearance, walls of text, raw enums and invalid dates. No deployment or Cloudflare mutation occurred in this run.
           TXT
           sha256sum "$EVIDENCE_DIR"/comparison/*/*.png > "$EVIDENCE_DIR/comparison/sha256.txt"
           git diff --check
           git status --short > "$EVIDENCE_DIR/git-status.txt"
-          printf 'ORDER=%s\nVALIDATION=PASS\nVISUAL_EVIDENCE=AVAILABLE\nDEPLOY_COMMAND_COUNT=0\nCLOUDFLARE_MUTATIONS=0\nSTATUS=READY_FOR_OWNER_VISUAL_APPROVAL_NO_DEPLOY\n' "$ORDER_ID" > "$EVIDENCE_DIR/result.txt"
+          printf 'ORDER=%s\nVALIDATION=PASS\nVISUAL_EVIDENCE=AVAILABLE\nDEPLOY_COMMAND_COUNT=0\nCLOUDFLARE_MUTATIONS=0\nSTATUS=READY_FOR_INTERNAL_VISUAL_GATE\n' "$ORDER_ID" > "$EVIDENCE_DIR/result.txt"
 
       - if: always()
         uses: actions/upload-artifact@v4
