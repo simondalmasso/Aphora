@@ -1,0 +1,412 @@
+name: Complete KV Free V3
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/complete-kv-free-v3-trigger]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sos-sf-workers-production
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/v3-full-014-continuation
+  OWNER_VISUAL_CONFIRMATION: WORKERS_FREE_CONFIRMED
+  BUDGET_MAX_USD: '0'
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+  SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+  MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
+  REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+  INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+  INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+  PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+  SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+  SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
+
+jobs:
+  complete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify and stage exact product patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          test "$OWNER_VISUAL_CONFIRMATION" = WORKERS_FREE_CONFIRMED
+          test "$BUDGET_MAX_USD" = 0
+          mkdir -p "$EVIDENCE_DIR"
+          printf 'mode=FINAL_V3_FULL_014_CONTINUATION\nsource_sha=%s\n' "$GITHUB_SHA" > "$EVIDENCE_DIR/execution-mode.txt"
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib
+
+          expected_parts = [
+              'b419d7560457640f637118680a38d4ffadc4788f0eadd328b560575be4781fa0',
+              '2840b4dddf6674c1fd166da1cb26d7b614c7b6e09ba387206d920a5716decdba',
+              '388d8b6ab894c8d4e3adffd18614866d6bf12b7cdb37d99d240969a93a20cb9a',
+              'd776c0cbf06354d274c8392d927a3a7882f4f3beeef65b0a5ef5ccfac749ef91',
+              '469b0461f75f597ed5d96f4cc0f0900ed34000b45be5f64ee2e99b4aa8e08cc7',
+              '8cfdebc50bf5f72777065fcf23f7493b44993ab5ca830bd8f94e72599aca7450',
+              '254e05a4b0205134e29e842505325e44703f85c341202c4be62f76248e9ecbe3',
+              'a616c5134f6dc1924472bee8f7725396eb3c96b2ae4e5026cee5bc33544df894',
+          ]
+          chunks = []
+          report = []
+          for index, expected in enumerate(expected_parts):
+              data = Path(f'.github/v3-full-014-parts/part{index:02d}').read_text().strip()
+              actual = hashlib.sha256(data.encode()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
+              chunks.append(data)
+              report.append(f'part{index:02d}_sha256={actual}')
+          encoded = ''.join(chunks)
+          transport = hashlib.sha256(encoded.encode()).hexdigest()
+          if transport != '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd':
+              raise SystemExit(f'PATCH_TRANSPORT_HASH_MISMATCH:{transport}')
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          content = hashlib.sha256(patch).hexdigest()
+          if content != '4be4aaf954713be50e56eee4de6118ec767cf6b9b63b86189c3fc6a0b5f20400':
+              raise SystemExit(f'PATCH_CONTENT_HASH_MISMATCH:{content}')
+          Path('/tmp/base.patch').write_bytes(patch)
+          report.extend([f'base_transport_sha256={transport}', f'base_content_sha256={content}'])
+
+          entries = [
+              ('.github/v3-full-014-provision-fix.patch.b64', False,
+               'bf4117c00120a1118737d8568d10202515610d1dc78b5384da8ce49e95e4bf98',
+               'e89bdaef77e5e8c9111a6bfc506e2fb63995869fa5d65d09819a92d41313ae4c', '/tmp/provision.patch'),
+              ('.github/v3-full-014-kv-free.patch.gz.b64', True,
+               'bce53f835ef4ce8770a1bd1464ebcc2d420ef18cd031a035fb8b7e30be023b89',
+               'a3b10732ca4c6d4f4cd6649c162ae589c28641c74b050eb0acfa6cd8fd79d220', '/tmp/kv.patch'),
+              ('.github/v3-full-014-owner-free.patch.gz.b64', True,
+               'd73cf0eccb264c72fe7c5cab152de1863a342078db831955a7ca6d145fc30c4f',
+               '038c7c2ce368a320029c76ecfaba3c532e325a3f6a91a63c3222ac2b3791c5e3', '/tmp/owner.patch'),
+              ('.github/v3-full-014-kv-probe-fix.patch.gz.b64', True,
+               '36cebd6148ba5b67b170d255253a66302f2f63c0a542b0f2f1fb5f0a0e4eb3d0',
+               'c2fe2a1b4ad293c0a34d2c8ce323e6f40632f2efbb607f6b3f459bc6badd2715', '/tmp/probe.patch'),
+          ]
+          for path, compressed, expected_transport, expected_content, output in entries:
+              encoded = Path(path).read_text().strip()
+              actual_transport = hashlib.sha256(encoded.encode()).hexdigest()
+              if actual_transport != expected_transport:
+                  raise SystemExit(f'TRANSPORT_HASH_MISMATCH:{path}:{actual_transport}')
+              data = base64.b64decode(encoded, validate=True)
+              if compressed:
+                  data = gzip.decompress(data)
+              actual_content = hashlib.sha256(data).hexdigest()
+              if actual_content != expected_content:
+                  raise SystemExit(f'CONTENT_HASH_MISMATCH:{path}:{actual_content}')
+              Path(output).write_bytes(data)
+              report.extend([f'{path}:transport={actual_transport}', f'{path}:content={actual_content}'])
+          Path('artifacts/v3-full-014-continuation/patch-verification.txt').write_text('\n'.join(report) + '\n')
+          PY
+          git apply --index /tmp/base.patch
+          git apply --index /tmp/provision.patch
+          git apply --index /tmp/kv.patch
+          git apply --index /tmp/owner.patch
+          git apply --index /tmp/probe.patch
+          git diff --cached --check
+          git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
+          if grep -RInE 'REPORTS_BUCKET|r2_buckets|/r2/' src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc; then
+            echo 'R2_OPERATIONAL_DEPENDENCY_PRESENT' >&2
+            exit 1
+          fi
+
+      - name: Generate deterministic deployed-source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess
+          excluded = ('.github/', 'artifacts/', 'dist/')
+          marker = 'public/source-provenance.json'
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
+          digest = hashlib.sha256()
+          included = 0
+          for raw in sorted(item for item in paths if item):
+              path = raw.decode()
+              if path == marker or path.startswith(excluded):
+                  continue
+              data = Path(path).read_bytes()
+              digest.update(path.encode())
+              digest.update(b'\0')
+              digest.update(len(data).to_bytes(8, 'big'))
+              digest.update(data)
+              included += 1
+          payload = {
+              'schemaVersion': 1,
+              'orderId': 'SOS-SF-OWNER-V3-FULL-COMPLETION-014',
+              'productTreeSha256': digest.hexdigest(),
+              'includedFileCount': included,
+              'deploymentRunId': os.environ['GITHUB_RUN_ID'],
+          }
+          Path(marker).write_text(json.dumps(payload, sort_keys=True, separators=(',', ':')) + '\n')
+          Path(os.environ['EVIDENCE_DIR'], 'source-provenance-local.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
+          PY
+          git add public/source-provenance.json
+          git diff --cached --check
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint clean
+        run: npm run lint -- --max-warnings=0
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Contract tests
+        run: npm run test:contract
+
+      - name: Build and budgets
+        run: npm run build
+
+      - name: Worker tests with real local D1 and KV
+        run: npm run test:worker
+
+      - name: E2E desktop mobile offline privacy and quota fail-closed
+        run: npm run test:e2e
+
+      - name: Validate owner configuration names
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$ ]] || exit 2
+          node - <<'NODE'
+          const values = String(process.env.SOS_SF_OPERATOR_EMAILS || '').split(',').map((value) => value.trim()).filter(Boolean);
+          if (!values.length || !values.every((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
+            throw new Error('SOS_SF_OPERATOR_EMAILS_REQUIRED_OR_INVALID');
+          }
+          NODE
+          printf 'google_client_id_present=true\noperator_allowlist_present=true\n' > "$EVIDENCE_DIR/protected-config-presence.txt"
+
+      - name: Prove owner-confirmed Workers Free and D1 KV authority
+        run: node scripts/verify-cloudflare-zero-cost.mjs
+
+      - name: Ensure persistent session signing secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${SESSION_SIGNING_KEY:-}" ]; then
+            test "${#SESSION_SIGNING_KEY}" -ge 32
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=github_actions_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+            exit 0
+          fi
+          npx wrangler secret list --config wrangler.jsonc > /tmp/worker-secrets-list.json
+          if node -e "const x=require('/tmp/worker-secrets-list.json');process.exit(x.some(v=>v.name==='SESSION_SIGNING_KEY')?0:1)"; then
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=existing_cloudflare_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+          else
+            generated="$(openssl rand -base64 48 | tr -d '\n')"
+            echo "::add-mask::$generated"
+            echo "SESSION_SIGNING_KEY=$generated" >> "$GITHUB_ENV"
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=generated_once_for_deploy' > "$EVIDENCE_DIR/session-secret-state.txt"
+          fi
+
+      - name: Reuse or verify D1 and KV Free
+        id: provision
+        run: node scripts/provision-cloudflare.mjs
+
+      - name: Require private runtime readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ steps.provision.outputs.resources_ready }}' = true
+          test '${{ steps.provision.outputs.private_ready }}' = true
+          cat "$EVIDENCE_DIR/deployment-mode.json"
+
+      - name: Apply idempotent remote D1 migrations
+        run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/d1-migrations.log"
+
+      - name: Verify remote D1 schema and security columns
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows') ORDER BY name" --json > "$EVIDENCE_DIR/d1-schema.json"
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "PRAGMA table_info(auth_sessions)" --json > "$EVIDENCE_DIR/d1-auth-session-columns.json"
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "PRAGMA table_info(report_photos)" --json > "$EVIDENCE_DIR/d1-report-photo-columns.json"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const rows = (file) => {
+            const value = JSON.parse(fs.readFileSync(path.join(process.env.EVIDENCE_DIR, file), 'utf8'));
+            return (Array.isArray(value) ? value : [value]).flatMap((entry) => entry.results || entry.result?.[0]?.results || []);
+          };
+          const names = new Set(rows('d1-schema.json').map((entry) => entry.name));
+          for (const name of ['auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows']) {
+            if (!names.has(name)) throw new Error(`D1_TABLE_MISSING:${name}`);
+          }
+          const sessionColumns = new Set(rows('d1-auth-session-columns.json').map((entry) => entry.name));
+          for (const name of ['csrf_hash','last_seen_at','rotated_from','revoked_at']) {
+            if (!sessionColumns.has(name)) throw new Error(`D1_COLUMN_MISSING:${name}`);
+          }
+          const photoColumns = new Set(rows('d1-report-photo-columns.json').map((entry) => entry.name));
+          if (!photoColumns.has('storage_backend')) throw new Error('D1_COLUMN_MISSING:storage_backend');
+          NODE
+
+      - name: Verify bounded remote KV binary operations
+        env:
+          KV_NAMESPACE_ID: ${{ steps.provision.outputs.kv_namespace_id }}
+        run: node scripts/verify-kv-namespace.mjs
+
+      - name: Deploy exact Worker once with D1 KV and protected secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .worker-secrets.json 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+          printf 'DEPLOY_COMMAND_COUNT=1\n' > "$EVIDENCE_DIR/deploy-count.txt"
+          npx wrangler versions list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-versions.json" || true
+          npx wrangler deployments list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-deployments.json" || true
+
+      - name: Verify production public private and source matrix
+        env:
+          EXPECT_PRIVATE_FEATURES: 'true'
+          WRITE_PROOF: '1'
+        run: npm run verify:remote -- "$DEPLOYMENT_URL"
+
+      - name: Verify production auth and privacy negative paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="$DEPLOYMENT_URL"
+          session_status="$(curl -fsS -o /tmp/session.json -w '%{http_code}' "$origin/api/session?verify=$GITHUB_RUN_ID")"
+          test "$session_status" = 200
+          node -e "const x=require('/tmp/session.json');const d=x.data||x;if(d.enabled!==true||d.authenticated!==false)process.exit(1)"
+          private_status="$(curl -sS -o /tmp/private.json -w '%{http_code}' "$origin/api/private/reports?verify=$GITHUB_RUN_ID")"
+          test "$private_status" = 401
+          auth_status="$(curl -sS -o /tmp/auth-negative.json -w '%{http_code}' -X POST "$origin/api/auth/google?verify=$GITHUB_RUN_ID" -H "Origin: $origin" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' --data '{"credential":"invalid"}')"
+          test "$auth_status" = 401
+          printf 'session_anonymous=200\nprivate_unauthenticated=401\ninvalid_google_credential=401\n' > "$EVIDENCE_DIR/auth-negative-production.txt"
+
+      - name: Verify deployed source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, subprocess
+          excluded = ('.github/', 'artifacts/', 'dist/')
+          marker = 'public/source-provenance.json'
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
+          digest = hashlib.sha256()
+          included = 0
+          for raw in sorted(item for item in paths if item):
+              path = raw.decode()
+              if path == marker or path.startswith(excluded):
+                  continue
+              data = Path(path).read_bytes()
+              digest.update(path.encode())
+              digest.update(b'\0')
+              digest.update(len(data).to_bytes(8, 'big'))
+              digest.update(data)
+              included += 1
+          Path('/tmp/local-product-tree.json').write_text(json.dumps({'productTreeSha256': digest.hexdigest(), 'includedFileCount': included}, sort_keys=True))
+          PY
+          curl -fsS "$DEPLOYMENT_URL/source-provenance.json?verify=$GITHUB_RUN_ID" > /tmp/remote-source-provenance.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const local = JSON.parse(fs.readFileSync('/tmp/local-product-tree.json', 'utf8'));
+          const committed = JSON.parse(fs.readFileSync('public/source-provenance.json', 'utf8'));
+          const remote = JSON.parse(fs.readFileSync('/tmp/remote-source-provenance.json', 'utf8'));
+          for (const candidate of [committed, remote]) {
+            if (candidate.orderId !== 'SOS-SF-OWNER-V3-FULL-COMPLETION-014') throw new Error('SOURCE_PROVENANCE_ORDER_MISMATCH');
+            if (candidate.productTreeSha256 !== local.productTreeSha256) throw new Error('SOURCE_PROVENANCE_DIGEST_MISMATCH');
+            if (candidate.includedFileCount !== local.includedFileCount) throw new Error('SOURCE_PROVENANCE_FILE_COUNT_MISMATCH');
+          }
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/cloudflare-github-drift.txt`, `github_product_tree_sha256=${local.productTreeSha256}\ncloudflare_product_tree_sha256=${remote.productTreeSha256}\nCLOUDFLARE_GITHUB_DRIFT=false\n`);
+          NODE
+
+      - name: Synchronize exact deployed product source and set TERMINAL
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -f --ignore-unmatch \
+            .github/v3-full-014.patch.gz.b64 \
+            .github/v3-full-014-provision-fix.patch.b64 \
+            .github/v3-full-014-kv-free.patch.gz.b64 \
+            .github/v3-full-014-owner-free.patch.gz.b64 \
+            .github/v3-full-014-kv-probe-fix.patch.gz.b64 \
+            .github/cloudflare-auth-diagnostic-trigger \
+            .github/export-effective-v3-trigger \
+            .github/validate-kv-free-v3-trigger \
+            .github/deploy-workers-kv-free.yml.gz.b64 \
+            .github/install-deploy-workers-kv-free-trigger \
+            .github/verify-kv-binary-probe-trigger \
+            .github/verify-kv-binary-direct-trigger \
+            .github/export-deploy-workers-probe-fix-trigger \
+            .github/complete-kv-free-v3-trigger
+          git rm -rf --ignore-unmatch .github/v3-full-014-parts
+          printf 'MODE=TERMINAL_V3_FULL_014\nOWNER_VISUAL_CONFIRMATION=WORKERS_FREE_CONFIRMED\nBUDGET_MAX_USD=0\n' > .github/arq-v3-deploy-trigger
+          git add .github/arq-v3-deploy-trigger public/source-provenance.json
+          git diff --cached --check
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m 'feat: complete SOS SF V3 D1 KV Free runtime 014'
+          git push origin HEAD:arq/visual-dashboard-v3
+          git rev-parse HEAD | tee "$EVIDENCE_DIR/synchronized-source-sha.txt"
+
+      - name: Finalize evidence manifest
+        if: always()
+        run: node scripts/finalize-evidence.mjs || true
+
+      - name: Publish non-closing issue checkpoint
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '## SOS-SF-OWNER-V3-FULL-COMPLETION-014 — KV Free continuation checkpoint'
+            echo
+            printf -- '- Run: `%s`\n' "$GITHUB_RUN_ID"
+            printf -- '- Source SHA at start: `%s`\n' "$GITHUB_SHA"
+            printf -- '- Job status: `%s`\n' '${{ job.status }}'
+            echo '- Storage: D1 Free + Workers KV Free'
+            echo '- R2 and billing endpoints: prohibited and unused'
+            echo '- Budget: USD 0'
+            echo '- main: untouched; issue remains open; AUD_HOLD=ACTIVE'
+          } > /tmp/issue-comment.md
+          gh issue comment 8 --repo "$GITHUB_REPOSITORY" --body-file /tmp/issue-comment.md || true
+
+      - name: Remove generated sensitive material
+        if: always()
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/worker-secrets-list.json /tmp/base.patch /tmp/provision.patch /tmp/kv.patch /tmp/owner.patch /tmp/probe.patch /tmp/session.json /tmp/private.json /tmp/auth-negative.json /tmp/local-product-tree.json /tmp/remote-source-provenance.json
+
+      - name: Upload completion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-v3-full-014-continuation-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
