@@ -29,12 +29,22 @@ jobs:
           git merge-base --is-ancestor f75116c75b88e2dd0852a55f6b7d3d07011c7051 HEAD
 
           parts=.github/visual-product-restore-a-parts
-          echo 'f2abe447839d199de07fc085c4914ec46361f04d4beb5d3bff335847dcf028eb  '"$parts/part00" | sha256sum -c -
+          echo 'bbae3999dd1d2d6037efd4207ceef245e0996ee62183de1e6e104fad682b76d9  '"$parts/part00" | sha256sum -c -
           echo 'f8650306162cad82e8086e1766dec5c45133b28c382575d237e88c3f3b303dcc  '"$parts/part01" | sha256sum -c -
           echo '5bfe679d5b181c3df1ac6522e6747018713cff037770f85ef6f4b38dd83c79b8  '"$parts/part02" | sha256sum -c -
           echo 'e387002f65c753ddfb4ee20288dc446dbe4078cee45409870a7a51ab7a4e04fb  '"$parts/part03" | sha256sum -c -
 
-          cat "$parts"/part00 "$parts"/part01 "$parts"/part02 "$parts"/part03 > /tmp/restore-a.patch.gz.b64
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/visual-product-restore-a-parts/part00').read_text()
+          if len(source) != 9899:
+              raise SystemExit(f'unexpected part00 size: {len(source)}')
+          corrected = source[:4488] + 'x' + source[4488:]
+          Path('/tmp/part00').write_text(corrected)
+          PY
+          echo 'f2abe447839d199de07fc085c4914ec46361f04d4beb5d3bff335847dcf028eb  /tmp/part00' | sha256sum -c -
+
+          cat /tmp/part00 "$parts"/part01 "$parts"/part02 "$parts"/part03 > /tmp/restore-a.patch.gz.b64
           echo '9bbe3721312536b179228f043e7e3ec490118647a4d319de803a459513f8dfcd  /tmp/restore-a.patch.gz.b64' | sha256sum -c -
           base64 --decode /tmp/restore-a.patch.gz.b64 > /tmp/restore-a.patch.gz
           echo 'c711783de2e9c01bdec6a1bb155fcf277e43b54028b2cc5f25a15c11c6f5f719  /tmp/restore-a.patch.gz' | sha256sum -c -
