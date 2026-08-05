@@ -1,0 +1,67 @@
+name: Apply Visual Product Restore A
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/apply-visual-product-restore-a-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sos-sf-015-apply-visual-product-restore-a
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify transport and apply exact correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "arq/visual-dashboard-v3"
+          git merge-base --is-ancestor f75116c75b88e2dd0852a55f6b7d3d07011c7051 HEAD
+
+          parts=.github/visual-product-restore-a-parts
+          echo 'f2abe447839d199de07fc085c4914ec46361f04d4beb5d3bff335847dcf028eb  '"$parts/part00" | sha256sum -c -
+          echo 'f8650306162cad82e8086e1766dec5c45133b28c382575d237e88c3f3b303dcc  '"$parts/part01" | sha256sum -c -
+          echo '5bfe679d5b181c3df1ac6522e6747018713cff037770f85ef6f4b38dd83c79b8  '"$parts/part02" | sha256sum -c -
+          echo 'e387002f65c753ddfb4ee20288dc446dbe4078cee45409870a7a51ab7a4e04fb  '"$parts/part03" | sha256sum -c -
+
+          cat "$parts"/part00 "$parts"/part01 "$parts"/part02 "$parts"/part03 > /tmp/restore-a.patch.gz.b64
+          echo '9bbe3721312536b179228f043e7e3ec490118647a4d319de803a459513f8dfcd  /tmp/restore-a.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/restore-a.patch.gz.b64 > /tmp/restore-a.patch.gz
+          echo 'c711783de2e9c01bdec6a1bb155fcf277e43b54028b2cc5f25a15c11c6f5f719  /tmp/restore-a.patch.gz' | sha256sum -c -
+          gunzip -c /tmp/restore-a.patch.gz > /tmp/restore-a.patch
+          echo '764ad588def8c8ba5f908ccfb2afa31e75cf08d693d880c4f25eb03f0e387feb  /tmp/restore-a.patch' | sha256sum -c -
+
+          git apply --check --exclude=.github/workflows/validate-visual-product-restore-a.yml /tmp/restore-a.patch
+          git apply --exclude=.github/workflows/validate-visual-product-restore-a.yml /tmp/restore-a.patch
+          git diff --check
+
+          test -f OWNER_CORRECTION_SOS_SF_015_VISUAL_PRODUCT_RESTORE_A.md
+          grep -q 'SOS-SF-015-VISUAL-PRODUCT-RESTORE-A' AGENTS.md
+          grep -q 'Río Paraná — Santa Fe' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -q 'Río Salado — Santo Tomé' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -q 'Ver tabla de mediciones' src/client/components/ui/HydroSeriesChart.tsx
+          ! grep -q 'LevelRuler' src/client/features/hydro/HydrometricMonitoring.tsx
+          ! grep -q 'Con conexión' src/client/app/AppShell.tsx
+          ! grep -q 'TerritoryTimeline\|EmergencyLifecycle\|ServiceStatus' src/client/app/DashboardPage.tsx
+          ! grep -RInE 'REPORTS_BUCKET|r2_buckets|/r2/' src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc
+
+          git rm -r "$parts"
+          git rm .github/apply-visual-product-restore-a-trigger
+          git add AGENTS.md src tests
+          git diff --cached --check
+          git status --short
+
+          git config user.name 'sos-sf-automation'
+          git config user.email 'sos-sf-automation@users.noreply.github.com'
+          git commit -m 'feat: restore visual hydrometric product after 015'
+          git push origin HEAD:arq/visual-dashboard-v3
