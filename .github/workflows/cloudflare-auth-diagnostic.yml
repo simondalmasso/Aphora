@@ -113,19 +113,34 @@ jobs:
           });
           NODE
 
-      - name: Verify Wrangler authentication path
+      - name: Verify Wrangler authentication paths
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts/cloudflare-auth-diagnostic
+          secret_status=FAIL
+          d1_status=FAIL
+          secret_exit=0
+          d1_exit=0
+
           if npx wrangler secret list --config wrangler.jsonc >/tmp/wrangler-secret-list.json 2>/tmp/wrangler-secret-list.stderr; then
-            printf '{"wranglerSecretList":"PASS"}\n' > artifacts/cloudflare-auth-diagnostic/wrangler.json
+            secret_status=PASS
           else
-            code=$?
-            printf '{"wranglerSecretList":"FAIL","exitCode":%s}\n' "$code" > artifacts/cloudflare-auth-diagnostic/wrangler.json
-            sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/wrangler-secret-list.stderr > artifacts/cloudflare-auth-diagnostic/wrangler.stderr.txt
+            secret_exit=$?
+            sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/wrangler-secret-list.stderr > artifacts/cloudflare-auth-diagnostic/wrangler-secret-list.stderr.txt
           fi
+
+          if npx wrangler d1 list --json >/tmp/wrangler-d1-list.json 2>/tmp/wrangler-d1-list.stderr; then
+            d1_status=PASS
+          else
+            d1_exit=$?
+            sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/wrangler-d1-list.stderr > artifacts/cloudflare-auth-diagnostic/wrangler-d1-list.stderr.txt
+          fi
+
+          printf '{"wranglerSecretList":"%s","wranglerSecretListExitCode":%s,"wranglerD1List":"%s","wranglerD1ListExitCode":%s}\n' \
+            "$secret_status" "$secret_exit" "$d1_status" "$d1_exit" \
+            > artifacts/cloudflare-auth-diagnostic/wrangler.json
           cat artifacts/cloudflare-auth-diagnostic/wrangler.json
 
       - uses: actions/upload-artifact@v4
