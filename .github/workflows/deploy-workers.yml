@@ -1,5 +1,5 @@
 name: Deploy Workers
-# V3-014 preflight: exact patch verification, full gates and storage provisioning; no deploy.
+# V3-014 preflight: exact segmented patch, full gates and storage provisioning; no deploy.
 
 on:
   workflow_dispatch:
@@ -42,31 +42,48 @@ jobs:
 
       - name: Assert bounded preflight mode
         run: |
-          grep -q '^MODE=PREFLIGHT_V3_FULL_014$' .github/arq-v3-deploy-trigger
+          grep -q '^MODE=PREFLIGHT_V3_FULL_014_R2$' .github/arq-v3-deploy-trigger
           test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
 
-      - name: Verify and apply exact product patch
+      - name: Verify and apply exact segmented product patch
         run: |
           mkdir -p "$EVIDENCE_DIR"
           python - <<'PY'
           from pathlib import Path
           import base64, gzip, hashlib
-          source = Path('.github/v3-full-014.patch.gz.b64')
-          encoded = source.read_text().strip()
-          encoded = encoded.replace('33bp3nY3nY982f7Jfs', '33bp3nY982f7Jfs', 1)
-          expected_b64 = '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd'
+          expected_parts = [
+              'b419d7560457640f637118680a38d4ffadc4788f0eadd328b560575be4781fa0',
+              '2840b4dddf6674c1fd166da1cb26d7b614c7b6e09ba387206d920a5716decdba',
+              '388d8b6ab894c8d4e3adffd18614866d6bf12b7cdb37d99d240969a93a20cb9a',
+              'd776c0cbf06354d274c8392d927a3a7882f4f3beeef65b0a5ef5ccfac749ef91',
+              '469b0461f75f597ed5d96f4cc0f0900ed34000b45be5f64ee2e99b4aa8e08cc7',
+              '8cfdebc50bf5f72777065fcf23f7493b44993ab5ca830bd8f94e72599aca7450',
+              '254e05a4b0205134e29e842505325e44703f85c341202c4be62f76248e9ecbe3',
+              'a616c5134f6dc1924472bee8f7725396eb3c96b2ae4e5026cee5bc33544df894',
+          ]
+          parts = []
+          report = []
+          for index, expected in enumerate(expected_parts):
+              path = Path(f'.github/v3-full-014-parts/part{index:02d}')
+              data = path.read_text().strip()
+              actual = hashlib.sha256(data.encode()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
+              parts.append(data)
+              report.append(f'part{index:02d}_sha256={actual}')
+          encoded = ''.join(parts)
           actual_b64 = hashlib.sha256(encoded.encode()).hexdigest()
+          expected_b64 = '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd'
           if actual_b64 != expected_b64:
               raise SystemExit(f'PATCH_TRANSPORT_HASH_MISMATCH:{actual_b64}')
-          compressed = base64.b64decode(encoded, validate=True)
-          patch = gzip.decompress(compressed)
-          expected_patch = '4be4aaf954713be50e56eee4de6118ec767cf6b9b63b86189c3fc6a0b5f20400'
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
           actual_patch = hashlib.sha256(patch).hexdigest()
+          expected_patch = '4be4aaf954713be50e56eee4de6118ec767cf6b9b63b86189c3fc6a0b5f20400'
           if actual_patch != expected_patch:
               raise SystemExit(f'PATCH_CONTENT_HASH_MISMATCH:{actual_patch}')
           Path('/tmp/v3-full-014.patch').write_bytes(patch)
-          Path('artifacts/v3-full-014-preflight/patch-verification.txt').write_text(
-              f'base64_sha256={actual_b64}\npatch_sha256={actual_patch}\n', encoding='utf-8')
+          report.extend([f'base64_sha256={actual_b64}', f'patch_sha256={actual_patch}'])
+          Path('artifacts/v3-full-014-preflight/patch-verification.txt').write_text('\n'.join(report)+'\n', encoding='utf-8')
           PY
           git apply --index /tmp/v3-full-014.patch
           git diff --cached --check
