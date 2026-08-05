@@ -288,3 +288,225 @@ dialog::backdrop { background: rgba(16,42,67,.62); }
 @media (forced-colors: active) {
   .freshness-badge, .classification, .status-symbol { border: 1px solid CanvasText; }
 }
+
+/* SOS-SF-015-VISUAL-PRODUCT-RESTORE-A */
+:root {
+  --max: 1240px;
+  --radius-lg: 22px;
+  --shadow-soft: 0 18px 55px rgba(20, 42, 62, .08);
+  --hydro-bg: #071b2c;
+  --hydro-surface: #0b263b;
+  --hydro-line: #67d6ff;
+  --hydro-muted: #a9c0cf;
+}
+
+.app-header { background: rgba(255,255,255,.96); backdrop-filter: blur(14px); }
+.header-inner { min-height: 64px; padding-block: 8px; }
+.brand-mark { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(145deg, var(--blue-900), #1a5c86); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+.brand small { margin-top: 2px; }
+.connection-state--offline { min-height: 38px; }
+.button, .ui-icon-button { border-radius: 12px; }
+.button--alert { display: inline-grid; place-items: center; min-height: 46px; background: #8d1f19; color: white; text-decoration: none; white-space: nowrap; }
+.button--alert:hover { background: #671713; color: white; }
+
+.dashboard { padding-top: 18px; gap: 16px; }
+.dashboard > section { border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); }
+.refresh-status { border-radius: 12px; }
+.section-heading { margin-bottom: 14px; }
+.section-heading h2 { letter-spacing: -.025em; }
+
+.official-alert {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(210px, .72fr) minmax(260px, .95fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px !important;
+  border-top: 0 !important;
+  border-left: 6px solid var(--blue-700) !important;
+  box-shadow: none !important;
+}
+.official-alert--attention { border-left-color: #b77a00 !important; background: #fffaf0 !important; }
+.official-alert--critical { border-left-color: var(--danger) !important; background: #fff4f2 !important; }
+.official-alert__copy h1 { margin: 0; color: var(--blue-950); font-size: clamp(1.3rem, 2.1vw, 1.75rem); line-height: 1.1; letter-spacing: -.025em; }
+.official-alert__copy > p:last-child, .official-alert__area { margin: 6px 0 0; color: var(--muted); }
+.official-alert__times, .official-alert__check { display: grid; gap: 8px; font-size: .86rem; }
+.official-alert__times span, .official-alert__check { display: grid; }
+.official-alert__times strong, .official-alert__check strong { color: var(--blue-950); font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+.official-alert__instruction { padding: 12px 14px; border-radius: 14px; background: rgba(230,129,40,.11); }
+.official-alert__instruction p { margin: 4px 0 0; font-weight: 650; }
+
+.situation-summary { padding: 22px !important; }
+.situation-summary__heading { align-items: center; }
+.situation-summary__lead { margin: 0; max-width: 82ch; font-size: 1.03rem; }
+.situation-facts { display: grid; grid-template-columns: .8fr .8fr 1.65fr; gap: 10px; margin-top: 15px; }
+.situation-facts > div { min-height: 88px; padding: 13px 14px; border-radius: 15px; background: var(--blue-050); display: grid; align-content: start; gap: 4px; }
+.situation-facts span { color: var(--muted); font-size: .77rem; font-weight: 700; text-transform: uppercase; letter-spacing: .045em; }
+.situation-facts strong { line-height: 1.3; }
+.situation-facts small { color: var(--muted); }
+.situation-facts__action { background: #eaf3f8 !important; border-left: 4px solid var(--blue-700); }
+.situation-limit { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #fff8dd; color: #5c4800; font-size: .88rem; }
+
+.dashboard > .hydrometric-section {
+  padding: clamp(20px, 3vw, 32px) !important;
+  border: 1px solid rgba(255,255,255,.08);
+  background: radial-gradient(circle at 92% 4%, rgba(47,119,164,.27), transparent 28%), linear-gradient(150deg, var(--hydro-bg), #0b2a40 66%, #0d334d);
+  color: white;
+  box-shadow: 0 24px 70px rgba(6, 27, 44, .24);
+}
+.hydrometric-section .section-kicker { color: #79d7f6; }
+.hydrometric-section__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 22px; margin-bottom: 18px; }
+.hydrometric-section__heading h2 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.45rem); letter-spacing: -.04em; }
+.hydrometric-section__heading p:last-child { margin: 6px 0 0; color: var(--hydro-muted); }
+.station-selector { display: inline-flex; flex-wrap: wrap; gap: 5px; padding: 5px; border: 1px solid rgba(255,255,255,.13); border-radius: 15px; background: rgba(255,255,255,.06); }
+.station-selector button { min-height: 42px; padding: 8px 13px; border: 0; border-radius: 11px; background: transparent; color: #c7dae5; font-weight: 720; cursor: pointer; }
+.station-selector button[aria-selected="true"] { background: white; color: var(--blue-950); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+
+.primary-station { padding: 18px; border: 1px solid rgba(255,255,255,.12); border-radius: 20px; background: rgba(3,15,25,.38); }
+.primary-station__header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+.primary-station__header > div > span, .primary-station__header p { color: var(--hydro-muted); font-size: .82rem; }
+.primary-station__header h3 { margin: 2px 0 0; font-size: clamp(1.25rem, 2.4vw, 1.8rem); letter-spacing: -.03em; }
+.primary-station__header p { margin: 4px 0 0; }
+.hydrometric-section .freshness-badge { color: white; border-color: rgba(255,255,255,.23); background: rgba(255,255,255,.09); }
+.hydrometric-section .freshness-badge--actualizado { color: #d5fff0; border-color: rgba(99,196,159,.6); background: rgba(39,118,89,.26); }
+.hydrometric-section .freshness-badge--actualizacion_demorada { color: #fff1b3; border-color: rgba(245,197,66,.65); background: rgba(139,95,0,.28); }
+.hydrometric-section .freshness-badge--desactualizado { color: #ffd4c4; border-color: rgba(230,129,40,.65); background: rgba(117,59,0,.34); }
+.primary-station__metrics { display: grid; grid-template-columns: 1.2fr repeat(3, 1fr); gap: 8px; margin: 15px 0 12px; }
+.primary-station__metrics > div { min-height: 78px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,.07); display: grid; align-content: center; gap: 3px; }
+.primary-station__metrics span { color: var(--hydro-muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; }
+.primary-station__metrics strong { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.primary-station__metrics > div:first-child strong { font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1; }
+.primary-station__metrics small { font-size: .42em; font-weight: 650; color: var(--hydro-muted); }
+
+.hydrometric-section .hydro-chart { margin-top: 0; padding: 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 18px; background: rgba(1,11,19,.52); overflow: hidden; }
+.hydrometric-section .hydro-chart svg { display: block; width: 100%; max-height: none; min-width: 0; overflow: visible; touch-action: pan-y; }
+.hydro-chart__meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; padding: 2px 5px 8px; color: var(--hydro-muted); font-size: .76rem; }
+.hydro-chart__meta span { display: flex; flex-wrap: wrap; gap: 5px; }
+.hydro-chart__meta strong { color: white; }
+.hydro-chart__plot { fill: rgba(7,31,48,.92); stroke: rgba(255,255,255,.08); }
+.hydrometric-section .hydro-chart__grid { stroke: rgba(198,222,235,.17); stroke-width: 1; }
+.hydrometric-section .hydro-chart__grid--vertical { stroke-dasharray: 3 6; }
+.hydrometric-section .hydro-chart__axis-label, .hydrometric-section .hydro-chart__unit { fill: #a9c0cf; font-size: 11px; }
+.hydrometric-section .hydro-chart__line { fill: none; stroke: var(--hydro-line); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 5px rgba(103,214,255,.24)); }
+.hydrometric-section .hydro-chart__point { fill: #dff7ff; stroke: #0f6f9c; stroke-width: 2; }
+.hydrometric-section .hydro-chart__point--active { fill: white; stroke: #67d6ff; stroke-width: 4; }
+.hydrometric-section .hydro-chart__threshold { stroke-width: 1.5; stroke-dasharray: 7 5; }
+.hydrometric-section .hydro-chart__threshold--normal { stroke: #65cda6; }
+.hydrometric-section .hydro-chart__threshold--vigilancia { stroke: #f5c542; }
+.hydrometric-section .hydro-chart__threshold--alerta { stroke: #f49a75; }
+.hydrometric-section .hydro-chart__threshold--evacuacion { stroke: #ff6c7d; }
+.hydro-chart__threshold-label-bg { fill: rgba(5,22,35,.88); }
+.hydrometric-section .hydro-chart__threshold-label { fill: #eaf5fb; font-size: 10px; font-weight: 650; }
+.hydro-chart__gap-pattern { stroke: rgba(255,255,255,.16); stroke-width: 1; }
+.hydro-chart__gap text { fill: #b8cbd6; font-size: 11px; font-weight: 700; }
+.hydro-chart__tooltip line { stroke: rgba(255,255,255,.58) !important; stroke-dasharray: 4 4; }
+.hydro-chart__tooltip rect { fill: rgba(2,14,23,.96); stroke: rgba(103,214,255,.65); }
+.hydrometric-section .hydro-chart__tooltip text { fill: white; font-size: 10px; }
+.hydro-chart__readout { min-height: 24px; margin: 2px 5px 0; color: #d8e7ef; font-size: .8rem; }
+.hydrometric-section .data-table-disclosure { margin: 6px 4px 0; }
+.hydrometric-section .data-table-disclosure summary { color: #bfeeff; }
+.hydrometric-section .data-table-disclosure .table-scroll { margin-top: 8px; border-radius: 12px; background: white; }
+.hydrometric-section .data-table-disclosure table { color: var(--ink); }
+.hydrometric-section .data-table-disclosure th { background: #eaf3f8; }
+.hydro-chart--unavailable > p { color: var(--hydro-muted); }
+
+.secondary-station { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 18px; align-items: center; margin-top: 12px; padding: 15px 16px; border: 1px solid rgba(255,255,255,.12); border-radius: 17px; background: rgba(255,255,255,.065); }
+.secondary-station h3 { margin: 0; font-size: 1.12rem; }
+.secondary-station p { margin: 3px 0 0; color: var(--hydro-muted); }
+.secondary-station__reading { display: grid; text-align: right; }
+.secondary-station__reading strong { font-size: 1.7rem; font-variant-numeric: tabular-nums; }
+.secondary-station__reading small { font-size: .55em; }
+.secondary-station__reading span { color: var(--hydro-muted); font-size: .76rem; }
+.hydrometric-section .secondary-station .button--secondary { border-color: rgba(255,255,255,.26); background: rgba(255,255,255,.09); color: white; }
+
+.safety-actions { padding: 22px !important; }
+.safety-actions .section-heading { margin-bottom: 12px; }
+.action-origin { border-radius: 15px; }
+.emergency-callout { border-width: 1px; border-radius: 14px; }
+.contact-grid a { border-radius: 13px; transition: transform .15s ease, box-shadow .15s ease; }
+.contact-grid a:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(16,42,67,.1); }
+.report-action { padding: 17px; border: 1px solid var(--line); border-radius: 15px; background: var(--blue-050); }
+
+.source-access { display: flex; justify-content: space-between; align-items: center; gap: 22px; padding: 18px 22px !important; box-shadow: none !important; }
+.source-access h2 { margin: 0; color: var(--blue-950); font-size: 1.3rem; }
+.source-access p:last-child { margin: 4px 0 0; max-width: 80ch; color: var(--muted); }
+.source-access .button { flex: none; }
+
+.details-dialog { width: min(1120px, calc(100vw - 24px)); }
+.dialog-lead { max-width: 88ch; color: var(--muted); }
+.source-group { margin-top: 28px !important; }
+.source-group > h3 { padding-bottom: 8px; border-bottom: 2px solid var(--blue-100); }
+.source-organization { margin: 18px 0; }
+.source-organization h4 { margin: 0 0 8px; color: var(--blue-950); }
+.source-organization table { min-width: 900px; }
+.classification { border-radius: 999px; padding: 4px 8px; letter-spacing: 0; text-transform: none; }
+.technical-disclosure { margin-top: 16px; padding: 0 16px 14px; border: 1px solid var(--line); border-radius: 14px; }
+.technical-disclosure summary { min-height: 52px; display: flex; align-items: center; cursor: pointer; color: var(--blue-950); font-weight: 750; }
+.technical-grid { display: grid; grid-template-columns: .7fr 1.3fr; gap: 16px; }
+.technical-grid > div { padding: 14px; border-radius: 12px; background: var(--blue-050); }
+.technical-grid h3 { margin-top: 0; }
+.technical-timeline { list-style: none; padding: 0; }
+.technical-timeline li { display: grid; grid-template-columns: 150px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.technical-timeline p { margin: 3px 0; }
+.technical-timeline time { color: var(--muted); font-size: .8rem; }
+
+@media (max-width: 980px) {
+  .official-alert { grid-template-columns: 1fr 1fr; }
+  .official-alert__instruction { grid-column: 1 / -1; }
+  .official-alert .button { justify-self: start; }
+  .hydrometric-section__heading { display: grid; }
+  .station-selector { justify-self: start; }
+  .primary-station__metrics { grid-template-columns: repeat(2, 1fr); }
+  .technical-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .app-header { position: sticky; }
+  .header-inner { min-height: 58px; padding: 7px 12px; }
+  .brand-mark { width: 38px; height: 38px; }
+  .brand small { display: none; }
+  .dashboard { padding: 10px 10px 34px; gap: 11px; }
+  .dashboard > section { border-radius: 17px; }
+  .official-alert { grid-template-columns: 1fr; padding: 15px !important; gap: 11px; }
+  .official-alert__instruction { grid-column: auto; }
+  .official-alert__times { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .official-alert .button { width: 100%; }
+  .situation-summary { padding: 16px !important; }
+  .situation-summary__heading { align-items: flex-start; }
+  .situation-facts { grid-template-columns: 1fr 1fr; }
+  .situation-facts__action { grid-column: 1 / -1; }
+  .dashboard > .hydrometric-section { padding: 16px !important; }
+  .hydrometric-section__heading { gap: 12px; margin-bottom: 13px; }
+  .station-selector { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .station-selector button { padding-inline: 8px; font-size: .78rem; }
+  .primary-station { padding: 12px; }
+  .primary-station__header { display: grid; gap: 10px; }
+  .primary-station__header .freshness-badge { justify-self: start; }
+  .primary-station__metrics { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .primary-station__metrics > div { min-height: 70px; }
+  .hydrometric-section .hydro-chart { padding: 7px; }
+  .hydro-chart__meta { display: grid; }
+  .hydrometric-section .hydro-chart svg { min-width: 0 !important; }
+  .hydrometric-section .hydro-chart__axis-label { font-size: 10px; }
+  .secondary-station { grid-template-columns: 1fr auto; gap: 10px; }
+  .secondary-station .button { grid-column: 1 / -1; width: 100%; }
+  .safety-actions { padding: 16px !important; }
+  .contact-grid { grid-template-columns: repeat(3,1fr); }
+  .contact-grid a:first-child { grid-column: auto; }
+  .report-action { display: grid; }
+  .source-access { display: grid; padding: 16px !important; }
+  .source-access .button { width: 100%; }
+  .detail-list dl { grid-template-columns: 1fr 1fr; }
+  .technical-timeline li { grid-template-columns: 1fr; gap: 3px; }
+}
+
+@media (max-width: 420px) {
+  .official-alert__times { grid-template-columns: 1fr; }
+  .situation-facts { grid-template-columns: 1fr; }
+  .situation-facts__action { grid-column: auto; }
+  .station-selector { grid-template-columns: 1fr; }
+  .primary-station__metrics { grid-template-columns: 1fr 1fr; }
+  .primary-station__metrics > div:first-child { grid-column: 1 / -1; }
+  .contact-grid { grid-template-columns: repeat(2,1fr); }
+  .contact-grid a:first-child { grid-column: 1 / -1; }
+  .detail-list dl { grid-template-columns: 1fr; }
+}

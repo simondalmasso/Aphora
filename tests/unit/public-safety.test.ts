@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertVerificationState, classificationForSource, dataStatusForFreshness, freshnessFor, highestFreshness, timelineFor } from '../../src/domain/public-safety';
+import { alertVerificationState, classificationForSource, dataStatusForFreshness, formatHumanAge, formatLocalDateTime, freshnessFor, highestFreshness, isPublicTimestamp, timelineFor } from '../../src/domain/public-safety';
 import type { HydrologicalSystem, OfficialAlert, Source } from '../../src/domain/snapshot';
 
 const now = new Date('2026-08-05T12:00:00.000Z');
@@ -37,4 +37,14 @@ describe('public safety semantics', () => {
     expect(events.some((event) => event.type === 'SOURCE_DEGRADED')).toBe(true);
     expect(events).toHaveLength(3);
   });
+  it('never exposes Unix epoch dates and renders age in public language', () => {
+    expect(isPublicTimestamp('1970-01-01T00:00:00.000Z')).toBe(false);
+    expect(formatLocalDateTime('1970-01-01T00:00:00.000Z')).toBe('Sin fecha disponible');
+    expect(formatLocalDateTime(null)).toBe('Sin fecha disponible');
+    expect(formatHumanAge('2026-08-05T11:59:30.000Z', now.toISOString())).toBe('hace menos de un minuto');
+    expect(formatHumanAge('2026-08-05T11:15:00.000Z', now.toISOString())).toBe('hace 45 min');
+    expect(formatHumanAge('2026-08-05T09:00:00.000Z', now.toISOString())).toBe('hace 3 horas');
+    expect(formatHumanAge('2026-08-02T12:00:00.000Z', now.toISOString())).toBe('hace 3 días');
+  });
+
 });

@@ -1,6 +1,13 @@
 import type { AlertVerificationState, DataStatus, FeedClassification, FreshnessState, HydrologicalSystem, OfficialAlert, Source, TimelineEvent } from './snapshot';
 
 export const LOCAL_TIME_ZONE = 'America/Argentina/Cordoba';
+const EARLIEST_PUBLIC_TIMESTAMP = Date.UTC(2000, 0, 1);
+
+export function isPublicTimestamp(value: string | null | undefined): value is string {
+  if (!value) return false;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && parsed >= EARLIEST_PUBLIC_TIMESTAMP;
+}
 
 export function freshnessFor(observedAt: string | null | undefined, now: Date, delayedMs: number, staleMs: number): FreshnessState {
   if (!observedAt || !Number.isFinite(Date.parse(observedAt))) return 'NO_DISPONIBLE';
@@ -62,7 +69,7 @@ export function timelineFor(systems: readonly HydrologicalSystem[], alerts: read
 }
 
 export function formatLocalDateTime(value: string | null | undefined): string {
-  if (!value || !Number.isFinite(Date.parse(value))) return 'Sin fecha disponible';
+  if (!isPublicTimestamp(value)) return 'Sin fecha disponible';
   return new Intl.DateTimeFormat('es-AR', {
     timeZone: LOCAL_TIME_ZONE,
     dateStyle: 'short',
@@ -72,6 +79,17 @@ export function formatLocalDateTime(value: string | null | undefined): string {
 }
 
 export function ageMinutes(value: string | null | undefined, now: string): number | null {
-  if (!value || !Number.isFinite(Date.parse(value)) || !Number.isFinite(Date.parse(now))) return null;
+  if (!isPublicTimestamp(value) || !isPublicTimestamp(now)) return null;
   return Math.max(0, Math.floor((Date.parse(now) - Date.parse(value)) / 60_000));
+}
+
+export function formatHumanAge(value: string | null | undefined, now: string): string {
+  const minutes = ageMinutes(value, now);
+  if (minutes === null) return 'antigüedad no disponible';
+  if (minutes < 1) return 'hace menos de un minuto';
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `hace ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} ${days === 1 ? 'día' : 'días'}`;
 }

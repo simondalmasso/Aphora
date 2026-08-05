@@ -1,59 +1,51 @@
 import type { OfficialAlert, Snapshot } from '../../../domain/snapshot';
-import { ageMinutes, formatLocalDateTime } from '../../../domain/public-safety';
+import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety';
 
 function statusContent(snapshot: Snapshot): { title: string; detail: string; level: 'critical' | 'attention' | 'neutral'; role?: 'alert' } {
   switch (snapshot.alertStatus) {
     case 'ALERTA_OFICIAL_ACTIVA':
       return { title: 'Alerta oficial activa', detail: 'Hay una advertencia oficial vigente que incluye a Santa Fe.', level: 'critical', role: 'alert' };
     case 'SIN_ALERTAS_OFICIALES_DETECTADAS':
-      return { title: 'Sin alertas oficiales detectadas', detail: 'El canal automático de alertas fue consultado y está vigente. Esto no equivale a ausencia de riesgo.', level: 'neutral' };
+      return { title: 'Sin alertas oficiales detectadas', detail: 'El canal automático fue consultado y continúa vigente. Esto no equivale a ausencia de riesgo.', level: 'neutral' };
     case 'VERIFICACION_DE_ALERTAS_DEGRADADA':
-      return { title: 'Verificación de alertas demorada', detail: 'El canal automático responde con información cuya vigencia es limitada. Verificá la fuente oficial.', level: 'attention' };
+      return { title: 'Verificación de alertas demorada', detail: 'La consulta automática tiene vigencia limitada. Confirmá la situación en el canal oficial.', level: 'attention' };
     default:
-      return { title: 'Fuentes de alertas no disponibles', detail: 'No es posible confirmar automáticamente si existen alertas vigentes. Consultá los canales oficiales.', level: 'attention', role: 'alert' };
+      return { title: 'No se pudieron verificar alertas', detail: 'No es posible confirmar automáticamente si existen alertas vigentes. Consultá los canales oficiales.', level: 'attention', role: 'alert' };
   }
 }
 
-function AlertCard({ alert, generatedAt }: { readonly alert: OfficialAlert; readonly generatedAt: string }) {
-  const age = ageMinutes(alert.sent, generatedAt);
-  return <article className="official-alert-card">
-    <div className="official-alert-card__meta">
-      <span>{alert.sender}</span>
-      <span>{alert.lifecycle === 'UPDATED' ? 'Actualizada' : alert.lifecycle === 'CANCELLED' ? 'Cancelada' : alert.lifecycle === 'EXPIRED' ? 'Vencida' : 'Activa'}</span>
+function ActiveAlert({ alert, generatedAt }: { readonly alert: OfficialAlert; readonly generatedAt: string }) {
+  return <>
+    <div className="official-alert__copy">
+      <p className="section-kicker">Alerta oficial</p>
+      <h1 id="official-alert-title">{alert.headline}</h1>
+      <p className="official-alert__area">{alert.area || 'Área no especificada por el organismo'}</p>
     </div>
-    <h2>{alert.headline}</h2>
-    <dl className="alert-facts">
-      <div><dt>Área</dt><dd>{alert.area || 'Área no especificada por el emisor'}</dd></div>
-      <div><dt>Emitida</dt><dd>{formatLocalDateTime(alert.sent)}{age === null ? '' : ` · hace ${age} min`}</dd></div>
-      <div><dt>Válida hasta</dt><dd>{formatLocalDateTime(alert.expires)}</dd></div>
-      <div><dt>Nivel</dt><dd>{alert.severity} · {alert.urgency} · {alert.certainty}</dd></div>
-    </dl>
-    {alert.instruction && <div className="official-instruction"><strong>Instrucción del organismo</strong><p>{alert.instruction}</p></div>}
-    {!alert.instruction && alert.description && <p>{alert.description}</p>}
-    <a className="text-link" href={alert.sourceUrl} target="_blank" rel="noreferrer">Ver aviso en la fuente oficial</a>
-  </article>;
+    <div className="official-alert__times">
+      <span><strong>Emitida</strong>{formatLocalDateTime(alert.sent)} · {formatHumanAge(alert.sent, generatedAt)}</span>
+      <span><strong>Vigente hasta</strong>{formatLocalDateTime(alert.expires)}</span>
+    </div>
+    <div className="official-alert__instruction">
+      <strong>Qué indica el organismo</strong>
+      <p>{alert.instruction || alert.description || 'Consultá el aviso oficial para conocer las indicaciones vigentes.'}</p>
+    </div>
+    <a className="button button--alert" href={alert.sourceUrl} target="_blank" rel="noreferrer">Ver alerta oficial</a>
+  </>;
 }
 
-export function OfficialAlertPanel({ snapshot, onSources }: { readonly snapshot: Snapshot; readonly onSources: (opener?: HTMLButtonElement | null) => void }) {
+export function OfficialAlertPanel({ snapshot }: { readonly snapshot: Snapshot }) {
   const content = statusContent(snapshot);
-  const active = (snapshot.alerts ?? []).filter((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'));
+  const active = (snapshot.alerts ?? []).find((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'));
   const source = snapshot.sources.find((item) => item.id === 'smn-alerts');
   return <section className={`official-alert official-alert--${content.level}`} aria-labelledby="official-alert-title" role={content.role}>
-    <div className="official-alert__status">
-      <span className="status-symbol" aria-hidden="true">{content.level === 'critical' ? '!' : content.level === 'attention' ? 'i' : '✓'}</span>
-      <div>
+    {active ? <ActiveAlert alert={active} generatedAt={snapshot.generatedAt}/> : <>
+      <div className="official-alert__copy">
         <p className="section-kicker">Alertas oficiales</p>
         <h1 id="official-alert-title">{content.title}</h1>
         <p>{content.detail}</p>
       </div>
-    </div>
-    {active.map((alert) => <AlertCard key={alert.identifier} alert={alert} generatedAt={snapshot.generatedAt}/>) }
-    <div className="official-alert__footer">
-      <div>
-        <span>Última consulta</span>
-        <strong>{formatLocalDateTime(source?.fetchedAt ?? source?.lastCheckedAt ?? snapshot.generatedAt)}</strong>
-      </div>
-      <button type="button" className="button button--secondary" onClick={(event) => onSources(event.currentTarget)}>Fuentes y actualización</button>
-    </div>
+      <div className="official-alert__check"><strong>Última consulta</strong><span>{formatLocalDateTime(source?.fetchedAt ?? source?.lastCheckedAt ?? snapshot.generatedAt)}</span></div>
+      {source?.url && <a className="button button--secondary" href={source.url} target="_blank" rel="noreferrer">Abrir canal oficial</a>}
+    </>}
   </section>;
 }

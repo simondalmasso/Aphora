@@ -24,7 +24,7 @@ export default function App() {
   const openReport = (opener?: HTMLButtonElement | null) => { if (opener) reportOpenerRef.current = opener; setReportOpen(true); };
   const openMessages = () => { setMessagesSeen(true); setMessagesOpen(true); };
 
-  return <AppShell online={online} refreshing={refreshing} unread={unread} messagesButtonRef={messagesButtonRef} reportButtonRef={reportOpenerRef} onRefresh={() => void refresh()} onMessages={openMessages} onReport={openReport} disclaimer={snapshot.emergencyDisclaimer}>
+  return <AppShell online={online} refreshing={refreshing} unread={unread} messagesButtonRef={messagesButtonRef} onRefresh={() => void refresh()} onMessages={openMessages} disclaimer={snapshot.emergencyDisclaimer}>
     <DashboardPage snapshot={snapshot} refreshing={refreshing} refreshError={refreshError} sourcesButtonRef={sourcesOpenerRef} reportButtonRef={reportOpenerRef} onSources={openSources} onReport={openReport}/>
     <DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={closeSources}/>
     <ReportDialog snapshot={snapshot} online={online} open={reportOpen} openerRef={reportOpenerRef} onClose={() => setReportOpen(false)}/>
