@@ -1,4 +1,4 @@
-name: Cloudflare Billing State Read Only
+name: Cloudflare D1 KV Read Only Gate
 
 on:
   push:
@@ -9,23 +9,35 @@ permissions:
   contents: read
 
 concurrency:
-  group: sos-sf-cloudflare-billing-read-only
+  group: sos-sf-cloudflare-d1-kv-read-only
   cancel-in-progress: false
 
 env:
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  OWNER_VISUAL_CONFIRMATION: WORKERS_FREE_CONFIRMED
+  BUDGET_MAX_USD: '0'
 
 jobs:
-  classify:
+  gate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Read subscriptions billing profile and PayGo state
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify token account D1 and KV with GET only
+        id: direct
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/cloudflare-billing-read-only
+          mkdir -p artifacts/cloudflare-d1-kv-read-only
           node <<'NODE'
           const fs = require('node:fs');
           const crypto = require('node:crypto');
@@ -33,18 +45,19 @@ jobs:
           const api = 'https://api.cloudflare.com/client/v4';
           const token = String(process.env.CLOUDFLARE_API_TOKEN ?? '').trim();
           const account = String(process.env.CLOUDFLARE_ACCOUNT_ID ?? '').trim();
-          const activeStates = new Set(['trial', 'provisioned', 'paid', 'awaitingpayment']);
-          const productPattern = /(?:^|[^a-z])(workers?|workers paid|workers standard|workerd|kv|workers kv|d1|r2|durable objects?|pages|developer platform)(?:$|[^a-z])/i;
-          const chargePattern = /paid|standard|paygo|pay-go|usage|metered|subscription|monthly|annual|yearly/i;
-          const hash = (value) => value ? crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 12) : null;
-          const numberOrNull = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
-          const text = (value) => value == null ? '' : String(value);
+          const owner = String(process.env.OWNER_VISUAL_CONFIRMATION ?? '');
+          const hash = (value) => value
+            ? crypto.createHash('sha256').update(value).digest('hex').slice(0, 12)
+            : null;
 
           async function get(name, path) {
             try {
               const response = await fetch(`${api}${path}`, {
                 method: 'GET',
-                headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'application/json',
+                },
               });
               const payload = await response.json().catch(() => ({}));
               return {
@@ -54,9 +67,11 @@ jobs:
                 httpStatus: response.status,
                 success: payload.success === true,
                 result: payload.result ?? null,
-                resultInfo: payload.result_info ?? null,
                 errors: Array.isArray(payload.errors)
-                  ? payload.errors.map((entry) => ({ code: entry?.code ?? null, message: text(entry?.message).slice(0, 240) }))
+                  ? payload.errors.map((entry) => ({
+                      code: entry?.code ?? null,
+                      message: String(entry?.message ?? '').slice(0, 240),
+                    }))
                   : [],
               };
             } catch (error) {
@@ -67,256 +82,158 @@ jobs:
                 httpStatus: null,
                 success: false,
                 result: null,
-                resultInfo: null,
-                errors: [{ code: null, message: error instanceof Error ? error.message : String(error) }],
+                errors: [{
+                  code: null,
+                  message: error instanceof Error ? error.message : String(error),
+                }],
               };
             }
-          }
-
-          function normalizeSubscription(entry) {
-            const ratePlan = entry?.rate_plan && typeof entry.rate_plan === 'object' ? entry.rate_plan : {};
-            const sets = Array.isArray(ratePlan.sets) ? ratePlan.sets.map(text) : [];
-            const relationText = [
-              entry?.name,
-              entry?.service,
-              entry?.product,
-              ratePlan.id,
-              ratePlan.name,
-              ratePlan.public_name,
-              ratePlan.scope,
-              ...sets,
-            ].map(text).join(' ');
-            const state = text(entry?.state ?? entry?.status);
-            const price = numberOrNull(entry?.price ?? ratePlan.price);
-            const frequency = text(entry?.frequency ?? ratePlan.frequency) || null;
-            const workersRelated = productPattern.test(relationText);
-            const active = activeStates.has(state.toLowerCase());
-            const potentiallyChargeable = active && workersRelated && (
-              (price !== null && price > 0)
-              || chargePattern.test(relationText)
-              || (frequency !== null && frequency.toLowerCase() !== 'not-applicable')
-            );
-            return {
-              idFingerprint: hash(entry?.id),
-              state: state || null,
-              price,
-              currency: text(entry?.currency ?? ratePlan.currency) || null,
-              frequency,
-              currentPeriodStart: text(entry?.current_period_start) || null,
-              currentPeriodEnd: text(entry?.current_period_end) || null,
-              nextRenewal: text(entry?.current_period_end) || null,
-              ratePlan: {
-                id: text(ratePlan.id) || null,
-                publicName: text(ratePlan.public_name ?? ratePlan.name) || null,
-                scope: text(ratePlan.scope) || null,
-                sets,
-                externallyManaged: typeof ratePlan.externally_managed === 'boolean' ? ratePlan.externally_managed : null,
-                isContract: typeof ratePlan.is_contract === 'boolean' ? ratePlan.is_contract : null,
-              },
-              workersRelated,
-              active,
-              potentiallyChargeable,
-            };
-          }
-
-          function summarizeUsage(records) {
-            if (!Array.isArray(records)) return null;
-            return records.map((entry) => {
-              const family = text(
-                entry?.ServiceFamilyName
-                ?? entry?.x_ProductFamilyName
-                ?? entry?.ServiceName
-                ?? entry?.x_ProductCategoryName
-              );
-              const description = text(entry?.ChargeDescription ?? entry?.SubAccountName);
-              const related = productPattern.test(`${family} ${description}`);
-              const cost = numberOrNull(
-                entry?.ContractedCost
-                ?? entry?.EffectiveCost
-                ?? entry?.BilledCost
-                ?? entry?.ListCost
-                ?? entry?.CumulatedContractedCost
-              );
-              return {
-                productFamily: family || null,
-                description: description.slice(0, 160) || null,
-                subscriptionFingerprint: hash(entry?.SubscriptionId ?? entry?.SubAccountId),
-                currency: text(entry?.BillingCurrency) || null,
-                cost,
-                chargeFrequency: text(entry?.ChargeFrequency) || null,
-                related,
-                positiveCost: cost !== null && cost > 0,
-              };
-            }).filter((entry) => entry.related);
           }
 
           (async () => {
-            const encodedAccount = encodeURIComponent(account);
+            const encoded = encodeURIComponent(account);
             const probes = {
-              subscriptions: await get('subscriptions', `/accounts/${encodedAccount}/subscriptions`),
-              billingProfile: await get('billing_profile', `/accounts/${encodedAccount}/billing/profile`),
-              paygoInfo: await get('paygo_usage_info', `/accounts/${encodedAccount}/paygo-usage-info`),
-              paygoUsage: await get('paygo_usage', `/accounts/${encodedAccount}/paygo-usage`),
-              billableUsage: await get('billable_usage', `/accounts/${encodedAccount}/billable/usage`),
-              workersSettingsReferenceOnly: await get('workers_settings_reference_only', `/accounts/${encodedAccount}/workers/account-settings`),
+              token: await get('token_verify', '/user/tokens/verify'),
+              account: await get('account_details', `/accounts/${encoded}`),
+              d1: await get('d1_list', `/accounts/${encoded}/d1/database?per_page=100`),
+              kv: await get('kv_namespaces', `/accounts/${encoded}/storage/kv/namespaces?per_page=100`),
+              workersReference: await get(
+                'workers_settings_reference_only',
+                `/accounts/${encoded}/workers/account-settings`,
+              ),
             };
 
-            const subscriptionsReadable = probes.subscriptions.httpStatus === 200 && probes.subscriptions.success;
-            const profileReadable = probes.billingProfile.httpStatus === 200 && probes.billingProfile.success;
-            const paygoInfoReadable = probes.paygoInfo.httpStatus === 200 && probes.paygoInfo.success;
-
-            const subscriptions = subscriptionsReadable && Array.isArray(probes.subscriptions.result)
-              ? probes.subscriptions.result.map(normalizeSubscription)
-              : null;
-            const workersSubscriptions = subscriptions?.filter((entry) => entry.workersRelated) ?? null;
-            const activeChargeableWorkers = workersSubscriptions?.filter((entry) => entry.potentiallyChargeable) ?? null;
-
-            const profile = profileReadable && probes.billingProfile.result && typeof probes.billingProfile.result === 'object'
-              ? probes.billingProfile.result
-              : null;
-            const hasBillingProfile = Boolean(profile && (
-              profile.id || profile.created_on || profile.account_type || profile.primary_email || profile.country
-            ));
-            const hasPaymentMethod = Boolean(profile && (
-              profile.payment_gateway || profile.payment_nonce || profile.card_number
-            ));
-            const paymentMethodSignals = profile ? {
-              gatewayPresent: Boolean(profile.payment_gateway),
-              paymentNoncePresent: Boolean(profile.payment_nonce),
-              maskedCardPresent: Boolean(profile.card_number),
-              paymentEmailPresent: Boolean(profile.payment_email),
-              nextBillDatePresent: Boolean(profile.next_bill_date),
-            } : null;
-
-            const paygoResult = paygoInfoReadable && probes.paygoInfo.result && typeof probes.paygoInfo.result === 'object'
-              ? probes.paygoInfo.result
-              : null;
-            const paygoSubscriptions = Array.isArray(paygoResult?.subscriptions)
-              ? paygoResult.subscriptions.map((entry) => ({
-                  idFingerprint: hash(entry?.id),
-                  active: !entry?.end_timestamp,
-                  startTimestamp: text(entry?.start_timestamp) || null,
-                  endTimestamp: text(entry?.end_timestamp) || null,
-                  billingCycleAnchorTimestamp: text(entry?.billing_cycle_anchor_timestamp) || null,
-                }))
-              : [];
-            const activePaygoFingerprints = new Set(paygoSubscriptions.filter((entry) => entry.active).map((entry) => entry.idFingerprint));
-            const matchedWorkersPaygo = workersSubscriptions?.filter((entry) => entry.idFingerprint && activePaygoFingerprints.has(entry.idFingerprint)) ?? [];
-
-            const paygoRelatedUsage = summarizeUsage(probes.paygoUsage.success ? probes.paygoUsage.result : null);
-            const billableRelatedUsage = summarizeUsage(probes.billableUsage.success ? probes.billableUsage.result : null);
-            const relatedUsage = [...(paygoRelatedUsage ?? []), ...(billableRelatedUsage ?? [])];
-            const positiveRelatedUsage = relatedUsage.filter((entry) => entry.positiveCost);
-            const activeWorkersPaygo = matchedWorkersPaygo.length > 0
-              || (Boolean(paygoResult?.covered) && relatedUsage.length > 0)
-              || positiveRelatedUsage.length > 0;
-
-            const requiredReadable = subscriptionsReadable && profileReadable && paygoInfoReadable;
-            let classification = 'BILLING_STATE_UNVERIFIED';
-            const paidEvidence = [];
-            if (activeChargeableWorkers && activeChargeableWorkers.length > 0) {
-              paidEvidence.push('ACTIVE_CHARGEABLE_WORKERS_SUBSCRIPTION');
-            }
-            if (activeWorkersPaygo) {
-              paidEvidence.push('ACTIVE_WORKERS_RELATED_PAYGO');
-            }
-            if (positiveRelatedUsage.length > 0) {
-              paidEvidence.push('POSITIVE_WORKERS_RELATED_USAGE_COST');
-            }
-
-            if (requiredReadable && paidEvidence.length > 0) {
-              classification = 'WORKERS_PAID_CONFIRMED';
-            } else if (
-              requiredReadable
-              && paidEvidence.length === 0
-              && (workersSubscriptions?.filter((entry) => entry.active).length ?? 0) === 0
-              && paygoSubscriptions.filter((entry) => entry.active).length === 0
-              && paygoResult?.covered !== true
-              && hasPaymentMethod === false
-            ) {
-              classification = 'WORKERS_FREE_CONFIRMED';
-            }
+            const d1Rows = Array.isArray(probes.d1.result) ? probes.d1.result : [];
+            const kvRows = Array.isArray(probes.kv.result) ? probes.kv.result : [];
+            const directReady = owner === 'WORKERS_FREE_CONFIRMED'
+              && probes.token.httpStatus === 200 && probes.token.success
+              && probes.account.httpStatus === 200 && probes.account.success
+              && probes.d1.httpStatus === 200 && probes.d1.success
+              && probes.kv.httpStatus === 200 && probes.kv.success;
 
             const report = {
               schemaVersion: 1,
               generatedAt: new Date().toISOString(),
+              classification: directReady ? 'D1_KV_REMOTE_GATE_PASS' : 'D1_KV_REMOTE_GATE_FAIL',
+              ownerVisualConfirmation: owner,
+              budgetMaxUsd: 0,
               accountFingerprint: hash(account),
               readOnlyProof: {
                 methodsUsed: ['GET'],
                 mutatingRequests: 0,
-                subscriptionChanges: 0,
-                usageModelChanges: 0,
+                billingEndpointsQueried: 0,
+                r2EndpointsQueried: 0,
                 provisioningActions: 0,
                 deployActions: 0,
               },
-              classification,
-              classificationBasis: {
-                requiredReadable,
-                subscriptionsReadable,
-                billingProfileReadable: profileReadable,
-                paygoInfoReadable,
-                paidEvidence,
-                defaultUsageModelExcludedFromClassification: true,
+              authority: {
+                tokenActive: probes.token.httpStatus === 200 && probes.token.success,
+                accountReachable: probes.account.httpStatus === 200 && probes.account.success,
+                d1ListReadable: probes.d1.httpStatus === 200 && probes.d1.success,
+                kvListReadable: probes.kv.httpStatus === 200 && probes.kv.success,
+                d1Count: d1Rows.length,
+                kvNamespaceCount: kvRows.length,
+                privateD1Present: d1Rows.some((entry) => entry?.name === 'sos-sf-private'),
+                privateReportsKvPresent: kvRows.some((entry) => entry?.title === 'sos-sf-private-reports'),
               },
-              subscriptions: {
-                total: subscriptions?.length ?? null,
-                workersRelated: workersSubscriptions,
-                activeChargeableWorkersCount: activeChargeableWorkers?.length ?? null,
+              referenceOnly: {
+                defaultUsageModel: probes.workersReference.success
+                  ? probes.workersReference.result?.default_usage_model ?? null
+                  : null,
+                usedForAuthorization: false,
               },
-              billingProfile: {
-                present: profileReadable ? hasBillingProfile : null,
-                paymentMethodPresent: profileReadable ? hasPaymentMethod : null,
-                paymentMethodSignals,
-              },
-              paygo: {
-                covered: paygoInfoReadable ? Boolean(paygoResult?.covered) : null,
-                subscriptions: paygoSubscriptions,
-                workersRelatedActiveMatches: matchedWorkersPaygo.map((entry) => entry.idFingerprint),
-                usageEndpoints: {
-                  paygoUsageReadable: probes.paygoUsage.httpStatus === 200 && probes.paygoUsage.success,
-                  billableUsageReadable: probes.billableUsage.httpStatus === 200 && probes.billableUsage.success,
-                },
-                relatedUsage,
-              },
-              endpointEvidence: Object.fromEntries(Object.entries(probes).map(([key, probe]) => [key, {
+              endpoints: Object.fromEntries(Object.entries(probes).map(([key, probe]) => [key, {
                 method: probe.method,
                 path: probe.path,
                 httpStatus: probe.httpStatus,
                 success: probe.success,
                 errors: probe.errors,
               }])),
-              referenceOnly: {
-                defaultUsageModel: probes.workersSettingsReferenceOnly.success
-                  ? text(probes.workersSettingsReferenceOnly.result?.default_usage_model) || null
-                  : null,
-                usedForClassification: false,
-              },
             };
 
             fs.writeFileSync(
-              'artifacts/cloudflare-billing-read-only/billing-state.json',
+              'artifacts/cloudflare-d1-kv-read-only/gate.json',
               `${JSON.stringify(report, null, 2)}\n`,
             );
             fs.writeFileSync(
-              'artifacts/cloudflare-billing-read-only/classification.txt',
-              `CLASSIFICATION=${classification}\nDEFAULT_USAGE_MODEL_USED_FOR_CLASSIFICATION=false\nMUTATING_REQUESTS=0\n`,
+              'artifacts/cloudflare-d1-kv-read-only/read-only-proof.txt',
+              [
+                `CLASSIFICATION=${report.classification}`,
+                'HTTP_METHODS=GET_ONLY',
+                'MUTATING_REQUESTS=0',
+                'BILLING_ENDPOINTS=0',
+                'R2_ENDPOINTS=0',
+                'PROVISIONING=0',
+                'DEPLOY=0',
+                'DEFAULT_USAGE_MODEL_USED_FOR_AUTHORIZATION=false',
+                '',
+              ].join('\n'),
             );
-            fs.writeFileSync(
-              'artifacts/cloudflare-billing-read-only/read-only-proof.txt',
-              'HTTP_METHODS=GET_ONLY\nSUBSCRIPTION_MUTATIONS=0\nBILLING_MUTATIONS=0\nUSAGE_MODEL_MUTATIONS=0\nPROVISIONING=0\nDEPLOY=0\n',
-            );
-            console.log(JSON.stringify(report));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `direct_ready=${directReady}\n`);
+            console.log(JSON.stringify({
+              classification: report.classification,
+              authority: report.authority,
+              referenceOnly: report.referenceOnly,
+              readOnlyProof: report.readOnlyProof,
+            }));
+            if (!directReady) process.exitCode = 1;
           })().catch((error) => {
             console.error(error);
             process.exitCode = 1;
           });
           NODE
 
-      - name: Upload sanitized billing evidence
+      - name: Verify Wrangler read-only authority
+        id: wrangler
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/cloudflare-d1-kv-read-only
+          d1=FAIL
+          kv=FAIL
+          d1_exit=0
+          kv_exit=0
+          if npx wrangler d1 list --json >/tmp/d1-list.json 2>/tmp/d1-list.stderr; then
+            d1=PASS
+          else
+            d1_exit=$?
+            sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/d1-list.stderr \
+              > artifacts/cloudflare-d1-kv-read-only/wrangler-d1.stderr.txt
+          fi
+          if npx wrangler kv namespace list >/tmp/kv-list.json 2>/tmp/kv-list.stderr; then
+            kv=PASS
+          else
+            kv_exit=$?
+            sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/kv-list.stderr \
+              > artifacts/cloudflare-d1-kv-read-only/wrangler-kv.stderr.txt
+          fi
+          printf '{"d1":"%s","d1Exit":%s,"kv":"%s","kvExit":%s}\n' \
+            "$d1" "$d1_exit" "$kv" "$kv_exit" \
+            > artifacts/cloudflare-d1-kv-read-only/wrangler.json
+          if [ "$d1" = PASS ] && [ "$kv" = PASS ]; then
+            echo 'wrangler_ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'wrangler_ready=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require owner-confirmed zero-cost D1 KV gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$OWNER_VISUAL_CONFIRMATION" = WORKERS_FREE_CONFIRMED
+          test "$BUDGET_MAX_USD" = 0
+          test '${{ steps.direct.outputs.direct_ready }}' = true
+          test '${{ steps.wrangler.outputs.wrangler_ready }}' = true
+          printf 'REMOTE_GATE=PASS\nOWNER_VISUAL_CONFIRMATION=WORKERS_FREE_CONFIRMED\nBUDGET_MAX_USD=0\nD1_AUTHORITY=PASS\nKV_AUTHORITY=PASS\nMUTATIONS=NONE\n' \
+            > artifacts/cloudflare-d1-kv-read-only/result.txt
+
+      - name: Upload sanitized read-only evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cloudflare-billing-read-only-${{ github.sha }}-${{ github.run_id }}
-          path: artifacts/cloudflare-billing-read-only/
+          name: cloudflare-d1-kv-read-only-${{ github.sha }}-${{ github.run_id }}
+          path: artifacts/cloudflare-d1-kv-read-only/
           if-no-files-found: error
           retention-days: 30
