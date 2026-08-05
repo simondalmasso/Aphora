@@ -1,0 +1,52 @@
+name: Apply Visual Product Restore A Fix V2
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/apply-visual-product-restore-a-fix-v2-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sos-sf-015-apply-visual-product-restore-a-fix-v2
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify and apply exact correction fixes
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          git merge-base --is-ancestor f7e2ba278af6e0d1ac3e409b746507b4a4d23132 HEAD
+          transport=.github/visual-product-restore-a-fix-v2.patch.gz.b64
+          echo '2858206ad23f0b66e8b0aecccea57e69129692598eb7ce2aec158899ada5eda2  '"$transport" | sha256sum -c -
+          base64 --decode "$transport" > /tmp/visual-restore-a-fix-v2.patch.gz
+          echo '791ce49c61ed1469d0ecc7afb78d3ce4a0628b43e79d9124b7cb55e87dfb7b55  /tmp/visual-restore-a-fix-v2.patch.gz' | sha256sum -c -
+          gunzip -c /tmp/visual-restore-a-fix-v2.patch.gz > /tmp/visual-restore-a-fix-v2.patch
+          echo '4434a246eb8b2f71d2aeda840dd3641501c2b71619d5b91e1373b3d0c83ddf7c  /tmp/visual-restore-a-fix-v2.patch' | sha256sum -c -
+          git apply --check /tmp/visual-restore-a-fix-v2.patch
+          git apply /tmp/visual-restore-a-fix-v2.patch
+          git diff --check
+
+          grep -q "points(4.57, '2026-08-05T00:00:00.000Z')" tests/e2e/dashboard.spec.ts
+          grep -q "element as HTMLInputElement" tests/e2e/dashboard.spec.ts
+          grep -q "testInfo.project.name !== 'desktop'" tests/e2e/dashboard.spec.ts
+          grep -q 'Disponible y vigente' src/worker/lite.ts
+          grep -q 'Última medición' src/client/features/hydro/HydrometricMonitoring.tsx
+          ! grep -q 'props.refreshError' src/client/app/DashboardPage.tsx
+
+          git rm "$transport" .github/apply-visual-product-restore-a-fix-v2-trigger
+          git add src tests
+          git diff --cached --check
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m 'fix: close visual restore validation gaps'
+          git push origin HEAD:arq/visual-dashboard-v3
