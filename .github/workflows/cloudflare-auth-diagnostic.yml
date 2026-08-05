@@ -30,7 +30,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Verify token, account scope and D1 access without mutation
+      - name: Verify token, account, D1 and R2 without mutation
+        id: direct
         shell: bash
         run: |
           set -euo pipefail
@@ -45,14 +46,14 @@ jobs:
             const token = rawToken.trim();
             const account = rawAccount.trim();
             const api = 'https://api.cloudflare.com/client/v4';
+            const fingerprint = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 12);
 
-            const redact = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 12);
-            async function probe(name, url, bearer) {
+            async function probe(name, url) {
               try {
                 const response = await fetch(url, {
                   method: 'GET',
                   headers: {
-                    Authorization: `Bearer ${bearer}`,
+                    Authorization: `Bearer ${token}`,
                     Accept: 'application/json',
                   },
                 });
@@ -64,7 +65,6 @@ jobs:
                   resultStatus: payload.result?.status ?? null,
                   errorCodes: Array.isArray(payload.errors) ? payload.errors.map((item) => item?.code).filter(Boolean) : [],
                   errorMessages: Array.isArray(payload.errors) ? payload.errors.map((item) => item?.message).filter(Boolean) : [],
-                  messageCodes: Array.isArray(payload.messages) ? payload.messages.map((item) => item?.code).filter(Boolean) : [],
                 };
               } catch (error) {
                 return { name, transportError: error instanceof Error ? error.message : String(error) };
@@ -72,48 +72,44 @@ jobs:
             }
 
             const report = {
-              schemaVersion: 1,
+              schemaVersion: 2,
               generatedAt: new Date().toISOString(),
               tokenPresent: token.length > 0,
               tokenTrimChanged: token !== rawToken,
               tokenLength: token.length,
-              tokenFingerprint: token ? redact(token) : null,
+              tokenFingerprint: token ? fingerprint(token) : null,
               accountPresent: account.length > 0,
               accountTrimChanged: account !== rawAccount,
               accountLength: account.length,
               accountFormatValid: /^[0-9a-f]{32}$/i.test(account),
-              accountFingerprint: account ? redact(account) : null,
+              accountFingerprint: account ? fingerprint(account) : null,
               probes: [],
             };
 
-            report.probes.push(await probe('token_verify_trimmed', `${api}/user/tokens/verify`, token));
-            report.probes.push(await probe('account_token_verify_trimmed', `${api}/accounts/${encodeURIComponent(account)}/tokens/verify`, token));
-            report.probes.push(await probe('account_details_trimmed', `${api}/accounts/${encodeURIComponent(account)}`, token));
-            report.probes.push(await probe('d1_list_trimmed', `${api}/accounts/${encodeURIComponent(account)}/d1/database?per_page=1`, token));
+            report.probes.push(await probe('token_verify', `${api}/user/tokens/verify`));
+            report.probes.push(await probe('account_details', `${api}/accounts/${encodeURIComponent(account)}`));
+            report.probes.push(await probe('d1_list', `${api}/accounts/${encodeURIComponent(account)}/d1/database?per_page=1`));
+            report.probes.push(await probe('r2_bucket_list', `${api}/accounts/${encodeURIComponent(account)}/r2/buckets?per_page=1`));
 
-            if (!report.tokenTrimChanged) {
-              report.probes.push({ name: 'token_verify_raw', sameAsTrimmed: true });
-            } else {
-              report.probes.push(await probe('token_verify_raw', `${api}/user/tokens/verify`, rawToken));
-            }
-            if (!report.accountTrimChanged) {
-              report.probes.push({ name: 'd1_list_raw_account', sameAsTrimmed: true });
-            } else {
-              report.probes.push(await probe('d1_list_raw_account', `${api}/accounts/${encodeURIComponent(rawAccount)}/d1/database?per_page=1`, token));
-            }
+            const byName = Object.fromEntries(report.probes.map((entry) => [entry.name, entry]));
+            report.directD1Ready = byName.d1_list?.httpStatus === 200 && byName.d1_list?.success === true;
+            report.directR2Ready = byName.r2_bucket_list?.httpStatus === 200 && byName.r2_bucket_list?.success === true;
+            report.directReady = report.directD1Ready && report.directR2Ready;
 
             fs.writeFileSync(
               'artifacts/cloudflare-auth-diagnostic/direct-api.json',
               `${JSON.stringify(report, null, 2)}\n`,
             );
             console.log(JSON.stringify(report));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `direct_ready=${report.directReady}\n`);
           })().catch((error) => {
             console.error(error);
             process.exitCode = 1;
           });
           NODE
 
-      - name: Verify Wrangler authentication paths
+      - name: Verify Wrangler D1 and R2 authority
+        id: wrangler
         if: always()
         shell: bash
         run: |
@@ -121,8 +117,10 @@ jobs:
           mkdir -p artifacts/cloudflare-auth-diagnostic
           secret_status=FAIL
           d1_status=FAIL
+          r2_status=FAIL
           secret_exit=0
           d1_exit=0
+          r2_exit=0
 
           if npx wrangler secret list --config wrangler.jsonc >/tmp/wrangler-secret-list.json 2>/tmp/wrangler-secret-list.stderr; then
             secret_status=PASS
@@ -138,10 +136,31 @@ jobs:
             sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/wrangler-d1-list.stderr > artifacts/cloudflare-auth-diagnostic/wrangler-d1-list.stderr.txt
           fi
 
-          printf '{"wranglerSecretList":"%s","wranglerSecretListExitCode":%s,"wranglerD1List":"%s","wranglerD1ListExitCode":%s}\n' \
-            "$secret_status" "$secret_exit" "$d1_status" "$d1_exit" \
+          if npx wrangler r2 bucket list --json >/tmp/wrangler-r2-list.json 2>/tmp/wrangler-r2-list.stderr; then
+            r2_status=PASS
+          else
+            r2_exit=$?
+            sed -E 's/[A-Za-z0-9_-]{20,}/[REDACTED]/g' /tmp/wrangler-r2-list.stderr > artifacts/cloudflare-auth-diagnostic/wrangler-r2-list.stderr.txt
+          fi
+
+          printf '{"wranglerSecretList":"%s","wranglerSecretListExitCode":%s,"wranglerD1List":"%s","wranglerD1ListExitCode":%s,"wranglerR2List":"%s","wranglerR2ListExitCode":%s}\n' \
+            "$secret_status" "$secret_exit" "$d1_status" "$d1_exit" "$r2_status" "$r2_exit" \
             > artifacts/cloudflare-auth-diagnostic/wrangler.json
           cat artifacts/cloudflare-auth-diagnostic/wrangler.json
+          if [ "$d1_status" = PASS ] && [ "$r2_status" = PASS ]; then
+            echo 'wrangler_ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'wrangler_ready=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require D1 and R2 authority
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ steps.direct.outputs.direct_ready }}' = 'true'
+          test '${{ steps.wrangler.outputs.wrangler_ready }}' = 'true'
+          printf 'D1_AUTHORITY=PASS\nR2_AUTHORITY=PASS\n' > artifacts/cloudflare-auth-diagnostic/gate.txt
 
       - uses: actions/upload-artifact@v4
         if: always()
