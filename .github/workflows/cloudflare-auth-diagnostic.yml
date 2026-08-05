@@ -39,79 +39,86 @@ jobs:
           const fs = require('node:fs');
           const crypto = require('node:crypto');
 
-          const rawToken = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
-          const rawAccount = String(process.env.CLOUDFLARE_ACCOUNT_ID ?? '');
-          const token = rawToken.trim();
-          const account = rawAccount.trim();
-          const api = 'https://api.cloudflare.com/client/v4';
+          (async () => {
+            const rawToken = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
+            const rawAccount = String(process.env.CLOUDFLARE_ACCOUNT_ID ?? '');
+            const token = rawToken.trim();
+            const account = rawAccount.trim();
+            const api = 'https://api.cloudflare.com/client/v4';
 
-          const redact = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 12);
-          async function probe(name, url, bearer) {
-            try {
-              const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                  Authorization: `Bearer ${bearer}`,
-                  Accept: 'application/json',
-                },
-              });
-              const payload = await response.json().catch(() => ({}));
-              return {
-                name,
-                httpStatus: response.status,
-                success: payload.success === true,
-                resultStatus: payload.result?.status ?? null,
-                errorCodes: Array.isArray(payload.errors) ? payload.errors.map((item) => item?.code).filter(Boolean) : [],
-                errorMessages: Array.isArray(payload.errors) ? payload.errors.map((item) => item?.message).filter(Boolean) : [],
-                messageCodes: Array.isArray(payload.messages) ? payload.messages.map((item) => item?.code).filter(Boolean) : [],
-              };
-            } catch (error) {
-              return { name, transportError: error instanceof Error ? error.message : String(error) };
+            const redact = (value) => crypto.createHash('sha256').update(value).digest('hex').slice(0, 12);
+            async function probe(name, url, bearer) {
+              try {
+                const response = await fetch(url, {
+                  method: 'GET',
+                  headers: {
+                    Authorization: `Bearer ${bearer}`,
+                    Accept: 'application/json',
+                  },
+                });
+                const payload = await response.json().catch(() => ({}));
+                return {
+                  name,
+                  httpStatus: response.status,
+                  success: payload.success === true,
+                  resultStatus: payload.result?.status ?? null,
+                  errorCodes: Array.isArray(payload.errors) ? payload.errors.map((item) => item?.code).filter(Boolean) : [],
+                  errorMessages: Array.isArray(payload.errors) ? payload.errors.map((item) => item?.message).filter(Boolean) : [],
+                  messageCodes: Array.isArray(payload.messages) ? payload.messages.map((item) => item?.code).filter(Boolean) : [],
+                };
+              } catch (error) {
+                return { name, transportError: error instanceof Error ? error.message : String(error) };
+              }
             }
-          }
 
-          const report = {
-            schemaVersion: 1,
-            generatedAt: new Date().toISOString(),
-            tokenPresent: token.length > 0,
-            tokenTrimChanged: token !== rawToken,
-            tokenLength: token.length,
-            tokenFingerprint: token ? redact(token) : null,
-            accountPresent: account.length > 0,
-            accountTrimChanged: account !== rawAccount,
-            accountLength: account.length,
-            accountFormatValid: /^[0-9a-f]{32}$/i.test(account),
-            accountFingerprint: account ? redact(account) : null,
-            probes: [],
-          };
+            const report = {
+              schemaVersion: 1,
+              generatedAt: new Date().toISOString(),
+              tokenPresent: token.length > 0,
+              tokenTrimChanged: token !== rawToken,
+              tokenLength: token.length,
+              tokenFingerprint: token ? redact(token) : null,
+              accountPresent: account.length > 0,
+              accountTrimChanged: account !== rawAccount,
+              accountLength: account.length,
+              accountFormatValid: /^[0-9a-f]{32}$/i.test(account),
+              accountFingerprint: account ? redact(account) : null,
+              probes: [],
+            };
 
-          report.probes.push(await probe('token_verify_trimmed', `${api}/user/tokens/verify`, token));
-          report.probes.push(await probe('account_token_verify_trimmed', `${api}/accounts/${encodeURIComponent(account)}/tokens/verify`, token));
-          report.probes.push(await probe('account_details_trimmed', `${api}/accounts/${encodeURIComponent(account)}`, token));
-          report.probes.push(await probe('d1_list_trimmed', `${api}/accounts/${encodeURIComponent(account)}/d1/database?per_page=1`, token));
+            report.probes.push(await probe('token_verify_trimmed', `${api}/user/tokens/verify`, token));
+            report.probes.push(await probe('account_token_verify_trimmed', `${api}/accounts/${encodeURIComponent(account)}/tokens/verify`, token));
+            report.probes.push(await probe('account_details_trimmed', `${api}/accounts/${encodeURIComponent(account)}`, token));
+            report.probes.push(await probe('d1_list_trimmed', `${api}/accounts/${encodeURIComponent(account)}/d1/database?per_page=1`, token));
 
-          if (!report.tokenTrimChanged) {
-            report.probes.push({ name: 'token_verify_raw', sameAsTrimmed: true });
-          } else {
-            report.probes.push(await probe('token_verify_raw', `${api}/user/tokens/verify`, rawToken));
-          }
-          if (!report.accountTrimChanged) {
-            report.probes.push({ name: 'd1_list_raw_account', sameAsTrimmed: true });
-          } else {
-            report.probes.push(await probe('d1_list_raw_account', `${api}/accounts/${encodeURIComponent(rawAccount)}/d1/database?per_page=1`, token));
-          }
+            if (!report.tokenTrimChanged) {
+              report.probes.push({ name: 'token_verify_raw', sameAsTrimmed: true });
+            } else {
+              report.probes.push(await probe('token_verify_raw', `${api}/user/tokens/verify`, rawToken));
+            }
+            if (!report.accountTrimChanged) {
+              report.probes.push({ name: 'd1_list_raw_account', sameAsTrimmed: true });
+            } else {
+              report.probes.push(await probe('d1_list_raw_account', `${api}/accounts/${encodeURIComponent(rawAccount)}/d1/database?per_page=1`, token));
+            }
 
-          fs.writeFileSync(
-            'artifacts/cloudflare-auth-diagnostic/direct-api.json',
-            `${JSON.stringify(report, null, 2)}\n`,
-          );
-          console.log(JSON.stringify(report));
+            fs.writeFileSync(
+              'artifacts/cloudflare-auth-diagnostic/direct-api.json',
+              `${JSON.stringify(report, null, 2)}\n`,
+            );
+            console.log(JSON.stringify(report));
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
           NODE
 
       - name: Verify Wrangler authentication path
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p artifacts/cloudflare-auth-diagnostic
           if npx wrangler secret list --config wrangler.jsonc >/tmp/wrangler-secret-list.json 2>/tmp/wrangler-secret-list.stderr; then
             printf '{"wranglerSecretList":"PASS"}\n' > artifacts/cloudflare-auth-diagnostic/wrangler.json
           else
@@ -122,6 +129,7 @@ jobs:
           cat artifacts/cloudflare-auth-diagnostic/wrangler.json
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: cloudflare-auth-diagnostic-${{ github.sha }}-${{ github.run_id }}
           path: artifacts/cloudflare-auth-diagnostic/
