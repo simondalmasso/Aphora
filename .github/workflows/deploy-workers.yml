@@ -1,5 +1,5 @@
 name: Deploy Workers
-# V3-014 source export mode; same canonical workflow, no production action.
+# V3-014 preflight: exact patch verification, full gates and storage provisioning; no deploy.
 
 on:
   workflow_dispatch:
@@ -9,28 +9,152 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: sos-sf-workers-production
   cancel-in-progress: false
 
+env:
+  EVIDENCE_DIR: artifacts/v3-full-014-preflight
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+  SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+  MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
+  REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+  INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+  INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+  PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+  SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+  SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
+
 jobs:
-  source-export:
+  preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 55
     steps:
       - name: Checkout exact SHA
         uses: actions/checkout@v4
-      - name: Assert export mode
-        run: grep -q '^MODE=EXPORT_V3_FULL_014' .github/arq-v3-deploy-trigger
-      - name: Package exact source
+        with:
+          fetch-depth: 0
+
+      - name: Assert bounded preflight mode
         run: |
-          printf '%s\n' "$GITHUB_SHA" > SOURCE_SHA.txt
-          tar --exclude=.git --exclude=node_modules --exclude=artifacts/current-run -czf /tmp/sos-sf-v3-full-014-source.tgz .
-      - name: Upload exact source
+          grep -q '^MODE=PREFLIGHT_V3_FULL_014$' .github/arq-v3-deploy-trigger
+          test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
+
+      - name: Verify and apply exact product patch
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib
+          source = Path('.github/v3-full-014.patch.gz.b64')
+          encoded = source.read_text().strip()
+          encoded = encoded.replace('33bp3nY3nY982f7Jfs', '33bp3nY982f7Jfs', 1)
+          expected_b64 = '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd'
+          actual_b64 = hashlib.sha256(encoded.encode()).hexdigest()
+          if actual_b64 != expected_b64:
+              raise SystemExit(f'PATCH_TRANSPORT_HASH_MISMATCH:{actual_b64}')
+          compressed = base64.b64decode(encoded, validate=True)
+          patch = gzip.decompress(compressed)
+          expected_patch = '4be4aaf954713be50e56eee4de6118ec767cf6b9b63b86189c3fc6a0b5f20400'
+          actual_patch = hashlib.sha256(patch).hexdigest()
+          if actual_patch != expected_patch:
+              raise SystemExit(f'PATCH_CONTENT_HASH_MISMATCH:{actual_patch}')
+          Path('/tmp/v3-full-014.patch').write_bytes(patch)
+          Path('artifacts/v3-full-014-preflight/patch-verification.txt').write_text(
+              f'base64_sha256={actual_b64}\npatch_sha256={actual_patch}\n', encoding='utf-8')
+          PY
+          git apply --index /tmp/v3-full-014.patch
+          git diff --cached --check
+          git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint clean
+        run: npm run lint -- --max-warnings=0
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Contract tests
+        run: npm run test:contract
+      - name: Build and budgets
+        run: npm run build
+      - name: Worker tests with real local D1 and R2
+        run: npm run test:worker
+      - name: E2E desktop mobile offline and no-third-party
+        run: npm run test:e2e
+
+      - name: Provision or verify D1 and R2
+        id: provision
+        run: node scripts/provision-cloudflare.mjs
+
+      - name: Apply remote D1 migrations
+        if: steps.provision.outputs.resources_ready == 'true'
+        run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/d1-migrations.log"
+
+      - name: Verify remote D1 schema
+        if: steps.provision.outputs.resources_ready == 'true'
+        run: |
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows') ORDER BY name" --json > "$EVIDENCE_DIR/d1-schema.json"
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "PRAGMA table_info(auth_sessions)" --json > "$EVIDENCE_DIR/d1-auth-session-columns.json"
+          node - <<'NODE'
+          const fs=require('node:fs'),p=require('node:path');
+          const rows=(file)=>{const x=JSON.parse(fs.readFileSync(p.join(process.env.EVIDENCE_DIR,file),'utf8'));return (Array.isArray(x)?x:[x]).flatMap(v=>v.results||v.result?.[0]?.results||[])};
+          const names=new Set(rows('d1-schema.json').map(v=>v.name));
+          for(const n of ['auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows']) if(!names.has(n)) throw new Error(`D1_TABLE_MISSING:${n}`);
+          const columns=new Set(rows('d1-auth-session-columns.json').map(v=>v.name));
+          for(const n of ['csrf_hash','last_seen_at','rotated_from','revoked_at']) if(!columns.has(n)) throw new Error(`D1_COLUMN_MISSING:${n}`);
+          NODE
+
+      - name: Configure and verify R2 retention lifecycle
+        if: steps.provision.outputs.resources_ready == 'true'
+        run: |
+          npx wrangler r2 bucket lifecycle remove sos-sf-private-reports --name sos-sf-report-retention --force --config wrangler.generated.jsonc >/dev/null 2>&1 || true
+          npx wrangler r2 bucket lifecycle add sos-sf-private-reports sos-sf-report-retention reports/ --expire-days "${REPORT_RETENTION_DAYS:-30}" --force --config wrangler.generated.jsonc
+          npx wrangler r2 bucket lifecycle list sos-sf-private-reports --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/r2-lifecycle.txt"
+          grep -q 'sos-sf-report-retention' "$EVIDENCE_DIR/r2-lifecycle.txt"
+
+      - name: Verify bounded R2 object operations
+        if: steps.provision.outputs.resources_ready == 'true'
+        run: |
+          probe="__v3_014_probe/${GITHUB_RUN_ID}.txt"
+          printf 'sos-sf-v3-014-r2-probe' > /tmp/probe.txt
+          npx wrangler r2 object put "sos-sf-private-reports/${probe}" --file /tmp/probe.txt --remote --force --config wrangler.generated.jsonc
+          npx wrangler r2 object get "sos-sf-private-reports/${probe}" --file /tmp/read.txt --remote --config wrangler.generated.jsonc
+          cmp /tmp/probe.txt /tmp/read.txt
+          npx wrangler r2 object delete "sos-sf-private-reports/${probe}" --remote --config wrangler.generated.jsonc
+
+      - name: Require independent infrastructure completion
+        run: |
+          test '${{ steps.provision.outputs.resources_ready }}' = 'true'
+          printf 'private_ready=%s\nresources_ready=%s\n' '${{ steps.provision.outputs.private_ready }}' '${{ steps.provision.outputs.resources_ready }}' > "$EVIDENCE_DIR/preflight-state.txt"
+
+      - name: Finalize evidence
+        if: always()
+        run: node scripts/finalize-evidence.mjs || true
+
+      - name: Remove generated sensitive material
+        if: always()
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/v3-full-014.patch
+
+      - name: Upload preflight evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sos-sf-v3-full-014-source-${{ github.sha }}
-          path: /tmp/sos-sf-v3-full-014-source.tgz
-          if-no-files-found: error
-          retention-days: 3
+          name: sos-sf-v3-full-014-preflight-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: warn
+          retention-days: 14
