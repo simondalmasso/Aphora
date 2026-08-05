@@ -18,6 +18,9 @@ export function SituationSummary({ snapshot }: { readonly snapshot: Snapshot }) 
     .map((system) => system.observedAt)
     .filter((value): value is string => Boolean(value))
     .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
+  const primaryAction = snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'
+    ? 'Seguí la instrucción completa de la alerta oficial vigente.'
+    : snapshot.recommendedAction;
   return <section className="situation-summary" aria-labelledby="situation-title">
     <div className="section-heading situation-summary__heading">
       <div><p className="section-kicker">Situación actual</p><h2 id="situation-title">Lo importante en Santa Fe</h2></div>
@@ -27,7 +30,7 @@ export function SituationSummary({ snapshot }: { readonly snapshot: Snapshot }) 
     <div className="situation-facts">
       <div><span>Estado hídrico</span><strong>{snapshot.stateLabel}</strong></div>
       <div><span>Última información</span><strong>{sentenceCase(formatHumanAge(latest, snapshot.generatedAt))}</strong><small>{formatLocalDateTime(latest)}</small></div>
-      <div className="situation-facts__action"><span>Acción principal</span><strong>{snapshot.recommendedAction}</strong></div>
+      <div className="situation-facts__action"><span>Acción principal</span><strong>{primaryAction}</strong></div>
     </div>
   </section>;
 }

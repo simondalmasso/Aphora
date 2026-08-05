@@ -26,7 +26,7 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--ink); font-size: 16px; line-height: 1.55; }
+body { margin: 0; min-width: 0; background: var(--canvas); color: var(--ink); font-size: 16px; line-height: 1.55; }
 button, input, select, textarea { font: inherit; }
 a { color: var(--blue-800); text-underline-offset: .18em; }
 a:hover { color: var(--blue-950); }
@@ -509,4 +509,16 @@ dialog::backdrop { background: rgba(16,42,67,.62); }
   .contact-grid { grid-template-columns: repeat(2,1fr); }
   .contact-grid a:first-child { grid-column: 1 / -1; }
   .detail-list dl { grid-template-columns: 1fr; }
+}
+
+
+/* SOS-SF-015-A-CONTINUATION-01 */
+html, body, #root, .site-shell { min-width: 0; max-width: 100%; }
+.header-inner, .brand, .dashboard, .dashboard > section, .official-alert > *, .situation-facts > *, .hydrometric-section__heading > *, .primary-station, .primary-station > *, .hydro-chart, .hydro-chart svg, .secondary-station > *, .source-access > * { min-width: 0; }
+.hydrometric-section .hydro-chart svg { max-width: 100%; }
+.offline-banner { max-width: var(--max); margin: 10px auto 0; padding: 10px 14px; border: 1px solid #d6ad17; border-radius: 12px; background: #fff6d9; color: #654600; display: flex; align-items: baseline; gap: 10px; }
+.offline-banner strong { flex: none; }
+.offline-banner span { min-width: 0; }
+@media (max-width: 700px) {
+  .offline-banner { margin: 8px 10px 0; display: grid; gap: 2px; }
 }

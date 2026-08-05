@@ -35,7 +35,9 @@ function ActiveAlert({ alert, generatedAt }: { readonly alert: OfficialAlert; re
 
 export function OfficialAlertPanel({ snapshot }: { readonly snapshot: Snapshot }) {
   const content = statusContent(snapshot);
-  const active = (snapshot.alerts ?? []).find((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'));
+  const active = snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'
+    ? (snapshot.alerts ?? []).find((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'))
+    : undefined;
   const source = snapshot.sources.find((item) => item.id === 'smn-alerts');
   return <section className={`official-alert official-alert--${content.level}`} aria-labelledby="official-alert-title" role={content.role}>
     {active ? <ActiveAlert alert={active} generatedAt={snapshot.generatedAt}/> : <>
