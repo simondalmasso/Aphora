@@ -1,0 +1,14 @@
+{
+  "public-safety-015-fix1.patch.gz.b64": {
+    "transportSha256": "f083063018ab2c42c55e03ac82866cb57361bae23f68e1cf194076963cbf6741",
+    "contentSha256": "137c23ea587fd1b81d5ae0bcab6793ff2e579c622a73e8f360969fc2653fd123"
+  },
+  "public-safety-015-fix2.patch.gz.b64": {
+    "transportSha256": "4fdb9b411c7bfa711d074b199eec1ebb753dcf8ec936a56d8251128a2422387b",
+    "contentSha256": "01bd338000d56f3a9a94b9a2d2c1e0dc9769348f235c1c9a77a438beff31ec77"
+  },
+  "public-safety-015-fix3.patch.gz.b64": {
+    "transportSha256": "1a3d965da2291a79057d17e36ab00901e230bfdce7afec1146a7356ee38e121d",
+    "contentSha256": "09a43c953c167245dbc6c7f6674b3a285a615d47fa4630fb90488bcfaca21d67"
+  }
+}
