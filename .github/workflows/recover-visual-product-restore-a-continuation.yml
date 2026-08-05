@@ -1,0 +1,110 @@
+name: Recover Visual Product Restore A Continuation
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/recover-visual-product-restore-a-continuation-trigger]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sos-sf-015-visual-restore-continuation-write
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply minimal verified corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          git merge-base --is-ancestor 8025647b774bc5f6a28e7319099492d4720e726b HEAD
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'REPLACE_PRECONDITION:{path}:{count}:{old[:80]}')
+              target.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'src/client/app/AppShell.tsx',
+              '          {!online && <span className="connection-state connection-state--offline" role="status">Sin conexión</span>}\n',
+              '',
+          )
+          replace_once(
+              'src/client/app/AppShell.tsx',
+              '    </header>\n    {children}\n',
+              '    </header>\n    {!online && <div className="offline-banner" role="status"><strong>Sin conexión</strong><span>No se pueden verificar alertas ni vigencia. Se muestra el último snapshot guardado con su fecha.</span></div>}\n    {children}\n',
+          )
+
+          replace_once(
+              'src/client/features/alerts/OfficialAlertPanel.tsx',
+              "  const active = (snapshot.alerts ?? []).find((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'));\n",
+              "  const active = snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'\n    ? (snapshot.alerts ?? []).find((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'))\n    : undefined;\n",
+          )
+
+          replace_once(
+              'src/client/features/situation/SituationSummary.tsx',
+              "  const latest = systems\n    .map((system) => system.observedAt)\n    .filter((value): value is string => Boolean(value))\n    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;\n  return <section",
+              "  const latest = systems\n    .map((system) => system.observedAt)\n    .filter((value): value is string => Boolean(value))\n    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;\n  const primaryAction = snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'\n    ? 'Seguí la instrucción completa de la alerta oficial vigente.'\n    : snapshot.recommendedAction;\n  return <section",
+          )
+          replace_once(
+              'src/client/features/situation/SituationSummary.tsx',
+              '<div className="situation-facts__action"><span>Acción principal</span><strong>{snapshot.recommendedAction}</strong></div>',
+              '<div className="situation-facts__action"><span>Acción principal</span><strong>{primaryAction}</strong></div>',
+          )
+
+          replace_once(
+              'src/client/features/actions/SafetyActions.tsx',
+              "export function SafetyActions({ snapshot, reportButtonRef, onReport }: { readonly snapshot: Snapshot; readonly reportButtonRef: RefObject<HTMLButtonElement | null>; readonly onReport: (opener?: HTMLButtonElement | null) => void }) {\n  return <section",
+              "export function SafetyActions({ snapshot, reportButtonRef, onReport }: { readonly snapshot: Snapshot; readonly reportButtonRef: RefObject<HTMLButtonElement | null>; readonly onReport: (opener?: HTMLButtonElement | null) => void }) {\n  const actionCopy = snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'\n    ? 'Consultá la alerta oficial vigente y seguí la instrucción completa del organismo emisor.'\n    : snapshot.recommendedAction;\n  return <section",
+          )
+          replace_once(
+              'src/client/features/actions/SafetyActions.tsx',
+              '<div className="action-origin"><span>Origen: {snapshot.alertStatus === \'ALERTA_OFICIAL_ACTIVA\' ? \'instrucción oficial\' : \'recomendación preventiva general\'}</span><p>{snapshot.recommendedAction}</p></div>',
+              '<div className="action-origin"><span>Origen: {snapshot.alertStatus === \'ALERTA_OFICIAL_ACTIVA\' ? \'referencia a instrucción oficial\' : \'recomendación preventiva general\'}</span><p>{actionCopy}</p></div>',
+          )
+
+          replace_once(
+              'src/client/styles/app.css',
+              'body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--ink); font-size: 16px; line-height: 1.55; }',
+              'body { margin: 0; min-width: 0; background: var(--canvas); color: var(--ink); font-size: 16px; line-height: 1.55; }',
+          )
+
+          css = Path('src/client/styles/app.css')
+          text = css.read_text()
+          marker = '/* SOS-SF-015-A-CONTINUATION-01 */'
+          if marker in text:
+              raise SystemExit('CSS_CONTINUATION_ALREADY_PRESENT')
+          text += '''\n\n/* SOS-SF-015-A-CONTINUATION-01 */\nhtml, body, #root, .site-shell { min-width: 0; max-width: 100%; }\n.header-inner, .brand, .dashboard, .dashboard > section, .official-alert > *, .situation-facts > *, .hydrometric-section__heading > *, .primary-station, .primary-station > *, .hydro-chart, .hydro-chart svg, .secondary-station > *, .source-access > * { min-width: 0; }\n.hydrometric-section .hydro-chart svg { max-width: 100%; }\n.offline-banner { max-width: var(--max); margin: 10px auto 0; padding: 10px 14px; border: 1px solid #d6ad17; border-radius: 12px; background: #fff6d9; color: #654600; display: flex; align-items: baseline; gap: 10px; }\n.offline-banner strong { flex: none; }\n.offline-banner span { min-width: 0; }\n@media (max-width: 700px) {\n  .offline-banner { margin: 8px 10px 0; display: grid; gap: 2px; }\n}\n'''
+          css.write_text(text)
+          PY
+
+          git diff --check
+          grep -q 'No se pueden verificar alertas ni vigencia' src/client/app/AppShell.tsx
+          grep -q "snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'" src/client/features/alerts/OfficialAlertPanel.tsx
+          grep -q 'Seguí la instrucción completa de la alerta oficial vigente' src/client/features/situation/SituationSummary.tsx
+          grep -q 'Consultá la alerta oficial vigente' src/client/features/actions/SafetyActions.tsx
+          grep -q 'body { margin: 0; min-width: 0;' src/client/styles/app.css
+          grep -q 'SOS-SF-015-A-CONTINUATION-01' src/client/styles/app.css
+          ! grep -q 'connection-state connection-state--offline' src/client/app/AppShell.tsx
+
+          git rm .github/recover-visual-product-restore-a-continuation-trigger
+          git add src/client/app/AppShell.tsx src/client/features/alerts/OfficialAlertPanel.tsx src/client/features/situation/SituationSummary.tsx src/client/features/actions/SafetyActions.tsx src/client/styles/app.css
+          git diff --cached --check
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m 'fix: resolve visual restore continuation defects'
+          git push origin HEAD:arq/visual-dashboard-v3
