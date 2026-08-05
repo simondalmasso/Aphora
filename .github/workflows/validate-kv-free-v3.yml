@@ -94,7 +94,11 @@ jobs:
           grep -q 'expirationTtl' src/worker/reports.ts
           grep -q "'arrayBuffer'" src/worker/reports.ts
           grep -q 'WORKERS_KV_FREE' scripts/provision-cloudflare.mjs
-          ! rg -n 'REPORTS_BUCKET|r2_buckets|/r2/' src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc
+          if grep -RInE 'REPORTS_BUCKET|r2_buckets|/r2/' \
+            src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc; then
+            echo 'R2_OPERATIONAL_DEPENDENCY_PRESENT' >&2
+            exit 1
+          fi
           printf 'D1_METADATA=PASS\nKV_BINARY=PASS\nR2_OPERATIONAL_DEPENDENCY=ABSENT\nBUDGET_POLICY=USD_0\n' > "$EVIDENCE_DIR/architecture.txt"
 
       - name: Setup Node
