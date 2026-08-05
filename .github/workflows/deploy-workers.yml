@@ -121,17 +121,12 @@ jobs:
 
           fix_encoded = Path('.github/v3-full-014-provision-fix.patch.b64').read_text().strip()
           fix_transport = hashlib.sha256(fix_encoded.encode()).hexdigest()
-          if fix_transport != '6af90fd94fc1f57fb247a59fd508001ace38b6c280eb15946925a0187c7dfcf1':
+          if fix_transport != 'bf4117c00120a1118737d8568d10202515610d1dc78b5384da8ce49e95e4bf98':
               raise SystemExit(f'PROVISION_FIX_TRANSPORT_HASH_MISMATCH:{fix_transport}')
           fix_patch = base64.b64decode(fix_encoded, validate=True)
           fix_hash = hashlib.sha256(fix_patch).hexdigest()
-          fix_text = fix_patch.decode('utf-8')
-          expected_header = (
-              'diff --git a/scripts/provision-cloudflare.mjs '
-              'b/scripts/provision-cloudflare.mjs'
-          )
-          if fix_text.count('diff --git ') != 1 or expected_header not in fix_text:
-              raise SystemExit('PROVISION_FIX_SCOPE_MISMATCH')
+          if fix_hash != 'e89bdaef77e5e8c9111a6bfc506e2fb63995869fa5d65d09819a92d41313ae4c':
+              raise SystemExit(f'PROVISION_FIX_CONTENT_HASH_MISMATCH:{fix_hash}')
           Path('/tmp/v3-full-014-provision-fix.patch').write_bytes(fix_patch)
           report.extend([
               f'provision_fix_base64_sha256={fix_transport}',
