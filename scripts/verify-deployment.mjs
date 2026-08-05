@@ -52,7 +52,7 @@ const results = checks.map((item) => {
     detail = 'shell + same-origin geolocation policy';
   } else if (item.path === '/lite') {
     const statusLabelIsTruthful = item.body.includes('Datos en vivo') || item.body.includes('Datos desactualizados');
-    const observationMatch = item.body.match(/Observación principal:\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)/);
+    const observationMatch = item.body.match(/Observación principal:\s*<time[^>]*datetime="([^"]+)"/);
     const observationAt = observationMatch ? Date.parse(observationMatch[1]) : Number.NaN;
     semantic = item.status === 200
       && item.contentType.includes('text/html')
