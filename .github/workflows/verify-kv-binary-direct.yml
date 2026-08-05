@@ -22,19 +22,25 @@ jobs:
           mkdir -p evidence
           node <<'NODE'
           const fs = require('node:fs');
-          const base = process.env.BASE_URL;
-          const output = {};
-          for (const pathname of ['/api/health','/api/auth/config','/api/session','/api/private/reports','/source-provenance.json']) {
-            const response = await fetch(`${base}${pathname}?inspect=${process.env.GITHUB_RUN_ID}`, { headers: { Accept: 'application/json' } });
-            const body = await response.json().catch(() => null);
-            if (pathname === '/api/health') output[pathname] = { status: response.status, service: body?.service ?? null, healthStatus: body?.status ?? null, privateMessaging: body?.privateMessaging ?? null, reporting: body?.reporting ?? null, dataMode: body?.dataMode ?? null };
-            else if (pathname === '/api/auth/config') output[pathname] = { status: response.status, enabled: body?.enabled ?? null, reportingEnabled: body?.reportingEnabled ?? null, googleClientIdPresent: typeof body?.googleClientId === 'string' && body.googleClientId.length > 0, activationState: body?.activationState ?? null };
-            else if (pathname === '/api/session') output[pathname] = { status: response.status, enabled: body?.enabled ?? null, authenticated: body?.authenticated ?? null, errorCode: body?.error?.code ?? body?.code ?? null };
-            else if (pathname === '/api/private/reports') output[pathname] = { status: response.status, errorCode: body?.error?.code ?? body?.code ?? null };
-            else output[pathname] = { status: response.status, schemaVersion: body?.schemaVersion ?? null, orderId: body?.orderId ?? null, productTreeSha256: body?.productTreeSha256 ?? null, includedFileCount: body?.includedFileCount ?? null, deploymentRunId: body?.deploymentRunId ?? null };
-          }
-          fs.writeFileSync('evidence/production-state.json', `${JSON.stringify(output, null, 2)}\n`);
-          console.log(JSON.stringify(output));
+
+          (async () => {
+            const base = process.env.BASE_URL;
+            const output = {};
+            for (const pathname of ['/api/health','/api/auth/config','/api/session','/api/private/reports','/source-provenance.json']) {
+              const response = await fetch(`${base}${pathname}?inspect=${process.env.GITHUB_RUN_ID}`, { headers: { Accept: 'application/json' } });
+              const body = await response.json().catch(() => null);
+              if (pathname === '/api/health') output[pathname] = { status: response.status, service: body?.service ?? null, healthStatus: body?.status ?? null, privateMessaging: body?.privateMessaging ?? null, reporting: body?.reporting ?? null, dataMode: body?.dataMode ?? null };
+              else if (pathname === '/api/auth/config') output[pathname] = { status: response.status, enabled: body?.enabled ?? null, reportingEnabled: body?.reportingEnabled ?? null, googleClientIdPresent: typeof body?.googleClientId === 'string' && body.googleClientId.length > 0, activationState: body?.activationState ?? null };
+              else if (pathname === '/api/session') output[pathname] = { status: response.status, enabled: body?.enabled ?? null, authenticated: body?.authenticated ?? null, errorCode: body?.error?.code ?? body?.code ?? null };
+              else if (pathname === '/api/private/reports') output[pathname] = { status: response.status, errorCode: body?.error?.code ?? body?.code ?? null };
+              else output[pathname] = { status: response.status, schemaVersion: body?.schemaVersion ?? null, orderId: body?.orderId ?? null, productTreeSha256: body?.productTreeSha256 ?? null, includedFileCount: body?.includedFileCount ?? null, deploymentRunId: body?.deploymentRunId ?? null };
+            }
+            fs.writeFileSync('evidence/production-state.json', `${JSON.stringify(output, null, 2)}\n`);
+            console.log(JSON.stringify(output));
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
           NODE
 
       - uses: actions/upload-artifact@v4
