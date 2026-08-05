@@ -1,0 +1,98 @@
+name: Export Deploy Workflow With KV Probe Fix
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/export-deploy-workers-probe-fix-trigger]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Transform canonical deploy workflow deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/deploy-workers-probe-fix
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          source_path = Path('.github/workflows/deploy-workers.yml')
+          text = source_path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}_MATCH_COUNT:{count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              """          report.extend([\n              f'owner_free_base64_sha256={owner_transport}',\n              f'owner_free_patch_sha256={owner_hash}',\n          ])\n          Path('artifacts/v3-full-014/patch-verification.txt').write_text(\n""",
+              """          report.extend([\n              f'owner_free_base64_sha256={owner_transport}',\n              f'owner_free_patch_sha256={owner_hash}',\n          ])\n\n          probe_encoded = Path('.github/v3-full-014-kv-probe-fix.patch.gz.b64').read_text().strip()\n          probe_transport = hashlib.sha256(probe_encoded.encode()).hexdigest()\n          if probe_transport != '36cebd6148ba5b67b170d255253a66302f2f63c0a542b0f2f1fb5f0a0e4eb3d0':\n              raise SystemExit(f'KV_PROBE_FIX_TRANSPORT_HASH_MISMATCH:{probe_transport}')\n          probe_patch = gzip.decompress(base64.b64decode(probe_encoded, validate=True))\n          probe_hash = hashlib.sha256(probe_patch).hexdigest()\n          if probe_hash != 'c2fe2a1b4ad293c0a34d2c8ce323e6f40632f2efbb607f6b3f459bc6badd2715':\n              raise SystemExit(f'KV_PROBE_FIX_CONTENT_HASH_MISMATCH:{probe_hash}')\n          Path('/tmp/v3-full-014-kv-probe-fix.patch').write_bytes(probe_patch)\n          report.extend([\n              f'kv_probe_fix_base64_sha256={probe_transport}',\n              f'kv_probe_fix_patch_sha256={probe_hash}',\n          ])\n          Path('artifacts/v3-full-014/patch-verification.txt').write_text(\n""",
+              'DECODE_BLOCK',
+          )
+
+          replace_once(
+              """          git apply --index /tmp/v3-full-014-owner-free.patch\n          git diff --cached --check\n""",
+              """          git apply --index /tmp/v3-full-014-owner-free.patch\n          git apply --index /tmp/v3-full-014-kv-probe-fix.patch\n          git diff --cached --check\n""",
+              'APPLY_BLOCK',
+          )
+
+          replace_once(
+              """          test ! -e .github/v3-full-014-owner-free.patch.gz.b64\n          test ! -e .github/v3-full-014.patch.gz.b64\n""",
+              """          test ! -e .github/v3-full-014-owner-free.patch.gz.b64\n          test ! -e .github/v3-full-014-kv-probe-fix.patch.gz.b64\n          test ! -e .github/v3-full-014.patch.gz.b64\n""",
+              'TERMINAL_ASSERT_BLOCK',
+          )
+
+          replace_once(
+              """            .github/v3-full-014-owner-free.patch.gz.b64 \\\n            .github/cloudflare-auth-diagnostic-trigger \\\n""",
+              """            .github/v3-full-014-owner-free.patch.gz.b64 \\\n            .github/v3-full-014-kv-probe-fix.patch.gz.b64 \\\n            .github/cloudflare-auth-diagnostic-trigger \\\n""",
+              'SYNC_PROBE_TRANSPORT_BLOCK',
+          )
+
+          replace_once(
+              """            .github/install-deploy-workers-kv-free-trigger\n""",
+              """            .github/install-deploy-workers-kv-free-trigger \\\n            .github/verify-kv-binary-probe-trigger \\\n            .github/verify-kv-binary-direct-trigger \\\n            .github/export-deploy-workers-probe-fix-trigger\n""",
+              'SYNC_TEMP_TRIGGER_BLOCK',
+          )
+
+          replace_once(
+              """ /tmp/v3-full-014-owner-free.patch /tmp/local-product-tree.json""",
+              """ /tmp/v3-full-014-owner-free.patch /tmp/v3-full-014-kv-probe-fix.patch /tmp/local-product-tree.json""",
+              'CLEANUP_BLOCK',
+          )
+
+          output = Path('/tmp/deploy-workers-probe-fix/deploy-workers.yml')
+          output.write_text(text)
+          digest = hashlib.sha256(text.encode()).hexdigest()
+          Path('/tmp/deploy-workers-probe-fix/sha256.txt').write_text(f'content_sha256={digest}\n')
+          print(f'content_sha256={digest}')
+          PY
+
+          grep -q 'KV_PROBE_FIX_TRANSPORT_HASH_MISMATCH' /tmp/deploy-workers-probe-fix/deploy-workers.yml
+          grep -q 'git apply --index /tmp/v3-full-014-kv-probe-fix.patch' /tmp/deploy-workers-probe-fix/deploy-workers.yml
+          grep -q '.github/v3-full-014-kv-probe-fix.patch.gz.b64' /tmp/deploy-workers-probe-fix/deploy-workers.yml
+          test "$(grep -c 'npx wrangler deploy' /tmp/deploy-workers-probe-fix/deploy-workers.yml)" = 1
+          if grep -nE 'Configure and verify R2|r2 bucket|r2 object|Provision or verify D1 and R2' /tmp/deploy-workers-probe-fix/deploy-workers.yml; then
+            echo 'R2_DEPLOY_STEP_PRESENT' >&2
+            exit 1
+          fi
+
+      - name: Upload transformed canonical workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-workers-probe-fix-${{ github.sha }}-${{ github.run_id }}
+          path: /tmp/deploy-workers-probe-fix/
+          if-no-files-found: error
+          retention-days: 7
