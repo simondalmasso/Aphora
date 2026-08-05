@@ -41,7 +41,7 @@ jobs:
               '4df4f3652103016704f9ac9a02de1e523c68d4f2e1114fa6d182c237ed5bbd8b',
               '1601a8e733ffdc43edd57208a2561c1d67ea4953a3f24755490b16c77a2e8069',
               'de0c865b7ec0409c548acb4340533b6567b90db903b226cf01ddc300bb3bae04',
-              '3247f45d9c18d02acba3e57e221f95c429db7f7f8d928c676ca4b0df7c4eae07',
+              '8d5f7036caee699ff8e5e5447146535781d7b546b0045c772e6c0efa429b7294',
               'd99e8d235d2406db9eebf279a02a7e84bace64e127f7b7cbd6dfbe15a535b9b5',
           ]
           chunks = []
@@ -51,8 +51,16 @@ jobs:
               actual = hashlib.sha256(value.encode()).hexdigest()
               if actual != expected:
                   raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
+              if index == 6:
+                  if len(value) != 15000 or value[5352] != 'w':
+                      raise SystemExit('PATCH_PART06_REPAIR_PRECONDITION_FAILED')
+                  value = value[:5352] + 'p' + value[5353:]
+                  repaired = hashlib.sha256(value.encode()).hexdigest()
+                  if repaired != '3247f45d9c18d02acba3e57e221f95c429db7f7f8d928c676ca4b0df7c4eae07':
+                      raise SystemExit(f'PATCH_PART06_REPAIR_HASH_MISMATCH:{repaired}')
+                  report.append('part06_repair=offset_5352_w_to_p')
               chunks.append(value)
-              report.append(f'part{index:02d}_sha256={actual}')
+              report.append(f'part{index:02d}_remote_sha256={actual}')
           encoded = ''.join(chunks)
           transport = hashlib.sha256(encoded.encode()).hexdigest()
           if transport != '5e44a6a727bbdebf32d721f6da9fdeb1a13921c5fa539ef8eb63111d8e2a70c5':
