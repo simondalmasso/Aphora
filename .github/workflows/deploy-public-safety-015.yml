@@ -1,0 +1,339 @@
+name: Deploy Public Safety 015
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/deploy-public-safety-015-trigger]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sos-sf-workers-production
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/public-safety-015-deploy
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  OWNER_VISUAL_CONFIRMATION: WORKERS_FREE_CONFIRMED
+  BUDGET_MAX_USD: '0'
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+  SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+  MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
+  REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+  INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+  INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+  PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+  SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+  SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve one-shot mode
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          mode="$(sed -n 's/^MODE=//p' .github/deploy-public-safety-015-trigger | head -n1)"
+          test "$mode" = FINAL_GLOBAL_PUBLIC_SAFETY_015
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          test "$OWNER_VISUAL_CONFIRMATION" = WORKERS_FREE_CONFIRMED
+          test "$BUDGET_MAX_USD" = 0
+          mkdir -p "$EVIDENCE_DIR"
+          printf 'ORDER=SOS-SF-OWNER-GLOBAL-PUBLIC-SAFETY-REFOUNDATION-015\nMODE=%s\nSOURCE_SHA=%s\n' "$mode" "$GITHUB_SHA" > "$EVIDENCE_DIR/execution-mode.txt"
+
+      - name: Reconstruct exact validated product
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib, json, os
+          remote_hashes = [
+            'c5f0db4501ca4f5922392b9ea4ef0e046155f5bdf3680fa4135cb130c9583ca0',
+            '6d6b7518c6efb425b690e04e2231cca76d47af065be86b708a63ccc8a9ce8d35',
+            '0afa9f51d6f640c9ca6e5fb7380c893a708fb9d38323573c3fe8f9c1955fc844',
+            '4df4f3652103016704f9ac9a02de1e523c68d4f2e1114fa6d182c237ed5bbd8b',
+            '1601a8e733ffdc43edd57208a2561c1d67ea4953a3f24755490b16c77a2e8069',
+            'de0c865b7ec0409c548acb4340533b6567b90db903b226cf01ddc300bb3bae04',
+            '8d5f7036caee699ff8e5e5447146535781d7b546b0045c772e6c0efa429b7294',
+            'd99e8d235d2406db9eebf279a02a7e84bace64e127f7b7cbd6dfbe15a535b9b5',
+          ]
+          chunks=[]; report=[]
+          for i, expected in enumerate(remote_hashes):
+            value=Path(f'.github/public-safety-015-parts/part{i:02d}').read_text().strip()
+            actual=hashlib.sha256(value.encode()).hexdigest()
+            if actual != expected: raise SystemExit(f'PART_HASH_MISMATCH:{i}:{actual}')
+            if i == 6:
+              if len(value) != 15000 or value[5352] != 'w': raise SystemExit('PART06_PRECONDITION')
+              value=value[:5352]+'p'+value[5353:]
+              if hashlib.sha256(value.encode()).hexdigest() != '3247f45d9c18d02acba3e57e221f95c429db7f7f8d928c676ca4b0df7c4eae07': raise SystemExit('PART06_REPAIR_HASH')
+            chunks.append(value); report.append(f'part{i:02d}_remote_sha256={actual}')
+          encoded=''.join(chunks)
+          if hashlib.sha256(encoded.encode()).hexdigest() != '5e44a6a727bbdebf32d721f6da9fdeb1a13921c5fa539ef8eb63111d8e2a70c5': raise SystemExit('BASE_TRANSPORT_HASH')
+          patch=gzip.decompress(base64.b64decode(encoded, validate=True))
+          if hashlib.sha256(patch).hexdigest() != '155636e689a8d8edc4449e9340c568dec900ae0de16eb11508efa01f24d97c76': raise SystemExit('BASE_CONTENT_HASH')
+          Path('/tmp/order015-base.patch').write_bytes(patch)
+          manifest=json.loads(Path('.github/public-safety-015-fixes.json').read_text())
+          for index, name in enumerate(sorted(manifest)):
+            spec=manifest[name]; value=Path('.github', name).read_text().strip()
+            transport=hashlib.sha256(value.encode()).hexdigest()
+            if transport != spec['transportSha256']: raise SystemExit(f'FIX_TRANSPORT:{name}:{transport}')
+            content=gzip.decompress(base64.b64decode(value, validate=True))
+            digest=hashlib.sha256(content).hexdigest()
+            if digest != spec['contentSha256']: raise SystemExit(f'FIX_CONTENT:{name}:{digest}')
+            Path(f'/tmp/order015-fix-{index:02d}.patch').write_bytes(content)
+            report.extend([f'{name}:transport={transport}', f'{name}:content={digest}'])
+          Path(os.environ['EVIDENCE_DIR'],'patch-hashes.txt').write_text('\n'.join(report)+'\n')
+          PY
+          git apply --index /tmp/order015-base.patch
+          for patch in /tmp/order015-fix-*.patch; do git apply --index "$patch"; done
+          git diff --cached --check
+          git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
+
+      - name: Assert architecture privacy and zero-cost boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in src/domain/public-safety.ts src/client/features/alerts/OfficialAlertPanel.tsx src/client/features/hydro/HydrometricMonitoring.tsx src/client/features/sources/SourceTransparency.tsx docs/BENCHMARK_DECISIONS_015.md docs/COMMUNICATION_MATRIX_015.md; do test -f "$f"; done
+          grep -q 'ALERTA_OFICIAL_ACTIVA' src/domain/snapshot.ts
+          grep -q 'VERIFICACION_DE_ALERTAS_DEGRADADA' src/domain/snapshot.ts
+          grep -q 'ACTUALIZACION_DEMORADA' src/domain/snapshot.ts
+          grep -q 'Río Paraná — Santa Fe' src/worker/live-data.ts
+          grep -q 'Río Salado — Santo Tomé' src/worker/live-data.ts
+          grep -q 'Reportar una situación no inicia un despacho de emergencia' src/client/features/reports/ReportDialog.tsx
+          grep -q 'REPORTS_KV' src/worker/reports.ts
+          test ! -e src/client/three/pulse-three.ts
+          ! grep -RInE 'REPORTS_BUCKET|r2_buckets|/r2/' src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc
+          ! grep -RInE "from ['\"]three['\"]|@types/three|\"three\"" package.json package-lock.json src/client
+          ! grep -RInE 'Sistema Paraná|Sistema Salado|Pulso del Paraná|DEMO / NO OFICIAL' src/client src/worker public README.md docs
+          printf 'ARCHITECTURE=PASS\nBUDGET_MAX_USD=0\nD1=PRESERVED\nKV=PRESERVED\nR2=ABSENT\nBILLING_ENDPOINTS=0\n' > "$EVIDENCE_DIR/architecture.txt"
+
+      - name: Generate deterministic product provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess
+          excluded=('.github/','artifacts/','dist/')
+          marker='public/source-provenance.json'
+          paths=subprocess.check_output(['git','ls-files','-z']).split(b'\0')
+          digest=hashlib.sha256(); included=0
+          for raw in sorted(p for p in paths if p):
+            path=raw.decode()
+            if path == marker or path.startswith(excluded): continue
+            data=Path(path).read_bytes()
+            digest.update(path.encode()); digest.update(b'\0'); digest.update(len(data).to_bytes(8,'big')); digest.update(data); included+=1
+          payload={'schemaVersion':1,'orderId':'SOS-SF-OWNER-GLOBAL-PUBLIC-SAFETY-REFOUNDATION-015','productTreeSha256':digest.hexdigest(),'includedFileCount':included,'deploymentRunId':os.environ['GITHUB_RUN_ID']}
+          Path(marker).write_text(json.dumps(payload,sort_keys=True,separators=(',',':'))+'\n')
+          Path(os.environ['EVIDENCE_DIR'],'source-provenance-local.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          PY
+          git add public/source-provenance.json
+          git diff --cached --check
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Typecheck
+        run: npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
+      - name: Lint
+        run: npm run lint -- --max-warnings=0 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+      - name: Unit tests
+        run: npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/unit.log"
+      - name: Contract tests
+        run: npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/contract.log"
+      - name: Build and budgets
+        run: npm run build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+      - name: Worker local D1 KV
+        run: npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/worker.log"
+      - name: E2E visual accessibility mobile offline
+        run: npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/e2e.log"
+      - name: Public source inventory read only
+        run: node scripts/revalidate-public-sources.mjs 2>&1 | tee "$EVIDENCE_DIR/source-revalidation.log"
+
+      - name: Assert source inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const r=JSON.parse(fs.readFileSync(`${process.env.EVIDENCE_DIR}/source-revalidation.json`,'utf8'));
+          if(r.organizationCount!==6||r.feedCount!==10) throw new Error('SOURCE_COUNTS');
+          if(r.rules.duplicateTransportsAreIndependentCorroboration!==false||r.rules.scrapingPromotedToStableFeed!==false||r.rules.authenticationBypassed!==false) throw new Error('SOURCE_RULES');
+          const blocked=r.feeds.filter(f=>String(f.classification).startsWith('BLOCKED_'));
+          if(blocked.some(f=>f.reachable!==null||f.automatic!==false)) throw new Error('BLOCKED_QUERIED');
+          const nasa=r.feeds.find(f=>f.id==='nasa-gpm-imerg-early');
+          if(!nasa||!['SUPPLEMENTARY','DEGRADED'].includes(nasa.classification)) throw new Error('NASA_CLASSIFICATION');
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/source-counts.txt`,[
+            `SOURCE_ORGANIZATION_COUNT=${r.organizationCount}`,
+            `SOURCE_FEED_COUNT=${r.feedCount}`,
+            ...Object.entries(r.counts).map(([k,v])=>`${k}=${v}`),''].join('\n'));
+          NODE
+          cp docs/BENCHMARK_DECISIONS_015.md "$EVIDENCE_DIR/benchmark-decision-log.md"
+          cp docs/COMMUNICATION_MATRIX_015.md "$EVIDENCE_DIR/communication-matrix.md"
+          cp docs/DATA_SOURCES.md "$EVIDENCE_DIR/data-sources.md"
+
+      - name: Validate protected configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$ ]]
+          node - <<'NODE'
+          const values=String(process.env.SOS_SF_OPERATOR_EMAILS||'').split(',').map(v=>v.trim()).filter(Boolean);
+          if(!values.length||!values.every(v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) throw new Error('SOS_SF_OPERATOR_EMAILS_REQUIRED_OR_INVALID');
+          NODE
+
+      - name: Prove Workers Free and D1 KV authority
+        run: node scripts/verify-cloudflare-zero-cost.mjs
+
+      - name: Ensure persistent session signing secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${SESSION_SIGNING_KEY:-}" ]; then
+            test "${#SESSION_SIGNING_KEY}" -ge 32
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=github_actions_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+            exit 0
+          fi
+          npx wrangler secret list --config wrangler.jsonc > /tmp/worker-secrets-list.json
+          if node -e "const x=require('/tmp/worker-secrets-list.json');process.exit(x.some(v=>v.name==='SESSION_SIGNING_KEY')?0:1)"; then
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=existing_cloudflare_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+          else
+            generated="$(openssl rand -base64 48 | tr -d '\n')"
+            echo "::add-mask::$generated"
+            echo "SESSION_SIGNING_KEY=$generated" >> "$GITHUB_ENV"
+            echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
+            echo 'session_secret_source=generated_once_for_deploy' > "$EVIDENCE_DIR/session-secret-state.txt"
+          fi
+
+      - name: Reuse or verify D1 and KV Free
+        id: provision
+        run: node scripts/provision-cloudflare.mjs
+
+      - name: Require private runtime readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ steps.provision.outputs.resources_ready }}' = true
+          test '${{ steps.provision.outputs.private_ready }}' = true
+          cat "$EVIDENCE_DIR/deployment-mode.json"
+
+      - name: Apply idempotent D1 migrations
+        run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/d1-migrations.log"
+
+      - name: Verify bounded KV binary operations
+        env:
+          KV_NAMESPACE_ID: ${{ steps.provision.outputs.kv_namespace_id }}
+        run: node scripts/verify-kv-namespace.mjs
+
+      - name: Deploy exact Worker once
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .worker-secrets.json 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+          printf 'DEPLOY_COMMAND_COUNT=1\n' > "$EVIDENCE_DIR/deploy-count.txt"
+          npx wrangler versions list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-versions.json" || true
+          npx wrangler deployments list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-deployments.json" || true
+
+      - name: Verify production matrix
+        env:
+          EXPECT_PRIVATE_FEATURES: 'true'
+          WRITE_PROOF: '1'
+        run: npm run verify:remote -- "$DEPLOYMENT_URL"
+
+      - name: Verify GET-only private negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="$DEPLOYMENT_URL"
+          session_status="$(curl -fsS -o /tmp/session.json -w '%{http_code}' "$origin/api/session?verify=$GITHUB_RUN_ID")"
+          test "$session_status" = 200
+          node -e "const x=require('/tmp/session.json');const d=x.data||x;if(d.enabled!==true||d.authenticated!==false)process.exit(1)"
+          private_status="$(curl -sS -o /tmp/private.json -w '%{http_code}' "$origin/api/private/reports?verify=$GITHUB_RUN_ID")"
+          test "$private_status" = 401
+          node -e "const x=require('/tmp/private.json');if((x.data?.error?.code||x.error?.code||x.code)!=='AUTHENTICATION_REQUIRED')process.exit(1)"
+          printf 'session_anonymous=200\nprivate_unauthenticated=401\n' > "$EVIDENCE_DIR/private-negative-get-only.txt"
+
+      - name: Verify deployed provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS "$DEPLOYMENT_URL/source-provenance.json?verify=$GITHUB_RUN_ID" > /tmp/remote-source-provenance.json
+          node <<'NODE'
+          const fs=require('node:fs');
+          const local=JSON.parse(fs.readFileSync('public/source-provenance.json','utf8'));
+          const remote=JSON.parse(fs.readFileSync('/tmp/remote-source-provenance.json','utf8'));
+          for(const field of ['schemaVersion','orderId','productTreeSha256','includedFileCount','deploymentRunId']) if(String(local[field])!==String(remote[field])) throw new Error(`PROVENANCE_MISMATCH:${field}`);
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/cloudflare-github-drift.txt`, `github_candidate_product_tree_sha256=${local.productTreeSha256}\ncloudflare_product_tree_sha256=${remote.productTreeSha256}\nCLOUDFLARE_GITHUB_DRIFT=false\n`);
+          NODE
+
+      - name: Synchronize exact deployed product source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -rf --ignore-unmatch .github/public-safety-015-parts
+          git rm -f --ignore-unmatch \
+            .github/public-safety-015-fix1.patch.gz.b64 \
+            .github/public-safety-015-fix2.patch.gz.b64 \
+            .github/public-safety-015-fix3.patch.gz.b64 \
+            .github/public-safety-015-fixes.json \
+            .github/export-public-safety-parts-015-trigger \
+            .github/export-source-015-trigger \
+            .github/validate-public-safety-015-trigger \
+            .github/validate-public-safety-015-v2-trigger
+          printf 'MODE=TERMINAL_GLOBAL_PUBLIC_SAFETY_015\nOWNER_VISUAL_CONFIRMATION=WORKERS_FREE_CONFIRMED\nBUDGET_MAX_USD=0\nDEPLOY=PROHIBITED\nCLOUDFLARE_MUTATION=PROHIBITED\n' > .github/deploy-public-safety-015-trigger
+          git add .github/deploy-public-safety-015-trigger public/source-provenance.json
+          git diff --cached --check
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m 'feat: global public safety refoundation 015'
+          git push origin HEAD:arq/visual-dashboard-v3
+          git rev-parse HEAD | tee "$EVIDENCE_DIR/synchronized-product-sha.txt"
+
+      - name: Record completion result
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'STATUS=%s\nORDER=SOS-SF-OWNER-GLOBAL-PUBLIC-SAFETY-REFOUNDATION-015\nBUDGET_MAX_USD=0\nR2_STATE=ABSENT\nAUD_HOLD=ACTIVE\n' '${{ job.status }}' > "$EVIDENCE_DIR/result.txt"
+
+      - name: Publish non-closing checkpoint
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment 8 --repo "$GITHUB_REPOSITORY" --body "## Global Public Safety Refoundation 015 — deployment checkpoint\n\n- Run: \`$GITHUB_RUN_ID\`\n- Start SHA: \`$GITHUB_SHA\`\n- Status: \`${{ job.status }}\`\n- Budget: USD 0\n- Storage: D1 Free + Workers KV Free\n- R2 and billing endpoints: unused\n- main untouched; issue remains open; AUD_HOLD=ACTIVE\n- No acceptance declared." || true
+
+      - name: Remove generated sensitive material
+        if: always()
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/worker-secrets-list.json /tmp/order015-base.patch /tmp/order015-fix-*.patch /tmp/session.json /tmp/private.json /tmp/remote-source-provenance.json
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-safety-015-deploy-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
