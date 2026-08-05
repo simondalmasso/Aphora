@@ -78,7 +78,7 @@ jobs:
           node -e "const x=require('/tmp/session.json');const d=x.data||x;if(d.enabled!==true||d.authenticated!==false)process.exit(1)"
           private_status="$(curl -sS -o /tmp/private.json -w '%{http_code}' "$origin/api/private/reports?terminal=$GITHUB_RUN_ID")"
           test "$private_status" = 401
-          node -e "const x=require('/tmp/private.json');if((x.error?.code||x.code)!=='AUTHENTICATION_REQUIRED')process.exit(1)"
+          node -e "const x=require('/tmp/private.json');if((x.data?.error?.code||x.error?.code||x.code)!=='AUTHENTICATION_REQUIRED')process.exit(1)"
           printf 'session_anonymous=200\nprivate_unauthenticated=401\ninvalid_google_credential_remote_post=SKIPPED_TO_PRESERVE_NON_MUTATING_TERMINAL\ninvalid_google_credential_contract=LOCAL_UNIT_AND_SOURCE_VERIFIED_400_CONTENT_REJECTED\n' > "$EVIDENCE_DIR/private-negative-get-only.txt"
 
       - name: Verify exact GitHub and Cloudflare product provenance
