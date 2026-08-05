@@ -18,7 +18,7 @@ interface Props {
 
 export function DashboardPage(props: Props) {
   return <main id="main" className="dashboard">
-    {(props.refreshing || props.refreshError) && <div className={`refresh-status ${props.refreshError ? 'refresh-status--error' : ''}`} role="status">{props.refreshing ? 'Actualizando fuentes públicas…' : props.refreshError}</div>}
+    {props.refreshing && <div className="refresh-status" role="status">Actualizando fuentes públicas…</div>}
     <OfficialAlertPanel snapshot={props.snapshot}/>
     <SituationSummary snapshot={props.snapshot}/>
     <HydrometricMonitoring snapshot={props.snapshot}/>

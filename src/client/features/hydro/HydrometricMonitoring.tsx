@@ -54,7 +54,7 @@ export function HydrometricMonitoring({ snapshot }: { readonly snapshot: Snapsho
         <div><span>Nivel actual</span><strong data-testid="hydro-current-level">{selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')} <small>m</small></strong></div>
         <div><span>Tendencia</span><strong>{trendLabel(selected)}</strong></div>
         <div><span>Cambio en 24 h</span><strong>{formatDelta(selected.delta24h)}</strong></div>
-        <div><span>Observada</span><strong>{formatLocalDateTime(selected.observedAt)}</strong></div>
+        <div><span>Última medición</span><strong>{formatLocalDateTime(selected.observedAt)}</strong></div>
       </div>
       {selected.available && selected.currentMetres !== null ? <HydroSeriesChart system={selected} generatedAt={snapshot.generatedAt}/> : <div className="data-caveat"><strong>Medición no disponible</strong><p>La estación no entregó una lectura utilizable. No se infiere ausencia de riesgo.</p></div>}
     </article> : <div className="data-caveat"><strong>Sin estaciones disponibles</strong><p>No se pudo construir una situación hidrométrica automática.</p></div>}

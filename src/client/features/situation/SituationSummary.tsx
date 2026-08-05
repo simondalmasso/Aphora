@@ -8,6 +8,10 @@ function freshnessLabel(value: Snapshot['freshness']): string {
   return 'Vigencia no disponible';
 }
 
+function sentenceCase(value: string): string {
+  return value ? `${value[0]!.toUpperCase()}${value.slice(1)}` : value;
+}
+
 export function SituationSummary({ snapshot }: { readonly snapshot: Snapshot }) {
   const systems = snapshot.systems ?? [];
   const latest = systems
@@ -22,7 +26,7 @@ export function SituationSummary({ snapshot }: { readonly snapshot: Snapshot }) 
     <p className="situation-summary__lead">{snapshot.summary}</p>
     <div className="situation-facts">
       <div><span>Estado hídrico</span><strong>{snapshot.stateLabel}</strong></div>
-      <div><span>Última información</span><strong>{formatHumanAge(latest, snapshot.generatedAt)}</strong><small>{formatLocalDateTime(latest)}</small></div>
+      <div><span>Última información</span><strong>{sentenceCase(formatHumanAge(latest, snapshot.generatedAt))}</strong><small>{formatLocalDateTime(latest)}</small></div>
       <div className="situation-facts__action"><span>Acción principal</span><strong>{snapshot.recommendedAction}</strong></div>
     </div>
   </section>;

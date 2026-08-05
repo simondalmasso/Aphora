@@ -5,8 +5,8 @@ import type { Snapshot, Source } from '../../src/domain/snapshot';
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
 const generatedAt = '2026-08-05T10:00:00.000Z';
 const storageKey = 'sos-sf:last-public-safety-snapshot:v4';
-const points = (base: number) => Array.from({ length: 24 }, (_, index) => ({
-  at: new Date(Date.parse(generatedAt) - ((23 - index) + (index < 12 ? 8 : 0)) * 60 * 60_000).toISOString(),
+const points = (base: number, endAt = generatedAt) => Array.from({ length: 24 }, (_, index) => ({
+  at: new Date(Date.parse(endAt) - ((23 - index) + (index < 12 ? 8 : 0)) * 60 * 60_000).toISOString(),
   metres: base + index * .01,
   measured: true,
   quality: 'PUBLISHED_OPERATIONAL' as const,
@@ -17,7 +17,7 @@ const systems = [
     id: 'parana-santa-fe', label: 'Río Paraná — Santa Fe', watercourse: 'Río Paraná', stationName: 'Santa Fe', stationCode: '30', available: true, dataStatus: 'LIVE' as const, freshness: 'ACTUALIZADO' as const, currentMetres: 3.22, observedAt: generatedAt, fetchedAt: generatedAt, validUntil: '2026-08-06T10:00:00.000Z', sourceId: 'ina-rest-30', sourceName: 'Instituto Nacional del Agua · INA REST', points: points(2.99), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia inferior', metres: 2 }, { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 5.3 }, { id: 'EVACUACION' as const, label: 'Nivel de evacuación de referencia', metres: 5.7 }], trend: 'RISING_SLOWLY' as const, delta1h: .01, delta6h: .06, delta24h: .23,
   },
   {
-    id: 'salado-santo-tome', label: 'Río Salado — Santo Tomé', watercourse: 'Río Salado', stationName: 'Santo Tomé', stationCode: '1679', available: true, dataStatus: 'STALE' as const, freshness: 'ACTUALIZACION_DEMORADA' as const, currentMetres: 4.8, observedAt: '2026-08-05T00:00:00.000Z', fetchedAt: '2026-08-05T09:55:00.000Z', validUntil: '2026-08-06T00:00:00.000Z', sourceId: 'ina-rest-3044', sourceName: 'Instituto Nacional del Agua · INA REST', points: points(4.57), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia inferior', metres: 0 }, { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 4.7 }], trend: 'RISING' as const, delta1h: .01, delta6h: .06, delta24h: .23,
+    id: 'salado-santo-tome', label: 'Río Salado — Santo Tomé', watercourse: 'Río Salado', stationName: 'Santo Tomé', stationCode: '1679', available: true, dataStatus: 'STALE' as const, freshness: 'ACTUALIZACION_DEMORADA' as const, currentMetres: 4.8, observedAt: '2026-08-05T00:00:00.000Z', fetchedAt: '2026-08-05T09:55:00.000Z', validUntil: '2026-08-06T00:00:00.000Z', sourceId: 'ina-rest-3044', sourceName: 'Instituto Nacional del Agua · INA REST', points: points(4.57, '2026-08-05T00:00:00.000Z'), thresholds: [{ id: 'NORMAL' as const, label: 'Referencia inferior', metres: 0 }, { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 4.7 }], trend: 'RISING' as const, delta1h: .01, delta6h: .06, delta24h: .23,
   },
 ] as const;
 
@@ -112,7 +112,7 @@ test('restores the main interactive hydrometric chart without gauges or fictiona
 test('separates emergency calls, citizen report and grouped source transparency', async ({ page }) => {
   await mockPublicApi(page);
   await page.goto('/');
-  const actions = page.getByRole('heading', { name: 'Qué hacer ahora' }).locator('..').locator('..');
+  const actions = page.locator('section[aria-labelledby="actions-title"]');
   await expect(actions.getByRole('link', { name: /911/ })).toHaveAttribute('href', 'tel:911');
   await expect(actions.getByRole('button', { name: 'Reportar una situación' })).toHaveCount(1);
   await actions.getByRole('button', { name: 'Reportar una situación' }).click();
@@ -180,12 +180,25 @@ test('automated accessibility structure has no serious semantic failures', async
       const id = element.getAttribute('id');
       return id ? `#${id}` : element.tagName.toLowerCase();
     };
-    const accessibleName = (element: Element) =>
-      element.getAttribute('aria-label')?.trim()
-      || element.getAttribute('aria-labelledby')?.trim()
-      || element.textContent?.trim()
-      || element.getAttribute('title')?.trim()
-      || '';
+    const accessibleName = (element: Element) => {
+      const labelledBy = element.getAttribute('aria-labelledby')
+        ?.split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent?.trim() ?? '')
+        .filter(Boolean)
+        .join(' ');
+      const labels = 'labels' in element
+        ? [...((element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).labels ?? [])]
+            .map((label) => label.textContent?.trim() ?? '')
+            .filter(Boolean)
+            .join(' ')
+        : '';
+      return element.getAttribute('aria-label')?.trim()
+        || labelledBy
+        || labels
+        || element.textContent?.trim()
+        || element.getAttribute('title')?.trim()
+        || '';
+    };
     for (const element of document.querySelectorAll('button,a[href],input,select,textarea,[role="button"]')) {
       if (!accessibleName(element)) violations.push({ rule: 'accessible-name', target: selector(element) });
     }
@@ -230,8 +243,10 @@ test('keyboard, reduced motion and focus return remain complete', async ({ page 
   expect(duration).toBeLessThan(.02);
 });
 
-test('required viewports have no clipping, overlap or horizontal page scroll', async ({ browser }) => {
+test('required viewports have no clipping, overlap or horizontal page scroll', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Las capturas canónicas se generan una sola vez con DPR 1.');
   const sizes = [
+    { width: 320, height: 800, name: '320x800' },
     { width: 360, height: 800, name: '360x800' },
     { width: 390, height: 844, name: '390x844' },
     { width: 768, height: 1024, name: '768x1024' },
@@ -239,7 +254,7 @@ test('required viewports have no clipping, overlap or horizontal page scroll', a
     { width: 1440, height: 900, name: '1440x900' },
   ];
   for (const size of sizes) {
-    const context = await browser.newContext({ viewport: { width: size.width, height: size.height }, serviceWorkers: 'block' });
+    const context = await browser.newContext({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 1, isMobile: false, hasTouch: false, serviceWorkers: 'block' });
     const page = await context.newPage();
     await mockPublicApi(page);
     await page.goto('/');
@@ -251,11 +266,10 @@ test('required viewports have no clipping, overlap or horizontal page scroll', a
   }
 });
 
-test('200 percent zoom and 320px reflow preserve access to critical actions', async ({ page }) => {
+test('200 percent zoom equivalent and 320px reflow preserve access to critical actions', async ({ page }) => {
   await mockPublicApi(page);
-  await page.setViewportSize({ width: 640, height: 900 });
+  await page.setViewportSize({ width: 320, height: 900 });
   await page.goto('/');
-  await page.evaluate(() => { document.documentElement.style.zoom = '2'; });
   const dimensions = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   await expect(page.getByRole('heading', { name: 'Alerta por tormentas fuertes' })).toBeVisible();
