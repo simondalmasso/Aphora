@@ -1,0 +1,85 @@
+name: Export Effective V3 Source
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/export-effective-v3-trigger]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and apply exact current V3 patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib
+
+          expected_parts = [
+              'b419d7560457640f637118680a38d4ffadc4788f0eadd328b560575be4781fa0',
+              '2840b4dddf6674c1fd166da1cb26d7b614c7b6e09ba387206d920a5716decdba',
+              '388d8b6ab894c8d4e3adffd18614866d6bf12b7cdb37d99d240969a93a20cb9a',
+              'd776c0cbf06354d274c8392d927a3a7882f4f3beeef65b0a5ef5ccfac749ef91',
+              '469b0461f75f597ed5d96f4cc0f0900ed34000b45be5f64ee2e99b4aa8e08cc7',
+              '8cfdebc50bf5f72777065fcf23f7493b44993ab5ca830bd8f94e72599aca7450',
+              '254e05a4b0205134e29e842505325e44703f85c341202c4be62f76248e9ecbe3',
+              'a616c5134f6dc1924472bee8f7725396eb3c96b2ae4e5026cee5bc33544df894',
+          ]
+          chunks = []
+          for index, expected in enumerate(expected_parts):
+              data = Path(f'.github/v3-full-014-parts/part{index:02d}').read_text().strip()
+              actual = hashlib.sha256(data.encode()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
+              chunks.append(data)
+
+          encoded = ''.join(chunks)
+          if hashlib.sha256(encoded.encode()).hexdigest() != '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd':
+              raise SystemExit('PATCH_TRANSPORT_HASH_MISMATCH')
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          if hashlib.sha256(patch).hexdigest() != '4be4aaf954713be50e56eee4de6118ec767cf6b9b63b86189c3fc6a0b5f20400':
+              raise SystemExit('PATCH_CONTENT_HASH_MISMATCH')
+          Path('/tmp/v3-full-014.patch').write_bytes(patch)
+
+          fix_encoded = Path('.github/v3-full-014-provision-fix.patch.b64').read_text().strip()
+          if hashlib.sha256(fix_encoded.encode()).hexdigest() != 'bf4117c00120a1118737d8568d10202515610d1dc78b5384da8ce49e95e4bf98':
+              raise SystemExit('PROVISION_FIX_TRANSPORT_HASH_MISMATCH')
+          fix_patch = base64.b64decode(fix_encoded, validate=True)
+          if hashlib.sha256(fix_patch).hexdigest() != 'e89bdaef77e5e8c9111a6bfc506e2fb63995869fa5d65d09819a92d41313ae4c':
+              raise SystemExit('PROVISION_FIX_CONTENT_HASH_MISMATCH')
+          Path('/tmp/v3-full-014-provision-fix.patch').write_bytes(fix_patch)
+          PY
+          git apply --index /tmp/v3-full-014.patch
+          git apply --index /tmp/v3-full-014-provision-fix.patch
+          git diff --cached --check
+          git diff --cached --stat
+
+      - name: Package effective source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/effective-v3
+          git ls-files -co --exclude-standard -z | tar --null -T - -cf /tmp/effective-v3/source.tar
+          git diff --cached --binary > /tmp/effective-v3/current-effective.patch
+          git diff --cached --name-only > /tmp/effective-v3/changed-files.txt
+          git rev-parse HEAD > /tmp/effective-v3/base-head.txt
+          sha256sum /tmp/effective-v3/source.tar /tmp/effective-v3/current-effective.patch > /tmp/effective-v3/sha256sums.txt
+
+      - name: Upload effective source
+        uses: actions/upload-artifact@v4
+        with:
+          name: effective-v3-source-${{ github.sha }}-${{ github.run_id }}
+          path: /tmp/effective-v3/
+          if-no-files-found: error
+          retention-days: 7
