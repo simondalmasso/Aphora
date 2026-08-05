@@ -48,12 +48,31 @@ jobs:
           set -euo pipefail
           mode="$(sed -n 's/^MODE=//p' .github/arq-v3-deploy-trigger | head -n1)"
           case "$mode" in
-            FINAL_V3_FULL_014) apply_patch=true; sync_source=true ;;
-            TERMINAL_V3_FULL_014) apply_patch=false; sync_source=false ;;
-            *) echo "UNSUPPORTED_V3_014_MODE:$mode" >&2; exit 1 ;;
+            FINAL_V3_FULL_014)
+              apply_patch=true
+              sync_source=true
+              mutate_cloudflare=true
+              deploy=true
+              ;;
+            TERMINAL_V3_FULL_014)
+              apply_patch=false
+              sync_source=false
+              mutate_cloudflare=false
+              deploy=false
+              ;;
+            *)
+              echo "UNSUPPORTED_V3_014_MODE:$mode" >&2
+              exit 1
+              ;;
           esac
-          test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
-          printf 'mode=%s\napply_patch=%s\nsync_source=%s\n' "$mode" "$apply_patch" "$sync_source" | tee -a "$GITHUB_OUTPUT"
+          test "$GITHUB_REF_NAME" = "arq/visual-dashboard-v3"
+          {
+            printf 'mode=%s\n' "$mode"
+            printf 'apply_patch=%s\n' "$apply_patch"
+            printf 'sync_source=%s\n' "$sync_source"
+            printf 'mutate_cloudflare=%s\n' "$mutate_cloudflare"
+            printf 'deploy=%s\n' "$deploy"
+          } | tee -a "$GITHUB_OUTPUT"
           mkdir -p "$EVIDENCE_DIR"
           printf 'mode=%s\nsource_sha=%s\n' "$mode" "$GITHUB_SHA" > "$EVIDENCE_DIR/execution-mode.txt"
 
@@ -85,11 +104,13 @@ jobs:
                   raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
               chunks.append(data)
               report.append(f'part{index:02d}_sha256={actual}')
+
           encoded = ''.join(chunks)
           actual_b64 = hashlib.sha256(encoded.encode()).hexdigest()
           expected_b64 = '32fe8c0f7741c3f996a5bb1dce5e4b22e5833a7d53b5ffc5611d83e7c6d436bd'
           if actual_b64 != expected_b64:
               raise SystemExit(f'PATCH_TRANSPORT_HASH_MISMATCH:{actual_b64}')
+
           patch = gzip.decompress(base64.b64decode(encoded, validate=True))
           actual_patch = hashlib.sha256(patch).hexdigest()
           expected_patch = '4be4aaf954713be50e56eee4de6118ec767cf6b9b63b86189c3fc6a0b5f20400'
@@ -107,8 +128,14 @@ jobs:
           if fix_hash != 'e89bdaef77e5e8c9111a6bfc506e2fb63995869fa5d65d09819a92d41313ae4c':
               raise SystemExit(f'PROVISION_FIX_CONTENT_HASH_MISMATCH:{fix_hash}')
           Path('/tmp/v3-full-014-provision-fix.patch').write_bytes(fix_patch)
-          report.extend([f'provision_fix_base64_sha256={fix_transport}', f'provision_fix_patch_sha256={fix_hash}'])
-          Path('artifacts/v3-full-014/patch-verification.txt').write_text('\n'.join(report) + '\n', encoding='utf-8')
+          report.extend([
+              f'provision_fix_base64_sha256={fix_transport}',
+              f'provision_fix_patch_sha256={fix_hash}',
+          ])
+          Path('artifacts/v3-full-014/patch-verification.txt').write_text(
+              '\n'.join(report) + '\n',
+              encoding='utf-8',
+          )
           PY
           git apply --index /tmp/v3-full-014.patch
           git apply --index /tmp/v3-full-014-provision-fix.patch
@@ -123,7 +150,56 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=no)"
           test -f migrations/0004_session_csrf_photo_access.sql
           test -f src/client/security/csrf.ts
+          test -f public/source-provenance.json
           grep -q "SESSION_SIGNING_KEY_PRESENT" scripts/provision-cloudflare.mjs
+
+      - name: Generate deterministic deployed-source provenance
+        if: steps.mode.outputs.apply_patch == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, subprocess
+
+          excluded = (
+              '.github/',
+              'artifacts/',
+              'dist/',
+          )
+          marker = 'public/source-provenance.json'
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
+          digest = hashlib.sha256()
+          included = 0
+          for raw in sorted(p for p in paths if p):
+              path = raw.decode('utf-8')
+              if path == marker or path.startswith(excluded):
+                  continue
+              data = Path(path).read_bytes()
+              digest.update(path.encode('utf-8'))
+              digest.update(b'\0')
+              digest.update(len(data).to_bytes(8, 'big'))
+              digest.update(data)
+              included += 1
+          payload = {
+              'schemaVersion': 1,
+              'orderId': 'SOS-SF-OWNER-V3-FULL-COMPLETION-014',
+              'productTreeSha256': digest.hexdigest(),
+              'includedFileCount': included,
+              'deploymentRunId': os.environ['GITHUB_RUN_ID'],
+          }
+          Path(marker).write_text(
+              json.dumps(payload, sort_keys=True, separators=(',', ':')) + '\n',
+              encoding='utf-8',
+          )
+          Path(os.environ['EVIDENCE_DIR'], 'source-provenance-local.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+          git add public/source-provenance.json
+          git diff --cached --check
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -162,40 +238,56 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$ ]] || { echo 'GOOGLE_CLIENT_ID_REQUIRED_OR_INVALID' >&2; exit 2; }
+          [[ "$GOOGLE_CLIENT_ID" =~ ^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$ ]] || {
+            echo 'GOOGLE_CLIENT_ID_REQUIRED_OR_INVALID' >&2
+            exit 2
+          }
           node - <<'NODE'
-          const values=String(process.env.SOS_SF_OPERATOR_EMAILS||'').split(',').map(v=>v.trim()).filter(Boolean);
-          if (!values.length || !values.every(v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) throw new Error('SOS_SF_OPERATOR_EMAILS_REQUIRED_OR_INVALID');
+          const values = String(process.env.SOS_SF_OPERATOR_EMAILS || '')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+          if (!values.length || !values.every((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))) {
+            throw new Error('SOS_SF_OPERATOR_EMAILS_REQUIRED_OR_INVALID');
+          }
           NODE
-          printf 'google_client_id_present=true\noperator_allowlist_present=true\n' > "$EVIDENCE_DIR/protected-config-presence.txt"
+          printf 'google_client_id_present=true\noperator_allowlist_present=true\n' \
+            > "$EVIDENCE_DIR/protected-config-presence.txt"
 
       - name: Ensure persistent session signing secret
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         shell: bash
         run: |
           set -euo pipefail
           if [ -n "${SESSION_SIGNING_KEY:-}" ]; then
             test "${#SESSION_SIGNING_KEY}" -ge 32
             echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
-            echo 'session_secret_source=github_actions_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+            echo 'session_secret_source=github_actions_secret' \
+              > "$EVIDENCE_DIR/session-secret-state.txt"
             exit 0
           fi
+
           npx wrangler secret list --config wrangler.jsonc > /tmp/worker-secrets-list.json
           if node -e "const x=require('/tmp/worker-secrets-list.json');process.exit(x.some(v=>v.name==='SESSION_SIGNING_KEY')?0:1)"; then
             echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
-            echo 'session_secret_source=existing_cloudflare_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+            echo 'session_secret_source=existing_cloudflare_secret' \
+              > "$EVIDENCE_DIR/session-secret-state.txt"
           else
             generated="$(openssl rand -base64 48 | tr -d '\n')"
             echo "::add-mask::$generated"
             echo "SESSION_SIGNING_KEY=$generated" >> "$GITHUB_ENV"
             echo 'SESSION_SIGNING_KEY_PRESENT=true' >> "$GITHUB_ENV"
-            echo 'session_secret_source=generated_once_for_cloudflare_secret' > "$EVIDENCE_DIR/session-secret-state.txt"
+            echo 'session_secret_source=generated_once_for_cloudflare_secret' \
+              > "$EVIDENCE_DIR/session-secret-state.txt"
           fi
 
       - name: Provision or verify D1 and R2
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         id: provision
         run: node scripts/provision-cloudflare.mjs
 
       - name: Require storage authority and private readiness
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -204,52 +296,103 @@ jobs:
           test '${{ steps.provision.outputs.private_ready }}' = 'true'
 
       - name: Apply remote D1 migrations
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         run: npx wrangler d1 migrations apply sos-sf-private --remote --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/d1-migrations.log"
 
       - name: Verify remote D1 schema and security columns
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows') ORDER BY name" --json > "$EVIDENCE_DIR/d1-schema.json"
-          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc --command "PRAGMA table_info(auth_sessions)" --json > "$EVIDENCE_DIR/d1-auth-session-columns.json"
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc \
+            --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows') ORDER BY name" \
+            --json > "$EVIDENCE_DIR/d1-schema.json"
+          npx wrangler d1 execute sos-sf-private --remote --config wrangler.generated.jsonc \
+            --command "PRAGMA table_info(auth_sessions)" \
+            --json > "$EVIDENCE_DIR/d1-auth-session-columns.json"
           node - <<'NODE'
-          const fs=require('node:fs'),p=require('node:path');
-          const rows=(file)=>{const x=JSON.parse(fs.readFileSync(p.join(process.env.EVIDENCE_DIR,file),'utf8'));return (Array.isArray(x)?x:[x]).flatMap(v=>v.results||v.result?.[0]?.results||[])};
-          const names=new Set(rows('d1-schema.json').map(v=>v.name));
-          for(const n of ['auth_sessions','conversations','messages','reports','report_photos','report_events','report_photo_access_grants','rate_windows']) if(!names.has(n)) throw new Error(`D1_TABLE_MISSING:${n}`);
-          const columns=new Set(rows('d1-auth-session-columns.json').map(v=>v.name));
-          for(const n of ['csrf_hash','last_seen_at','rotated_from','revoked_at']) if(!columns.has(n)) throw new Error(`D1_COLUMN_MISSING:${n}`);
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const rows = (file) => {
+            const value = JSON.parse(
+              fs.readFileSync(path.join(process.env.EVIDENCE_DIR, file), 'utf8'),
+            );
+            return (Array.isArray(value) ? value : [value])
+              .flatMap((entry) => entry.results || entry.result?.[0]?.results || []);
+          };
+          const names = new Set(rows('d1-schema.json').map((value) => value.name));
+          for (const name of [
+            'auth_sessions',
+            'conversations',
+            'messages',
+            'reports',
+            'report_photos',
+            'report_events',
+            'report_photo_access_grants',
+            'rate_windows',
+          ]) {
+            if (!names.has(name)) throw new Error(`D1_TABLE_MISSING:${name}`);
+          }
+          const columns = new Set(
+            rows('d1-auth-session-columns.json').map((value) => value.name),
+          );
+          for (const name of ['csrf_hash', 'last_seen_at', 'rotated_from', 'revoked_at']) {
+            if (!columns.has(name)) throw new Error(`D1_COLUMN_MISSING:${name}`);
+          }
           NODE
 
       - name: Configure and verify R2 retention lifecycle
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         shell: bash
         run: |
           set -euo pipefail
           days="${REPORT_RETENTION_DAYS:-30}"
-          npx wrangler r2 bucket lifecycle remove sos-sf-private-reports --id sos-sf-report-retention --config wrangler.generated.jsonc >/dev/null 2>&1 || true
-          npx wrangler r2 bucket lifecycle add sos-sf-private-reports sos-sf-report-retention reports/ --expire-days "$days" --config wrangler.generated.jsonc
-          npx wrangler r2 bucket lifecycle list sos-sf-private-reports --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/r2-lifecycle.txt"
+          npx wrangler r2 bucket lifecycle remove sos-sf-private-reports \
+            --id sos-sf-report-retention \
+            --config wrangler.generated.jsonc >/dev/null 2>&1 || true
+          npx wrangler r2 bucket lifecycle add sos-sf-private-reports \
+            sos-sf-report-retention reports/ \
+            --expire-days "$days" \
+            --config wrangler.generated.jsonc
+          npx wrangler r2 bucket lifecycle list sos-sf-private-reports \
+            --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/r2-lifecycle.txt"
           grep -q 'sos-sf-report-retention' "$EVIDENCE_DIR/r2-lifecycle.txt"
 
       - name: Verify bounded remote R2 object operations
+        if: steps.mode.outputs.mutate_cloudflare == 'true'
         shell: bash
         run: |
           set -euo pipefail
           probe="__v3_014_probe/${GITHUB_RUN_ID}.txt"
           printf 'sos-sf-v3-014-r2-probe' > /tmp/probe.txt
-          npx wrangler r2 object put "sos-sf-private-reports/${probe}" --file /tmp/probe.txt --remote --config wrangler.generated.jsonc
-          npx wrangler r2 object get "sos-sf-private-reports/${probe}" --file /tmp/read.txt --remote --config wrangler.generated.jsonc
+          npx wrangler r2 object put "sos-sf-private-reports/${probe}" \
+            --file /tmp/probe.txt \
+            --remote \
+            --config wrangler.generated.jsonc
+          npx wrangler r2 object get "sos-sf-private-reports/${probe}" \
+            --file /tmp/read.txt \
+            --remote \
+            --config wrangler.generated.jsonc
           cmp /tmp/probe.txt /tmp/read.txt
-          npx wrangler r2 object delete "sos-sf-private-reports/${probe}" --remote --config wrangler.generated.jsonc
+          npx wrangler r2 object delete "sos-sf-private-reports/${probe}" \
+            --remote \
+            --config wrangler.generated.jsonc
           printf 'r2_put_get_delete=PASS\n' > "$EVIDENCE_DIR/r2-object-test.txt"
 
       - name: Deploy exact Worker with D1 R2 and protected secrets
+        if: steps.mode.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler deploy --config wrangler.generated.jsonc --secrets-file .worker-secrets.json 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
-          npx wrangler versions list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-versions.json" || true
-          npx wrangler deployments list --config wrangler.generated.jsonc --json > "$EVIDENCE_DIR/worker-deployments.json" || true
+          npx wrangler deploy \
+            --config wrangler.generated.jsonc \
+            --secrets-file .worker-secrets.json 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+          npx wrangler versions list \
+            --config wrangler.generated.jsonc \
+            --json > "$EVIDENCE_DIR/worker-versions.json" || true
+          npx wrangler deployments list \
+            --config wrangler.generated.jsonc \
+            --json > "$EVIDENCE_DIR/worker-deployments.json" || true
 
       - name: Verify production public private and source matrix
         env:
@@ -267,19 +410,95 @@ jobs:
           node -e "const x=require('/tmp/session.json');const d=x.data||x;if(d.enabled!==true||d.authenticated!==false)process.exit(1)"
           private_status="$(curl -sS -o /tmp/private.json -w '%{http_code}' "$origin/api/private/reports?verify=$GITHUB_RUN_ID")"
           test "$private_status" = 401
-          auth_status="$(curl -sS -o /tmp/auth-negative.json -w '%{http_code}' -X POST "$origin/api/auth/google?verify=$GITHUB_RUN_ID" -H "Origin: $origin" -H 'Sec-Fetch-Site: same-origin' -H 'Content-Type: application/json' --data '{"credential":"invalid"}')"
+          auth_status="$(curl -sS -o /tmp/auth-negative.json -w '%{http_code}' \
+            -X POST "$origin/api/auth/google?verify=$GITHUB_RUN_ID" \
+            -H "Origin: $origin" \
+            -H 'Sec-Fetch-Site: same-origin' \
+            -H 'Content-Type: application/json' \
+            --data '{"credential":"invalid"}')"
           test "$auth_status" = 401
-          printf 'session_anonymous=200\nprivate_unauthenticated=401\ninvalid_google_credential=401\n' > "$EVIDENCE_DIR/auth-negative-production.txt"
+          printf 'session_anonymous=200\nprivate_unauthenticated=401\ninvalid_google_credential=401\n' \
+            > "$EVIDENCE_DIR/auth-negative-production.txt"
+
+      - name: Verify deployed source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, subprocess
+
+          excluded = (
+              '.github/',
+              'artifacts/',
+              'dist/',
+          )
+          marker = 'public/source-provenance.json'
+          paths = subprocess.check_output(['git', 'ls-files', '-z']).split(b'\0')
+          digest = hashlib.sha256()
+          included = 0
+          for raw in sorted(p for p in paths if p):
+              path = raw.decode('utf-8')
+              if path == marker or path.startswith(excluded):
+                  continue
+              data = Path(path).read_bytes()
+              digest.update(path.encode('utf-8'))
+              digest.update(b'\0')
+              digest.update(len(data).to_bytes(8, 'big'))
+              digest.update(data)
+              included += 1
+          Path('/tmp/local-product-tree.json').write_text(
+              json.dumps(
+                  {
+                      'productTreeSha256': digest.hexdigest(),
+                      'includedFileCount': included,
+                  },
+                  sort_keys=True,
+              ),
+              encoding='utf-8',
+          )
+          PY
+          curl -fsS \
+            "$DEPLOYMENT_URL/source-provenance.json?verify=$GITHUB_RUN_ID" \
+            > /tmp/remote-source-provenance.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const local = JSON.parse(fs.readFileSync('/tmp/local-product-tree.json', 'utf8'));
+          const committed = JSON.parse(fs.readFileSync('public/source-provenance.json', 'utf8'));
+          const remote = JSON.parse(fs.readFileSync('/tmp/remote-source-provenance.json', 'utf8'));
+          for (const candidate of [committed, remote]) {
+            if (candidate.orderId !== 'SOS-SF-OWNER-V3-FULL-COMPLETION-014') {
+              throw new Error('SOURCE_PROVENANCE_ORDER_MISMATCH');
+            }
+            if (candidate.productTreeSha256 !== local.productTreeSha256) {
+              throw new Error('SOURCE_PROVENANCE_DIGEST_MISMATCH');
+            }
+            if (candidate.includedFileCount !== local.includedFileCount) {
+              throw new Error('SOURCE_PROVENANCE_FILE_COUNT_MISMATCH');
+            }
+          }
+          fs.writeFileSync(
+            `${process.env.EVIDENCE_DIR}/cloudflare-github-drift.txt`,
+            [
+              `github_product_tree_sha256=${local.productTreeSha256}`,
+              `cloudflare_product_tree_sha256=${remote.productTreeSha256}`,
+              'CLOUDFLARE_GITHUB_DRIFT=false',
+              '',
+            ].join('\n'),
+          );
+          NODE
 
       - name: Synchronize deployed product source to GitHub
         if: steps.mode.outputs.sync_source == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          git rm -f .github/v3-full-014.patch.gz.b64 .github/v3-full-014-provision-fix.patch.b64
+          git rm -f \
+            .github/v3-full-014.patch.gz.b64 \
+            .github/v3-full-014-provision-fix.patch.b64
           git rm -rf .github/v3-full-014-parts
-          printf 'MODE=SYNCED_V3_FULL_014\n' > .github/arq-v3-deploy-trigger
-          git add .github/arq-v3-deploy-trigger
+          printf 'MODE=TERMINAL_V3_FULL_014\n' > .github/arq-v3-deploy-trigger
+          git add .github/arq-v3-deploy-trigger public/source-provenance.json
           git diff --cached --check
           git config user.name 'sos-sf-automation'
           git config user.email 'sos-sf-automation@users.noreply.github.com'
@@ -299,24 +518,24 @@ jobs:
         run: |
           set -euo pipefail
           conclusion='${{ job.status }}'
-          cat > /tmp/issue-comment.md <<EOF
-          ## SOS-SF-OWNER-V3-FULL-COMPLETION-014 — workflow checkpoint
-
-          - Mode: `${{ steps.mode.outputs.mode }}`
-          - Run: `${GITHUB_RUN_ID}`
-          - Source SHA at start: `${GITHUB_SHA}`
-          - Job status: `${conclusion}`
-          - `main`: untouched
-          - Issue: remains open
-          - `AUD_HOLD`: ACTIVE
-
-          Evidence is attached to the workflow artifact. This comment does not declare owner or AUD acceptance.
-          EOF
+          {
+            echo '## SOS-SF-OWNER-V3-FULL-COMPLETION-014 — workflow checkpoint'
+            echo
+            printf -- '- Mode: `%s`\n' '${{ steps.mode.outputs.mode }}'
+            printf -- '- Run: `%s`\n' "$GITHUB_RUN_ID"
+            printf -- '- Source SHA at start: `%s`\n' "$GITHUB_SHA"
+            printf -- '- Job status: `%s`\n' "$conclusion"
+            echo '- `main`: untouched'
+            echo '- Issue: remains open'
+            echo '- `AUD_HOLD`: ACTIVE'
+            echo
+            echo 'Evidence is attached to the workflow artifact. This comment does not declare owner or AUD acceptance.'
+          } > /tmp/issue-comment.md
           gh issue comment 8 --repo "$GITHUB_REPOSITORY" --body-file /tmp/issue-comment.md || true
 
       - name: Remove generated sensitive material
         if: always()
-        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/session.json /tmp/private.json /tmp/auth-negative.json /tmp/worker-secrets-list.json /tmp/v3-full-014.patch /tmp/v3-full-014-provision-fix.patch
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc /tmp/probe.txt /tmp/read.txt /tmp/session.json /tmp/private.json /tmp/auth-negative.json /tmp/worker-secrets-list.json /tmp/v3-full-014.patch /tmp/v3-full-014-provision-fix.patch /tmp/local-product-tree.json /tmp/remote-source-provenance.json
 
       - name: Upload V3 completion evidence
         if: always()
