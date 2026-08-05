@@ -1,4 +1,4 @@
-name: All Sources 013 Workers First Metadata
+name: All Sources 013 Workers First Correction
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   actions: read
+  issues: write
 
 concurrency:
   group: sos-sf-workers-production
@@ -29,33 +30,339 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Restore corrected runtime and use stable NASA metadata endpoint
-        env: { GH_TOKEN: "${{ github.token }}" }
+
+      - name: Record mandatory production drift
         run: |
-          rm -rf "$EVIDENCE_DIR" /tmp/as013 && mkdir -p "$EVIDENCE_DIR" /tmp/as013
-          curl --fail --location --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/${{ github.repository }}/actions/artifacts/8913009575/zip -o /tmp/as013.zip
+          rm -rf "$EVIDENCE_DIR" /tmp/as013
+          mkdir -p "$EVIDENCE_DIR" /tmp/as013
+          cat > "$EVIDENCE_DIR/pre-correction-drift.json" <<'JSON'
+          {
+            "orderId": "ALL-SOURCES-013",
+            "accepted": false,
+            "workerVersion": "dde3e09c-4da0-4efe-ac93-d7ecf5b66364",
+            "failedWorkflowRun": 30961574907,
+            "branchHeadBeforeCorrection": "c6fbedb96b22b47131c8110f6a7b681a9974bd24",
+            "cloudflareGithubDrift": true,
+            "reason": "Worker runtime contained unsynchronized metadata-backed NASA code; metadata is not a rainfall observation."
+          }
+          JSON
+
+      - name: Restore deployed runtime and implement bounded NASA sample chain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --location --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/artifacts/8913143222/zip \
+            -o /tmp/as013.zip
           unzip -q /tmp/as013.zip -d /tmp/as013
           git apply /tmp/as013/runtime.patch
+
           cat > src/worker/providers/nasa.ts <<'TS'
-          import { fetchProvider,type ProviderPolicy,type ProviderResult } from './core';
-          export interface NasaGpmReading{readonly observedAt:string;readonly value:number|null;readonly latencyMinutes:number;readonly resolution:string;readonly uncertainty:string}
-          interface ImageServerMetadata{readonly name?:unknown;readonly serviceDataType?:unknown;readonly pixelSizeX?:unknown;readonly pixelSizeY?:unknown;readonly timeInfo?:{readonly timeExtent?:unknown;readonly defaultTimeInterval?:unknown;readonly defaultTimeIntervalUnits?:unknown}}
-          const POLICY:ProviderPolicy=Object.freeze({id:'nasa-gpm-imerg-early',hosts:Object.freeze(['gis.earthdata.nasa.gov']),paths:Object.freeze([/^\/image\/rest\/services\/GESDISC\/GPM_3IMERGHHE\/ImageServer$/]),contentTypes:Object.freeze(['application/json','text/plain']),timeoutMs:12_000,maxBytes:750_000,freshMs:8*60*60_000,staleMs:14*24*60*60_000});
-          export function fetchNasaGpm(url:string):Promise<ProviderResult<NasaGpmReading>>{return fetchProvider(url,POLICY,body=>{const p=JSON.parse(body) as ImageServerMetadata;const extent=p.timeInfo?.timeExtent;if(p.name!=='GESDISC/GPM_3IMERGHHE'||p.serviceDataType!=='esriImageServiceDataTypeScientific'||!Array.isArray(extent)||typeof extent[1]!=='number'||!Number.isFinite(extent[1])||typeof p.pixelSizeX!=='number'||typeof p.pixelSizeY!=='number')throw Error('NASA_METADATA_PARSE');const observedAt=new Date(extent[1]).toISOString();const interval=p.timeInfo?.defaultTimeInterval;return{value:Object.freeze({observedAt,value:null,latencyMinutes:240,resolution:`${p.pixelSizeX}° × ${p.pixelSizeY}° / ${typeof interval==='number'?interval:30} minutos`,uncertainty:'IMERG Early V07: disponibilidad del producto satelital oficial; SOS-SF no transforma esta metadata en pluviómetro ni nivel local.'}),observedAt}})}
+          import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core';
+
+          export interface NasaGpmReading {
+            readonly observedAt: string;
+            readonly value: number;
+            readonly latencyMinutes: number;
+            readonly resolution: string;
+            readonly uncertainty: string;
+            readonly sourceUrl: string;
+            readonly objectId: number;
+          }
+
+          interface RasterReference {
+            readonly objectId: number;
+            readonly observedAt: string;
+          }
+
+          const HOST = 'gis.earthdata.nasa.gov';
+          const QUERY_PATH = /^\/image\/rest\/services\/GESDISC\/GPM_3IMERGHHE\/ImageServer\/query$/;
+          const SAMPLE_PATH = /^\/image\/rest\/services\/GESDISC\/GPM_3IMERGHHE\/ImageServer\/getSamples$/;
+          const QUERY_POLICY: ProviderPolicy = Object.freeze({
+            id: 'nasa-gpm-imerg-early',
+            hosts: Object.freeze([HOST]),
+            paths: Object.freeze([QUERY_PATH]),
+            contentTypes: Object.freeze(['application/json']),
+            timeoutMs: 16_000,
+            maxBytes: 500_000,
+            freshMs: 15 * 60_000,
+            staleMs: 0,
+          });
+          const SAMPLE_POLICY: ProviderPolicy = Object.freeze({
+            id: 'nasa-gpm-imerg-early',
+            hosts: Object.freeze([HOST]),
+            paths: Object.freeze([SAMPLE_PATH]),
+            contentTypes: Object.freeze(['application/json']),
+            timeoutMs: 12_000,
+            maxBytes: 500_000,
+            freshMs: 15 * 60_000,
+            staleMs: 0,
+          });
+
+          function record(value: unknown): value is Record<string, unknown> {
+            return typeof value === 'object' && value !== null && !Array.isArray(value);
+          }
+
+          function finite(value: unknown): number | null {
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+            if (typeof value !== 'string') return null;
+            const normalized = value.trim().replace(',', '.');
+            if (!normalized || /^(?:nodata|null|nan)$/i.test(normalized)) return null;
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : null;
+          }
+
+          function unavailableFrom<T, U>(result: ProviderResult<T>): ProviderResult<U> {
+            return Object.freeze({
+              value: null,
+              status: result.status,
+              fetchedAt: result.fetchedAt,
+              observedAt: result.observedAt,
+              errorClass: result.errorClass,
+              fromCache: result.fromCache,
+            });
+          }
+
+          export async function fetchNasaGpm(baseUrl: string): Promise<ProviderResult<NasaGpmReading>> {
+            const queryUrl = new URL(`${baseUrl.replace(/\/$/, '')}/query`);
+            queryUrl.searchParams.set('where', '1=1');
+            queryUrl.searchParams.set('outFields', 'OBJECTID,StdTime');
+            queryUrl.searchParams.set('orderByFields', 'StdTime DESC');
+            queryUrl.searchParams.set('resultRecordCount', '1');
+            queryUrl.searchParams.set('returnGeometry', 'false');
+            queryUrl.searchParams.set('f', 'json');
+
+            const latest = await fetchProvider<RasterReference>(queryUrl.toString(), QUERY_POLICY, (body) => {
+              const payload = JSON.parse(body) as unknown;
+              if (!record(payload) || record(payload.error)) throw new Error('NASA_QUERY_ERROR');
+              const feature = Array.isArray(payload.features) ? payload.features[0] : null;
+              const attributes = record(feature) && record(feature.attributes) ? feature.attributes : null;
+              const objectId = finite(attributes?.objectid ?? attributes?.OBJECTID);
+              const stdTime = finite(attributes?.stdtime ?? attributes?.StdTime);
+              if (objectId === null || !Number.isInteger(objectId) || objectId <= 0 || stdTime === null || stdTime < 1_000_000_000_000) {
+                throw new Error('NASA_QUERY_SCHEMA');
+              }
+              const observedAt = new Date(stdTime).toISOString();
+              return { value: Object.freeze({ objectId, observedAt }), observedAt };
+            });
+            if (!latest.value) return unavailableFrom<RasterReference, NasaGpmReading>(latest);
+
+            const sampleUrl = new URL(`${baseUrl.replace(/\/$/, '')}/getSamples`);
+            sampleUrl.searchParams.set('geometry', JSON.stringify({ x: -60.7, y: -31.63, spatialReference: { wkid: 4326 } }));
+            sampleUrl.searchParams.set('geometryType', 'esriGeometryPoint');
+            sampleUrl.searchParams.set('returnFirstValueOnly', 'true');
+            sampleUrl.searchParams.set('outFields', 'OBJECTID,StdTime');
+            sampleUrl.searchParams.set('mosaicRule', JSON.stringify({
+              mosaicMethod: 'esriMosaicLockRaster',
+              lockRasterIds: [latest.value.objectId],
+            }));
+            sampleUrl.searchParams.set('f', 'json');
+
+            const raster = latest.value;
+            return fetchProvider<NasaGpmReading>(sampleUrl.toString(), SAMPLE_POLICY, (body) => {
+              const payload = JSON.parse(body) as unknown;
+              if (!record(payload) || record(payload.error) || !Array.isArray(payload.samples) || payload.samples.length === 0) {
+                throw new Error('NASA_SAMPLE_MISSING');
+              }
+              const sample = payload.samples.find(record);
+              if (!sample) throw new Error('NASA_SAMPLE_SCHEMA');
+              const rasterId = finite(sample.rasterId ?? sample.rasterID ?? (record(sample.attributes) ? sample.attributes.objectid ?? sample.attributes.OBJECTID : null));
+              if (rasterId !== null && rasterId !== raster.objectId) throw new Error('NASA_SAMPLE_RASTER_MISMATCH');
+              const value = finite(sample.value ?? sample.pixelValue ?? sample.values);
+              if (value === null) throw new Error('NASA_SAMPLE_VALUE_MISSING');
+              const latencyMinutes = Math.max(0, Math.round((Date.now() - Date.parse(raster.observedAt)) / 60_000));
+              return {
+                value: Object.freeze({
+                  observedAt: raster.observedAt,
+                  value,
+                  latencyMinutes,
+                  resolution: '0,1° / 30 minutos',
+                  uncertainty: 'IMERG Early V07 es una estimación satelital suplementaria; no reemplaza pluviómetros ni niveles hidrométricos locales.',
+                  sourceUrl: sampleUrl.toString(),
+                  objectId: raster.objectId,
+                }),
+                observedAt: raster.observedAt,
+              };
+            });
+          }
           TS
+
           python <<'PY'
           from pathlib import Path
-          p=Path('src/worker/providers/smn.ts');s=p.read_text()
-          old="export function fetchSmnObservations(_url:string):Promise<ProviderResult<SmnObservationSummary>>{throw Error('SMN_OBSERVATIONS_CREDENTIAL_REQUIRED')}"
-          new="export function fetchSmnObservations(url:string):Promise<ProviderResult<SmnObservationSummary>>{void url;return Promise.reject(new Error('SMN_OBSERVATIONS_CREDENTIAL_REQUIRED'))}"
-          if old in s:s=s.replace(old,new)
+          import re
+
+          p = Path('src/worker/providers/smn.ts')
+          s = p.read_text()
+          old = "export function fetchSmnObservations(_url:string):Promise<ProviderResult<SmnObservationSummary>>{throw Error('SMN_OBSERVATIONS_CREDENTIAL_REQUIRED')}"
+          new = "export function fetchSmnObservations(url:string):Promise<ProviderResult<SmnObservationSummary>>{void url;return Promise.reject(new Error('SMN_OBSERVATIONS_CREDENTIAL_REQUIRED'))}"
+          if old in s:
+              s = s.replace(old, new)
           p.write_text(s)
-          p=Path('src/worker/live-data.ts');s=p.read_text()
-          s=s.replace("const NASA_GPM_URL = 'https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer/identify';","const NASA_GPM_URL = 'https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer';")
-          s=s.replace("    contribution: result.value ? 'Estimación satelital suplementaria disponible; no se transforma en un nivel o pluviómetro local.' : 'Estimación satelital suplementaria no disponible.',","    contribution: result.value ? 'Producto GPM IMERG Early V07 disponible con timestamp y resolución oficiales; no se transforma en pluviómetro ni nivel local.' : 'Producto satelital suplementario no disponible.',")
+
+          p = Path('src/worker/live-data.ts')
+          s = p.read_text()
+          s = s.replace("const LIVE_DATA_CACHE_VERSION = 'all-sources-013-v1';", "const LIVE_DATA_CACHE_VERSION = 'all-sources-013-v2';")
+          s = re.sub(
+              r"const NASA_GPM_URL = '[^']+';",
+              "const NASA_GPM_URL = 'https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer';",
+              s,
+              count=1,
+          )
+          replacement = r'''async function nasaSource(): Promise<Source> {
+            const result: ProviderResult<NasaGpmReading> = await fetchNasaGpm(NASA_GPM_URL);
+            const connected = result.value !== null
+              && Number.isFinite(result.value.value)
+              && Number.isFinite(Date.parse(result.value.observedAt));
+            const observedAt = connected ? result.value!.observedAt : result.fetchedAt;
+            return Object.freeze({
+              id: 'nasa-gpm-imerg-early',
+              name: 'NASA GPM IMERG Early',
+              kind: 'SATELLITE_OBSERVATION',
+              status: connected ? sourceStatus(result) : 'UNAVAILABLE',
+              observedAt,
+              validUntil: new Date(Date.parse(observedAt) + 6 * 3_600_000).toISOString(),
+              contribution: connected
+                ? `Muestra satelital real en Santa Fe: ${result.value!.value.toFixed(2)} mm/h, raster ${result.value!.objectId}.`
+                : `NASA GPM no entregó una muestra numérica acotada (${result.errorClass ?? 'SIN_MUESTRA'}).`,
+              official: true,
+              connected,
+              url: connected ? result.value!.sourceUrl : `${NASA_GPM_URL}/query`,
+              latencyMinutes: connected ? result.value!.latencyMinutes : undefined,
+              resolution: connected ? result.value!.resolution : '0,1° / 30 minutos',
+              uncertainty: connected
+                ? result.value!.uncertainty
+                : 'Fuente suplementaria no utilizada para determinar el estado hídrico principal.',
+            });
+          }
+
+          function highestState'''
+          s, count = re.subn(
+              r"async function nasaSource\(\): Promise<Source> \{[\s\S]*?\n\}\n\nfunction highestState",
+              replacement,
+              s,
+              count=1,
+          )
+          assert count == 1, 'NASA_SOURCE_BLOCK_NOT_FOUND'
           p.write_text(s)
+
+          p = Path('scripts/verify-deployment.mjs')
+          s = p.read_text().replace('AbortSignal.timeout(25_000)', 'AbortSignal.timeout(40_000)')
+          needle = "const pass = results.every((result) => result.pass);"
+          matrix = r'''const healthData = payload(checks.find((item) => item.path === '/api/health'));
+          const sourcesData = payload(checks.find((item) => item.path === '/api/sources'));
+          const providers = Array.isArray(healthData?.providers) ? healthData.providers : [];
+          const sources = Array.isArray(sourcesData?.sources) ? sourcesData.sources : [];
+          const provider = (id) => providers.find((item) => item.id === id);
+          const source = (id) => sources.find((item) => item.id === id);
+          const primaryPairs = [
+            ['ina-rest-30', 'ina:30'],
+            ['ina-rest-3044', 'ina:3044'],
+            ['ina-waterml-parana', 'ina-waterml-parana'],
+            ['ina-waterml-salado', 'ina-waterml-salado'],
+            ['smn-alerts', 'smn-alerts'],
+          ];
+          const primaryPass = primaryPairs.every(([healthId, sourceId]) => {
+            const health = provider(healthId);
+            const item = source(sourceId);
+            return ['FRESH', 'STALE'].includes(health?.status)
+              && health?.errorClass === null
+              && health?.circuitOpenUntil === null
+              && Number.isFinite(Date.parse(health?.lastSuccessAt))
+              && Number.isFinite(Date.parse(health?.lastObservedAt))
+              && item?.connected === true
+              && ['FRESH', 'STALE'].includes(item?.status)
+              && Number.isFinite(Date.parse(item?.observedAt))
+              && typeof item?.url === 'string';
+          });
+          const blockedPass = [
+            ['ports-hydrometers', 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE'],
+            ['smn-observations', 'CREDENTIAL_REQUIRED'],
+          ].every(([id, errorClass]) => provider(id)?.status === 'UNAVAILABLE'
+            && provider(id)?.errorClass === errorClass
+            && provider(id)?.circuitOpenUntil === null
+            && source(id)?.connected === false
+            && source(id)?.status === 'UNAVAILABLE'
+            && typeof source(id)?.url === 'string');
+          const nasaHealth = provider('nasa-gpm-imerg-early');
+          const nasaSource = source('nasa-gpm-imerg-early');
+          const nasaConnectedPass = nasaSource?.connected === true
+            && ['FRESH', 'STALE'].includes(nasaHealth?.status)
+            && nasaHealth?.errorClass === null
+            && Number.isFinite(Date.parse(nasaHealth?.lastSuccessAt))
+            && Number.isFinite(Date.parse(nasaHealth?.lastObservedAt))
+            && Number.isFinite(nasaSource?.latencyMinutes)
+            && nasaSource.latencyMinutes >= 0
+            && /[-+]?\d+(?:[.,]\d+)? mm\/h/.test(String(nasaSource?.contribution ?? ''))
+            && String(nasaSource?.url ?? '').includes('/getSamples?')
+            && String(nasaSource?.url ?? '').includes('mosaicRule=');
+          const nasaUnavailablePass = nasaSource?.connected === false
+            && nasaSource?.status === 'UNAVAILABLE'
+            && nasaHealth?.status === 'UNAVAILABLE'
+            && ['TIMEOUT', 'HTTP', 'PARSE', 'NETWORK', 'CONTENT_TYPE', 'BODY_TOO_LARGE', 'CIRCUIT_OPEN'].includes(nasaHealth?.errorClass)
+            && String(nasaSource?.url ?? '').endsWith('/query');
+          const matrixPass = primaryPass && blockedPass && (nasaConnectedPass || nasaUnavailablePass);
+          results.push({ path: '/api/source-matrix', status: matrixPass ? 200 : 500, contentType: 'application/json', cacheControl: 'no-store', security: true, semantic: matrixPass, detail: 'ALL-SOURCES-013 primary matrix + conditional real NASA sample', pass: matrixPass });
+
+          const pass = results.every((result) => result.pass);'''
+          assert needle in s, 'VERIFY_PASS_MARKER_NOT_FOUND'
+          p.write_text(s.replace(needle, matrix, 1))
           PY
-          git diff -- src/worker > "$EVIDENCE_DIR/runtime.patch"
+
+          cat > tests/unit/nasa-provider.test.ts <<'TS'
+          import { afterEach, describe, expect, it, vi } from 'vitest';
+          import { fetchNasaGpm } from '../../src/worker/providers/nasa';
+
+          const originalFetch = globalThis.fetch;
+          afterEach(() => {
+            globalThis.fetch = originalFetch;
+            vi.unstubAllGlobals();
+            vi.restoreAllMocks();
+          });
+
+          describe('NASA GPM bounded sample chain', () => {
+            it('locks getSamples to the latest queried raster and calculates latency from StdTime', async () => {
+              const stdTime = Date.now() - 95 * 60_000;
+              const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+                const url = new URL(input instanceof Request ? input.url : String(input));
+                if (url.pathname.endsWith('/query')) {
+                  return new Response(JSON.stringify({ features: [{ attributes: { objectid: 586368, stdtime: stdTime } }] }), { headers: { 'Content-Type': 'application/json' } });
+                }
+                return new Response(JSON.stringify({ samples: [{ rasterId: 586368, value: '1.25' }] }), { headers: { 'Content-Type': 'application/json' } });
+              });
+              globalThis.fetch = fetchMock as typeof fetch;
+
+              const result = await fetchNasaGpm('https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer');
+              expect(result.value?.value).toBe(1.25);
+              expect(result.value?.latencyMinutes).toBeGreaterThanOrEqual(94);
+              expect(result.value?.latencyMinutes).toBeLessThanOrEqual(96);
+              expect(fetchMock).toHaveBeenCalledTimes(2);
+              const sampleUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
+              const mosaicRule = JSON.parse(sampleUrl.searchParams.get('mosaicRule') ?? '{}');
+              expect(mosaicRule).toEqual({ mosaicMethod: 'esriMosaicLockRaster', lockRasterIds: [586368] });
+            });
+
+            it('returns UNAVAILABLE when the locked raster has no real numeric sample', async () => {
+              const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+                const url = new URL(input instanceof Request ? input.url : String(input));
+                if (url.pathname.endsWith('/query')) {
+                  return new Response(JSON.stringify({ features: [{ attributes: { objectid: 42, stdtime: Date.now() - 60_000 } }] }), { headers: { 'Content-Type': 'application/json' } });
+                }
+                return new Response(JSON.stringify({ error: { code: 503, message: 'Wait timeout' } }), { headers: { 'Content-Type': 'application/json' } });
+              });
+              globalThis.fetch = fetchMock as typeof fetch;
+
+              const result = await fetchNasaGpm('https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer');
+              expect(result.value).toBeNull();
+              expect(result.status).toBe('UNAVAILABLE');
+              expect(result.errorClass).toBe('PARSE');
+            });
+          });
+          TS
+
+          git diff -- src/worker scripts/verify-deployment.mjs tests/unit/nasa-provider.test.ts > "$EVIDENCE_DIR/runtime.patch"
+
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
@@ -65,36 +372,115 @@ jobs:
       - run: npm run test:contract
       - run: npm run build
       - run: npm run test:worker
+
       - name: Prepare bounded Cloudflare configuration
         run: node scripts/provision-cloudflare.mjs
       - name: Wrangler dry run
         run: npx wrangler deploy --dry-run --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-dry-run.log"
-      - name: Deploy Worker first
+      - name: Deploy corrected Worker first
         run: npx wrangler deploy --config wrangler.generated.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
-      - name: Verify all source families twice in production
+
+      - name: Verify complete production source matrix twice
         run: |
           node <<'NODE'
-          const fs=require('node:fs');const base=process.env.DEPLOYMENT_URL;
-          async function read(path){const r=await fetch(`${base}${path}?all013=${Date.now()}-${Math.random()}`,{cache:'no-store',headers:{'Cache-Control':'no-store'},signal:AbortSignal.timeout(30000)});const text=await r.text();if(!r.ok)throw Error(`${path}:HTTP_${r.status}`);return JSON.parse(text).data}
-          (async()=>{const rounds=[];for(let i=0;i<2;i++){rounds.push({health:await read('/api/health'),sources:await read('/api/sources'),snapshot:await read('/api/snapshot')});await new Promise(r=>setTimeout(r,1500))}const h=rounds[1].health.providers,s=rounds[1].sources.sources;
-          for(const [hid,sid] of [['ina-rest-30','ina:30'],['ina-rest-3044','ina:3044'],['ina-waterml-parana','ina-waterml-parana'],['ina-waterml-salado','ina-waterml-salado'],['smn-alerts','smn-alerts'],['nasa-gpm-imerg-early','nasa-gpm-imerg-early']]){const hp=h.find(x=>x.id===hid),sp=s.find(x=>x.id===sid);if(!hp||hp.errorClass!==null||hp.circuitOpenUntil!==null||!hp.lastSuccessAt)throw Error(`health:${hid}:${JSON.stringify(hp)}`);if(!sp||sp.connected!==true||!sp.url)throw Error(`source:${sid}:${JSON.stringify(sp)}`)}
-          for(const [id,error] of [['ports-hydrometers','OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE'],['smn-observations','CREDENTIAL_REQUIRED']]){const hp=h.find(x=>x.id===id),sp=s.find(x=>x.id===id);if(hp?.errorClass!==error||hp?.circuitOpenUntil!==null||sp?.connected!==false||!sp?.url)throw Error(`block:${id}:${JSON.stringify({hp,sp})}`)}
-          const systems=rounds[1].snapshot.systems;if(!systems.find(x=>x.id==='parana-santa-fe'&&x.available)||!systems.find(x=>x.id==='salado-santo-tome'&&x.available))throw Error('systems');fs.writeFileSync(`${process.env.EVIDENCE_DIR}/production-matrix.json`,JSON.stringify(rounds,null,2));console.log(JSON.stringify({status:'PASS',providers:h,sources:s},null,2))})().catch(e=>{console.error(e);process.exit(1)})
+          const fs = require('node:fs');
+          const base = process.env.DEPLOYMENT_URL;
+          async function read(path) {
+            const response = await fetch(`${base}${path}?all013=${Date.now()}-${Math.random()}`, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-store' },
+              signal: AbortSignal.timeout(45_000),
+            });
+            const text = await response.text();
+            if (!response.ok) throw new Error(`${path}:HTTP_${response.status}`);
+            return JSON.parse(text).data;
+          }
+          function verify(round) {
+            const providers = round.health.providers;
+            const sources = round.sources.sources;
+            const provider = (id) => providers.find((item) => item.id === id);
+            const source = (id) => sources.find((item) => item.id === id);
+            const primary = [
+              ['ina-rest-30', 'ina:30'],
+              ['ina-rest-3044', 'ina:3044'],
+              ['ina-waterml-parana', 'ina-waterml-parana'],
+              ['ina-waterml-salado', 'ina-waterml-salado'],
+              ['smn-alerts', 'smn-alerts'],
+            ];
+            for (const [healthId, sourceId] of primary) {
+              const health = provider(healthId);
+              const item = source(sourceId);
+              if (!health || !['FRESH', 'STALE'].includes(health.status) || health.errorClass !== null || health.circuitOpenUntil !== null || !Number.isFinite(Date.parse(health.lastSuccessAt)) || !Number.isFinite(Date.parse(health.lastObservedAt))) {
+                throw new Error(`primary-health:${healthId}:${JSON.stringify(health)}`);
+              }
+              if (!item || item.connected !== true || !['FRESH', 'STALE'].includes(item.status) || !Number.isFinite(Date.parse(item.observedAt)) || typeof item.url !== 'string') {
+                throw new Error(`primary-source:${sourceId}:${JSON.stringify(item)}`);
+              }
+            }
+            for (const [id, errorClass] of [['ports-hydrometers', 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE'], ['smn-observations', 'CREDENTIAL_REQUIRED']]) {
+              const health = provider(id);
+              const item = source(id);
+              if (health?.status !== 'UNAVAILABLE' || health?.errorClass !== errorClass || health?.circuitOpenUntil !== null || item?.connected !== false || item?.status !== 'UNAVAILABLE' || typeof item?.url !== 'string') {
+                throw new Error(`blocked:${id}:${JSON.stringify({ health, item })}`);
+              }
+            }
+            const nasaHealth = provider('nasa-gpm-imerg-early');
+            const nasa = source('nasa-gpm-imerg-early');
+            if (nasa?.connected === true) {
+              if (!['FRESH', 'STALE'].includes(nasaHealth?.status) || nasaHealth?.errorClass !== null || !Number.isFinite(Date.parse(nasaHealth?.lastSuccessAt)) || !Number.isFinite(Date.parse(nasaHealth?.lastObservedAt)) || !Number.isFinite(nasa.latencyMinutes) || nasa.latencyMinutes < 0 || !/[-+]?\d+(?:[.,]\d+)? mm\/h/.test(String(nasa.contribution)) || !String(nasa.url).includes('/getSamples?') || !String(nasa.url).includes('mosaicRule=')) {
+                throw new Error(`nasa-connected-invalid:${JSON.stringify({ nasaHealth, nasa })}`);
+              }
+            } else if (nasa?.connected === false) {
+              if (nasa.status !== 'UNAVAILABLE' || nasaHealth?.status !== 'UNAVAILABLE' || !['TIMEOUT', 'HTTP', 'PARSE', 'NETWORK', 'CONTENT_TYPE', 'BODY_TOO_LARGE', 'CIRCUIT_OPEN'].includes(nasaHealth?.errorClass) || !String(nasa.url).endsWith('/query')) {
+                throw new Error(`nasa-unavailable-invalid:${JSON.stringify({ nasaHealth, nasa })}`);
+              }
+            } else {
+              throw new Error(`nasa-connected-flag-missing:${JSON.stringify(nasa)}`);
+            }
+            const systems = round.snapshot.systems;
+            if (!systems.find((item) => item.id === 'parana-santa-fe' && item.available) || !systems.find((item) => item.id === 'salado-santo-tome' && item.available)) {
+              throw new Error('primary-systems-unavailable');
+            }
+          }
+          (async () => {
+            const rounds = [];
+            for (let index = 0; index < 2; index += 1) {
+              const round = { health: await read('/api/health'), sources: await read('/api/sources'), snapshot: await read('/api/snapshot') };
+              verify(round);
+              rounds.push(round);
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+            fs.writeFileSync(`${process.env.EVIDENCE_DIR}/production-matrix.json`, JSON.stringify({ status: 'VERIFIED_NOT_ACCEPTED', rounds }, null, 2));
+            console.log(JSON.stringify({ status: 'VERIFIED_NOT_ACCEPTED', providers: rounds[1].health.providers, sources: rounds[1].sources.sources }, null, 2));
+          })().catch((error) => { console.error(error); process.exit(1); });
           NODE
-      - name: Synchronize exact verified source to GitHub second
+
+      - name: Synchronize exact deployed code and remove disposable workflows
         run: |
           git config user.name 'SOS-SF ARQ'
           git config user.email 'actions@users.noreply.github.com'
-          git add src/worker/providers/core.ts src/worker/providers/ina.ts src/worker/providers/smn.ts src/worker/providers/nasa.ts src/worker/live-data.ts
-          git commit -m 'feat: connect and classify all official source families 013'
-          printf 'all-sources-013-terminal-%s\n' "$(date -u +%Y%m%dT%H%M%SZ)" > .github/arq-v3-deploy-trigger
-          git add .github/arq-v3-deploy-trigger
-          git commit -m 'ci: run terminal all-sources 013 pipeline'
+          git add \
+            src/worker/providers/core.ts \
+            src/worker/providers/ina.ts \
+            src/worker/providers/smn.ts \
+            src/worker/providers/nasa.ts \
+            src/worker/live-data.ts \
+            scripts/verify-deployment.mjs \
+            tests/unit/nasa-provider.test.ts
+          git rm -f \
+            .github/workflows/all-sources-013-discovery.yml \
+            .github/workflows/all-sources-013-workers-first.yml \
+            .github/workflows/all-sources-013-workers-first-rerun.yml \
+            .github/workflows/all-sources-013-workers-first-final.yml \
+            .github/workflows/all-sources-013-workers-first-metadata.yml \
+            .github/workflows/nasa-013-probe.yml
+          git commit -m 'fix: reconcile all sources and bound NASA raster sampling'
           git push origin HEAD:arq/visual-dashboard-v3
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: all-sources-013-workers-first-${{ github.run_id }}
           path: artifacts/all-sources-013
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
