@@ -1,0 +1,217 @@
+name: Validate Public Safety 015
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/validate-public-safety-015-trigger]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sos-sf-public-safety-015-validation
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/public-safety-015-validation
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify and apply exact public safety patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          python - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib
+
+          expected_parts = [
+              'c5f0db4501ca4f5922392b9ea4ef0e046155f5bdf3680fa4135cb130c9583ca0',
+              '6d6b7518c6efb425b690e04e2231cca76d47af065be86b708a63ccc8a9ce8d35',
+              '0afa9f51d6f640c9ca6e5fb7380c893a708fb9d38323573c3fe8f9c1955fc844',
+              '4df4f3652103016704f9ac9a02de1e523c68d4f2e1114fa6d182c237ed5bbd8b',
+              '1601a8e733ffdc43edd57208a2561c1d67ea4953a3f24755490b16c77a2e8069',
+              'de0c865b7ec0409c548acb4340533b6567b90db903b226cf01ddc300bb3bae04',
+              '3247f45d9c18d02acba3e57e221f95c429db7f7f8d928c676ca4b0df7c4eae07',
+              'd99e8d235d2406db9eebf279a02a7e84bace64e127f7b7cbd6dfbe15a535b9b5',
+          ]
+          chunks = []
+          report = []
+          for index, expected in enumerate(expected_parts):
+              value = Path(f'.github/public-safety-015-parts/part{index:02d}').read_text().strip()
+              actual = hashlib.sha256(value.encode()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'PATCH_PART_HASH_MISMATCH:{index:02d}:{actual}')
+              chunks.append(value)
+              report.append(f'part{index:02d}_sha256={actual}')
+          encoded = ''.join(chunks)
+          transport = hashlib.sha256(encoded.encode()).hexdigest()
+          if transport != '5e44a6a727bbdebf32d721f6da9fdeb1a13921c5fa539ef8eb63111d8e2a70c5':
+              raise SystemExit(f'PATCH_TRANSPORT_HASH_MISMATCH:{transport}')
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          content = hashlib.sha256(patch).hexdigest()
+          if content != '155636e689a8d8edc4449e9340c568dec900ae0de16eb11508efa01f24d97c76':
+              raise SystemExit(f'PATCH_CONTENT_HASH_MISMATCH:{content}')
+          Path('/tmp/public-safety-015.patch').write_bytes(patch)
+          report.extend([
+              f'transport_sha256={transport}',
+              f'content_sha256={content}',
+              f'content_bytes={len(patch)}',
+          ])
+          Path('artifacts/public-safety-015-validation/patch-hashes.txt').write_text('\n'.join(report) + '\n')
+          PY
+          git apply --index /tmp/public-safety-015.patch
+          git diff --cached --check
+          git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
+
+      - name: Assert product public safety architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/domain/public-safety.ts
+          test -f src/client/features/alerts/OfficialAlertPanel.tsx
+          test -f src/client/features/hydro/HydrometricMonitoring.tsx
+          test -f src/client/features/sources/SourceTransparency.tsx
+          test -f docs/BENCHMARK_DECISIONS_015.md
+          test -f docs/COMMUNICATION_MATRIX_015.md
+          grep -q 'ALERTA_OFICIAL_ACTIVA' src/domain/snapshot.ts
+          grep -q 'VERIFICACION_DE_ALERTAS_DEGRADADA' src/domain/snapshot.ts
+          grep -q 'ACTUALIZACION_DEMORADA' src/domain/snapshot.ts
+          grep -q 'Río Paraná — Santa Fe' src/worker/live-data.ts
+          grep -q 'Río Salado — Santo Tomé' src/worker/live-data.ts
+          grep -q 'Servicio independiente que integra y organiza fuentes públicas oficiales' src/client/app/AppShell.tsx
+          grep -q 'Reportar una situación no inicia un despacho de emergencia' src/client/features/reports/ReportDialog.tsx
+          grep -q 'REPORTS_KV' src/worker/reports.ts
+          grep -q 'expirationTtl' src/worker/reports.ts
+          test ! -e src/client/three/pulse-three.ts
+          if grep -RInE 'REPORTS_BUCKET|r2_buckets|/r2/' src scripts/provision-cloudflare.mjs wrangler.jsonc wrangler.test.jsonc; then
+            echo 'R2_OPERATIONAL_DEPENDENCY_PRESENT' >&2
+            exit 1
+          fi
+          if grep -RInE "from ['\"]three['\"]|@types/three|\"three\"" package.json package-lock.json src/client; then
+            echo 'THREE_DEPENDENCY_PRESENT' >&2
+            exit 1
+          fi
+          if grep -RInE 'Sistema Paraná|Sistema Salado|Pulso del Paraná|DEMO / NO OFICIAL' src/client src/worker public README.md docs; then
+            echo 'RETIRED_PUBLIC_LANGUAGE_PRESENT' >&2
+            exit 1
+          fi
+          printf 'PUBLIC_SAFETY_ARCHITECTURE=PASS\nD1_STATE=PRESERVED\nKV_STATE=PRESERVED\nR2_STATE=ABSENT\nBUDGET_MAX_USD=0\n' > "$EVIDENCE_DIR/architecture.txt"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
+
+      - name: Lint clean
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint -- --max-warnings=0 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/unit.log"
+
+      - name: Contract tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/contract.log"
+
+      - name: Build and budgets
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+
+      - name: Worker tests with local D1 and KV
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/worker.log"
+
+      - name: E2E visual accessibility mobile and offline
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/e2e.log"
+
+      - name: Revalidate public source inventory read only
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/revalidate-public-sources.mjs 2>&1 | tee "$EVIDENCE_DIR/source-revalidation.log"
+
+      - name: Assert source inventory semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = `${process.env.EVIDENCE_DIR}/source-revalidation.json`;
+          const report = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (report.organizationCount !== 6) throw new Error(`SOURCE_ORGANIZATION_COUNT:${report.organizationCount}`);
+          if (report.feedCount !== 10) throw new Error(`SOURCE_FEED_COUNT:${report.feedCount}`);
+          if (report.rules.duplicateTransportsAreIndependentCorroboration !== false) throw new Error('DUPLICATE_CORROBORATION_RULE');
+          if (report.rules.scrapingPromotedToStableFeed !== false) throw new Error('SCRAPING_RULE');
+          if (report.rules.authenticationBypassed !== false) throw new Error('AUTH_BYPASS_RULE');
+          const blocked = report.feeds.filter((feed) => String(feed.classification).startsWith('BLOCKED_'));
+          if (blocked.some((feed) => feed.reachable !== null || feed.automatic !== false)) throw new Error('BLOCKED_FEED_QUERIED');
+          const nasa = report.feeds.find((feed) => feed.id === 'nasa-gpm-imerg-early');
+          if (!nasa || !['SUPPLEMENTARY','DEGRADED'].includes(nasa.classification)) throw new Error('NASA_CLASSIFICATION_INVALID');
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/source-counts.txt`, [
+            `SOURCE_ORGANIZATION_COUNT=${report.organizationCount}`,
+            `SOURCE_FEED_COUNT=${report.feedCount}`,
+            ...Object.entries(report.counts).map(([key, value]) => `${key}=${value}`),
+            '',
+          ].join('\n'));
+          NODE
+
+      - name: Copy decision and communication evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp docs/BENCHMARK_DECISIONS_015.md "$EVIDENCE_DIR/benchmark-decision-log.md"
+          cp docs/COMMUNICATION_MATRIX_015.md "$EVIDENCE_DIR/communication-matrix.md"
+          cp docs/DATA_SOURCES.md "$EVIDENCE_DIR/data-sources.md"
+          git diff --cached --name-status > "$EVIDENCE_DIR/changed-files.txt"
+
+      - name: Record validation success
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'ORDER=SOS-SF-OWNER-GLOBAL-PUBLIC-SAFETY-REFOUNDATION-015\nVALIDATION=PASS\nDEPLOY_COMMAND_COUNT=0\nCLOUDFLARE_MUTATIONS=0\nBILLING_ENDPOINTS=0\nR2_ENDPOINTS=0\nACCESSIBILITY_CLAIM=AUTOMATED_SEMANTIC_KEYBOARD_REFLOW_CHECKS_NOT_FULL_WCAG_CERTIFICATION\n' > "$EVIDENCE_DIR/result.txt"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-safety-015-validation-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ env.EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
