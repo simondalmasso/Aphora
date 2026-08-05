@@ -19,16 +19,16 @@
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "REPORTS_BUCKET",
-      "bucket_name": "sos-sf-test-reports"
-    }
-  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": true
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "REPORTS_KV",
+      "id": "00000000000000000000000000000001"
+    }
+  ]
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { clearSessionCookie, createSessionCookie, readSession, validateGoogleClaims, verifyGoogleIdToken, type GoogleClaims } from '../../src/worker/auth';
+import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookie, readSession, securityTokenHash, validateGoogleClaims, verifyGoogleIdToken, type GoogleClaims } from '../../src/worker/auth';
 
 const clientId = 'client.apps.googleusercontent.com';
 const now = Date.parse('2026-08-02T15:00:00.000Z');
@@ -48,7 +48,7 @@ describe('direct Google identity and own sessions', () => {
   it('creates signed finite HttpOnly sessions with unique identity and server-side role', async () => {
     const secret = 'test-session-key-with-at-least-thirty-two-bytes';
     const cookie = await createSessionCookie(claims, secret, 'operator@example.org', now, 'fixed-session-id');
-    expect(cookie).toContain('HttpOnly; Secure; SameSite=Lax');
+    expect(cookie).toContain('HttpOnly; Secure; SameSite=Strict');
     const request = new Request('https://sos-sf.test', { headers: { Cookie: cookie.split(';')[0]! } });
     await expect(readSession(request, secret, now + 1)).resolves.toMatchObject({ sessionId: 'session:fixed-session-id', sub: claims.sub, email: claims.email, role: 'VERIFIED_OPERATOR' });
     const rawCookie = cookie.split(';')[0]!;
@@ -58,5 +58,9 @@ describe('direct Google identity and own sessions', () => {
     await expect(readSession(new Request('https://sos-sf.test', { headers: { Cookie: tamperedCookie } }), secret, now + 1)).resolves.toBeNull();
     await expect(readSession(request, secret, now + 8 * 60 * 60 * 1000 + 1)).resolves.toBeNull();
     expect(clearSessionCookie()).toContain('Max-Age=0');
+    const csrf = createCsrfCookie('csrf-token-value-with-more-than-thirty-two-characters', new Date(now + 60_000).toISOString(), now);
+    expect(csrf).toContain('Secure; SameSite=Strict');
+    await expect(securityTokenHash('csrf-token-value-with-more-than-thirty-two-characters')).resolves.toMatch(/^[a-zA-Z0-9_-]{40,}$/);
+    expect(clearCsrfCookie()).toContain('Max-Age=0');
   });
 });

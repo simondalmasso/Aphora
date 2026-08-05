@@ -13,7 +13,8 @@ export interface StoredLocationReading {
 }
 
 export interface StoredReportDraft {
-  readonly version: 2;
+  readonly version: 3;
+  readonly id: string;
   readonly idempotencyKey: string;
   readonly category: string;
   readonly description: string;
@@ -27,7 +28,7 @@ export interface StoredReportDraft {
 }
 
 const DB_NAME = 'sos-sf-offline';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = 'report-drafts';
 const ACTIVE_KEY = 'active';
 
@@ -60,7 +61,7 @@ async function transaction<T>(mode: IDBTransactionMode, operation: (store: IDBOb
 export async function loadReportDraft(): Promise<StoredReportDraft | null> {
   try {
     const value = await transaction<StoredReportDraft | undefined>('readonly', (store) => store.get(ACTIVE_KEY));
-    if (!value || value.version !== 2 || typeof value.idempotencyKey !== 'string' || !Array.isArray(value.photos)) return null;
+    if (!value || value.version !== 3 || typeof value.id !== 'string' || typeof value.idempotencyKey !== 'string' || !Array.isArray(value.photos)) return null;
     return value;
   } catch { return null; }
 }

@@ -147,6 +147,35 @@ test('Informar does not request location on load and exposes manual, consented a
   await page.keyboard.press('Escape');
 });
 
+test('free KV quota exhaustion is controlled, retains the idempotent attempt and never suggests an upgrade', async ({ page }) => {
+  await mockPublicApi(page);
+  await page.route('**/api/private/reports', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await route.fulfill({
+      status: 503,
+      headers: { 'Cache-Control': 'private, no-store', 'Content-Type': 'application/json' },
+      json: {
+        ok: false,
+        error: {
+          code: 'REPORT_STORAGE_UNAVAILABLE',
+          message: 'El almacenamiento privado alcanzó temporalmente su límite gratuito.',
+        },
+      },
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Informar', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Informar una situación' });
+  await dialog.getByLabel('Descripción').fill('Agua acumulada en una esquina.');
+  await dialog.getByRole('button', { name: 'Enviar informe' }).click();
+  const status = dialog.getByRole('status');
+  await expect(status).toContainText('límite gratuito');
+  await expect(status).toContainText('quedó pendiente');
+  await expect(status).toContainText('evitar duplicados');
+  await expect(status).not.toContainText(/upgrade|pago|tarjeta|factur/i);
+  await expect(dialog.getByRole('button', { name: 'Reintentar envío' })).toBeVisible();
+});
+
 test('messages remain closed by default and private features fail closed without protected config', async ({ page }) => {
   await mockPublicApi(page);
   await page.goto('/');

@@ -5,12 +5,12 @@ SOS Santa Fe es un repositorio público. No publiques en commits, issues, pull r
 - tokens, claves, cookies, credenciales o valores de secrets;
 - datos personales o reportes ciudadanos reales;
 - URLs privadas con credenciales, firmas o identificadores de sesión;
-- exports de D1/R2, registros de autenticación o archivos `.env` / `.dev.vars`;
+- exports de D1/KV, registros de autenticación o archivos `.env` / `.dev.vars`;
 - capturas que contengan cuentas, correos, ubicaciones exactas o datos privados.
 
 ## Reportar una vulnerabilidad
 
-Usá **Security → Report a vulnerability** para enviar un informe privado cuando esa opción esté disponible. No abras un issue público para fallas que afecten autenticación, sesiones, mensajería privada, reportes, D1/R2, credenciales o configuración de producción.
+Usá **Security → Report a vulnerability** para enviar un informe privado cuando esa opción esté disponible. No abras un issue público para fallas que afecten autenticación, sesiones, mensajería privada, reportes, D1/KV, credenciales o configuración de producción.
 
 Incluí el impacto, los pasos mínimos para reproducirlo, la versión o commit afectado y una mitigación sugerida. Usá datos ficticios y no incluyas credenciales reales.
 

@@ -2,6 +2,7 @@ import type { SessionPrincipal, UserRole } from '../domain/private-messaging/typ
 
 const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
 const SESSION_COOKIE = '__Host-sos_sf_session';
+const CSRF_COOKIE = '__Host-sos_sf_csrf';
 const SESSION_MS = 8 * 60 * 60 * 1000;
 
 export interface GoogleClaims { readonly iss: string; readonly aud: string | readonly string[]; readonly azp?: string; readonly sub: string; readonly exp: number; readonly iat?: number; readonly email: string; readonly email_verified: boolean; readonly name?: string }
@@ -59,7 +60,7 @@ export async function createSessionCookieForPrincipal(principal: SessionPrincipa
   const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(principal)));
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', await hmacKey(secret), new TextEncoder().encode(encoded)));
   const maxAge = Math.max(0, Math.floor((Date.parse(principal.expiresAt) - nowMs) / 1000));
-  return `${SESSION_COOKIE}=${encoded}.${bytesToBase64Url(signature)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+  return `${SESSION_COOKIE}=${encoded}.${bytesToBase64Url(signature)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
 }
 export async function createSessionCookie(claims: GoogleClaims, secret: string, operatorEmails: string, nowMs = Date.now(), sessionId: string = crypto.randomUUID()): Promise<string> { return createSessionCookieForPrincipal(createSessionPrincipal(claims, operatorEmails, nowMs, sessionId), secret, nowMs); }
 
@@ -75,4 +76,19 @@ export async function readSession(request: Request, secret: string, nowMs = Date
   if (!['AUTHENTICATED_USER', 'VERIFIED_OPERATOR', 'ADMIN'].includes(session.role) || !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= nowMs) return null;
   return Object.freeze(session);
 }
-export function clearSessionCookie(): string { return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`; }
+
+export function randomSecurityToken(bytes = 32): string {
+  const value = new Uint8Array(bytes);
+  crypto.getRandomValues(value);
+  return bytesToBase64Url(value);
+}
+export async function securityTokenHash(value: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return bytesToBase64Url(digest);
+}
+export function createCsrfCookie(token: string, expiresAt: string, nowMs = Date.now()): string {
+  const maxAge = Math.max(0, Math.floor((Date.parse(expiresAt) - nowMs) / 1000));
+  return `${CSRF_COOKIE}=${token}; Path=/; Max-Age=${maxAge}; Secure; SameSite=Strict`;
+}
+export function clearSessionCookie(): string { return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`; }
+export function clearCsrfCookie(): string { return `${CSRF_COOKIE}=; Path=/; Max-Age=0; Secure; SameSite=Strict`; }

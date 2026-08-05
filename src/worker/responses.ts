@@ -32,16 +32,15 @@ export function errorResponse(code: string, message: string, status: number): Re
   return jsonResponse({ error: { code, message } }, { status, cacheControl: 'no-store', mode: 'SERVICE' });
 }
 
-export function privateJsonResponse(data: unknown, options: { status?: number; headers?: Readonly<Record<string, string>> } = {}): Response {
+export function privateJsonResponse(data: unknown, options: { status?: number; headers?: HeadersInit } = {}): Response {
+  const headers = new Headers(options.headers);
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Pragma', 'no-cache');
+  headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
   return withSecurityHeaders(new Response(JSON.stringify({ ok: (options.status ?? 200) < 400, data }), {
     status: options.status ?? 200,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'private, no-store',
-      'Pragma': 'no-cache',
-      'X-Robots-Tag': 'noindex, nofollow, noarchive',
-      ...options.headers,
-    },
+    headers,
   }));
 }
 

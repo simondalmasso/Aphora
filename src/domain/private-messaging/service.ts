@@ -93,7 +93,13 @@ export class MessagingService {
       failureReason: null,
       verifiedOperator: operator,
     });
-    await this.store.insertMessage(message);
+    try {
+      await this.store.insertMessage(message);
+    } catch (error) {
+      const concurrent = await this.store.findByIdempotency(conversation.id, input.idempotencyKey);
+      if (concurrent) return { message: concurrent, duplicate: true };
+      throw error;
+    }
     if (!this.store.consumeRateLimit) for (const actorId of rateActors) await this.store.recordSend(actorId, createdAt);
     await this.audit(principal, 'MESSAGE_ACCEPTED', message.id);
     return { message, duplicate: false };

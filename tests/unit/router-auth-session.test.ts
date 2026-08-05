@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
-import { createSessionCookieForPrincipal } from '../../src/worker/auth';
+import { createSessionCookieForPrincipal, securityTokenHash } from '../../src/worker/auth';
 import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store';
 import { routeRequest } from '../../src/worker/router';
 
@@ -27,20 +27,31 @@ class Db implements D1DatabaseLike {
 }
 
 const secret = 'test-session-key-with-at-least-thirty-two-bytes';
+const csrfToken = 'csrf-token-value-with-more-than-thirty-two-characters';
 const principal: SessionPrincipal = { sessionId: 'session:test-session', sub: '1234567890', email: 'operator@example.org', role: 'VERIFIED_OPERATOR', expiresAt: '2099-08-03T23:00:00.000Z' };
 
 async function fixture(operatorEmails = 'operator@example.org') {
   const db = new Db();
-  db.sessions.set(principal.sessionId, { id: principal.sessionId, sub: principal.sub, email: principal.email, role: principal.role, expires_at: principal.expiresAt, revoked_at: null });
+  db.sessions.set(principal.sessionId, { id: principal.sessionId, sub: principal.sub, email: principal.email, role: principal.role, expires_at: principal.expiresAt, revoked_at: null, csrf_hash: await securityTokenHash(csrfToken) });
   const cookie = await createSessionCookieForPrincipal(principal, secret, Date.parse('2026-08-03T20:00:00.000Z'));
   const env = { ASSETS: { fetch: async () => new Response(null, { status: 404 }) }, PRIVATE_MESSAGING_ENABLED: 'true', GOOGLE_CLIENT_ID: 'client.apps.googleusercontent.com', SESSION_SIGNING_KEY: secret, SOS_SF_OPERATOR_EMAILS: operatorEmails, MESSAGES_DB: db };
   return { db, cookie: cookie.split(';')[0]!, env };
 }
 
-describe('revocable sessions', () => {
-  it('revokes the server-side session on logout', async () => {
-    const { db, cookie, env } = await fixture();
+function writeHeaders(cookie: string, csrf = csrfToken): HeadersInit {
+  return { Cookie: cookie, Origin: 'https://sos-sf.test', 'Sec-Fetch-Site': 'same-origin', 'X-CSRF-Token': csrf };
+}
+
+describe('revocable CSRF-bound sessions', () => {
+  it('rejects logout without the session CSRF token', async () => {
+    const { cookie, env } = await fixture();
     const response = await routeRequest(new Request('https://sos-sf.test/api/logout', { method: 'POST', headers: { Cookie: cookie, Origin: 'https://sos-sf.test' } }), env);
+    expect(response.status).toBe(400);
+  });
+
+  it('revokes the server-side session on CSRF-protected logout', async () => {
+    const { db, cookie, env } = await fixture();
+    const response = await routeRequest(new Request('https://sos-sf.test/api/logout', { method: 'POST', headers: writeHeaders(cookie) }), env);
     expect(response.status).toBe(200);
     expect(response.headers.get('Set-Cookie')).toContain('Max-Age=0');
     expect(db.sessions.get(principal.sessionId)?.revoked_at).toBeTruthy();

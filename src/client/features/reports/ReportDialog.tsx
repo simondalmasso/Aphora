@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Snapshot } from '../../../domain/snapshot';
+import { privateHeaders } from '../../security/csrf';
 import { prepareReportPhoto } from './image-processing';
 import {
   clearReportDraft,
@@ -39,9 +40,8 @@ function emptyDraft(trustedContact = ''): Draft {
   return { category: 'ANEGAMIENTO', description: '', locationLabel: '', trustedContact };
 }
 
-function newIdempotencyKey(): string {
-  return `report-${crypto.randomUUID()}`;
-}
+function newDraftId(): string { return `draft-${crypto.randomUUID()}`; }
+function newIdempotencyKey(): string { return `report-${crypto.randomUUID()}`; }
 
 function trustedNumber(value: string): string | null {
   const digits = value.replace(/[^0-9+]/g, '');
@@ -52,7 +52,9 @@ function trustedNumber(value: string): string | null {
 export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft());
+  const [draftId, setDraftId] = useState(newDraftId);
   const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
+  const autoAttemptedKey = useRef<string | null>(null);
   const [location, setLocation] = useState<StoredLocationReading | null>(null);
   const [exactConsent, setExactConsent] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
@@ -79,6 +81,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
           locationLabel: stored.locationLabel,
           trustedContact: stored.trustedContact,
         });
+        setDraftId(stored.id);
         setIdempotencyKey(stored.idempotencyKey);
         setLocation(stored.location);
         setExactConsent(stored.exactConsent);
@@ -96,7 +99,8 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
   }, []);
 
   const storedDraft = useCallback((nextQueueState: StoredReportDraft['queueState']): StoredReportDraft => ({
-    version: 2,
+    version: 3,
+    id: draftId,
     idempotencyKey,
     category: draft.category,
     description: draft.description,
@@ -107,7 +111,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     photos: storedPhotos(photos),
     queueState: nextQueueState,
     updatedAt: new Date().toISOString(),
-  }), [draft, exactConsent, idempotencyKey, location, photos]);
+  }), [draft, draftId, exactConsent, idempotencyKey, location, photos]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -193,12 +197,12 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     }
   };
 
-  const persistPending = async () => {
+  const persistPending = useCallback(async () => {
     await saveReportDraft(storedDraft('PENDING_SEND'));
     setQueueState('PENDING_SEND');
-  };
+  }, [storedDraft]);
 
-  const submit = async () => {
+  const submit = useCallback(async () => {
     if (!draft.description.trim() || draft.description.trim().length > 500) {
       setStatus('La descripción debe tener entre 1 y 500 caracteres.');
       return;
@@ -247,6 +251,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
       const response = await fetch('/api/private/reports', {
         method: 'POST',
         credentials: 'same-origin',
+        headers: privateHeaders('POST'),
         body: form,
       });
       const payload = await response.json() as {
@@ -264,6 +269,7 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
       await clearReportDraft();
       const trusted = draft.trustedContact;
       setDraft(emptyDraft(trusted));
+      setDraftId(newDraftId());
       setIdempotencyKey(newIdempotencyKey());
       setPhotos([]);
       setLocation(null);
@@ -280,7 +286,15 @@ export function ReportDialog({ open, online, snapshot, openerRef, onClose }: Pro
     } finally {
       setBusy(false);
     }
-  };
+  }, [draft, exactConsent, idempotencyKey, location, online, persistPending, photos]);
+
+  useEffect(() => {
+    if (!online) { autoAttemptedKey.current = null; return; }
+    if (!open || !hydrated || busy || queueState !== 'PENDING_SEND' || autoAttemptedKey.current === idempotencyKey) return;
+    autoAttemptedKey.current = idempotencyKey;
+    const timer = window.setTimeout(() => { void submit(); }, 800);
+    return () => window.clearTimeout(timer);
+  }, [busy, hydrated, idempotencyKey, online, open, queueState, submit]);
 
   return (
     <dialog

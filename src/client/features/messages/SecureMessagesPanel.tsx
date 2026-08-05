@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { PrivateConversation, PrivateMessage, SessionPrincipal } from '../../../domain/private-messaging/types';
 import type { CriticalMessage } from '../../../domain/zungun-compat/types';
+import { privateHeaders } from '../../security/csrf';
 
 interface AuthConfig { readonly enabled: boolean; readonly reportingEnabled: boolean; readonly googleClientId: string | null }
 interface Envelope<T> { readonly data: T; readonly error?: { readonly message?: string } }
@@ -16,6 +17,7 @@ interface ReportRow {
   readonly moderation_flags_json?: string;
   readonly photos?: readonly ReportPhoto[];
 }
+interface PhotoAccess { readonly url: string; readonly expiresAt: string; readonly singleUse: boolean }
 
 declare global {
   interface Window {
@@ -28,7 +30,7 @@ declare global {
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json', ...init?.headers }, ...init });
+  const response = await fetch(path, { ...init, credentials: 'same-origin', cache: 'no-store', headers: privateHeaders(init?.method, init?.headers) });
   const envelope = await response.json() as Envelope<T>;
   if (!response.ok) throw new Error(envelope.error?.message ?? 'La operación no está disponible.');
   return envelope.data;
@@ -42,6 +44,7 @@ function flags(value: string | undefined): string[] {
   try { const parsed = JSON.parse(value ?? '[]'); return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []; }
   catch { return []; }
 }
+function nextMessageKey(): string { return `message-${crypto.randomUUID()}`; }
 
 export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }: {
   readonly publicMessages: readonly CriticalMessage[];
@@ -59,16 +62,19 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
   const [messages, setMessages] = useState<readonly PrivateMessage[]>([]);
   const [reports, setReports] = useState<readonly ReportRow[]>([]);
   const [draft, setDraft] = useState('');
+  const [messageKey, setMessageKey] = useState(nextMessageKey);
   const [forwardDestination, setForwardDestination] = useState('');
   const [forwardReference, setForwardReference] = useState('');
   const [operatorNote, setOperatorNote] = useState('');
   const [redactedDescription, setRedactedDescription] = useState('');
   const [moderationFlags, setModerationFlags] = useState<string[]>([]);
+  const [photoAccess, setPhotoAccess] = useState<Record<string, PhotoAccess>>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
   const close = useCallback(() => {
     setLoginRequested(false);
+    setPhotoAccess({});
     window.google?.accounts.id.cancel?.();
     onClose();
     requestAnimationFrame(() => openerRef.current?.focus());
@@ -84,10 +90,10 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
     let selected = listed.conversations[0] ?? null;
     if (!selected && session.role === 'AUTHENTICATED_USER') {
       selected = (await api<{ conversation: PrivateConversation }>('/api/private/conversations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Origin: location.origin }, body: '{}',
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
       })).conversation;
     }
-    setConversations(listed.conversations);
+    setConversations(selected && !listed.conversations.some((item) => item.id === selected?.id) ? [selected, ...listed.conversations] : listed.conversations);
     setConversation(selected);
     if (selected) await loadMessages(selected.id);
     if (isOperator(session)) await loadReports();
@@ -127,12 +133,12 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
         callback: ({ credential }) => {
           setBusy(true);
           void api<{ principal: SessionPrincipal }>('/api/auth/google', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', Origin: location.origin }, body: JSON.stringify({ credential }),
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential }),
           }).then(async (session) => {
             setPrincipal(session.principal);
             setLoginRequested(false);
             await loadPrivate(session.principal);
-            setStatus('Sesión iniciada.');
+            setStatus('Sesión iniciada y protegida contra solicitudes cruzadas.');
           }).catch(() => setStatus('Google no pudo validar la sesión.')).finally(() => setBusy(false));
         },
       });
@@ -157,9 +163,9 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
   const logout = async () => {
     setBusy(true);
     try {
-      await api('/api/logout', { method: 'POST', headers: { Origin: location.origin } });
-      setPrincipal(null); setConversations([]); setConversation(null); setMessages([]); setReports([]); setLoginRequested(false);
-      setStatus('Sesión cerrada y revocada.');
+      await api('/api/logout', { method: 'POST' });
+      setPrincipal(null); setConversations([]); setConversation(null); setMessages([]); setReports([]); setLoginRequested(false); setPhotoAccess({});
+      setStatus('Sesión cerrada y revocada en el servidor.');
     } catch { setStatus('No se pudo cerrar la sesión.'); }
     finally { setBusy(false); }
   };
@@ -167,9 +173,10 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
     if (!conversation || !draft.trim() || draft.length > 280 || busy) return;
     setBusy(true); setStatus(null);
     try {
-      await api('/api/private/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: location.origin }, body: JSON.stringify({ conversationId: conversation.id, body: draft.trim(), idempotencyKey: crypto.randomUUID() }) });
-      setDraft(''); await loadMessages(conversation.id); setStatus('Mensaje recibido por el servicio. No garantiza lectura ni respuesta inmediata.');
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'No se pudo enviar.'); }
+      const result = await api<{ duplicate: boolean }>('/api/private/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: conversation.id, body: draft.trim(), idempotencyKey: messageKey }) });
+      setDraft(''); setMessageKey(nextMessageKey()); await loadMessages(conversation.id);
+      setStatus(result.duplicate ? 'El reintento fue reconocido sin duplicar el mensaje.' : 'Mensaje recibido por el servicio. No garantiza lectura ni respuesta inmediata.');
+    } catch (error) { setStatus(`${error instanceof Error ? error.message : 'No se pudo enviar.'} El mismo texto conserva su clave para un reintento seguro.`); }
     finally { setBusy(false); }
   };
   const transition = async (report: ReportRow, next: string) => {
@@ -180,7 +187,7 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
         if (!forwardDestination.trim() || !forwardReference.trim()) throw new Error('Indicá destino y referencia de derivación.');
         body.forwardedDestination = forwardDestination.trim(); body.forwardedReference = forwardReference.trim();
       }
-      await api(`/api/private/operator/reports/${encodeURIComponent(report.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Origin: location.origin }, body: JSON.stringify(body) });
+      await api(`/api/private/operator/reports/${encodeURIComponent(report.id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       await loadReports(); setStatus('Estado, moderación y auditoría del informe actualizados.');
     } catch (error) { setStatus(error instanceof Error ? error.message : 'No se pudo actualizar.'); }
     finally { setBusy(false); }
@@ -188,9 +195,18 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
   const reviewPhoto = async (reportId: string, photoId: string, next: string) => {
     setBusy(true);
     try {
-      await api(`/api/private/operator/reports/${encodeURIComponent(reportId)}/photos/${encodeURIComponent(photoId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Origin: location.origin }, body: JSON.stringify({ status: next, note: operatorNote.trim() || 'Revisión manual de la evidencia visual.' }) });
+      await api(`/api/private/operator/reports/${encodeURIComponent(reportId)}/photos/${encodeURIComponent(photoId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next, note: operatorNote.trim() || 'Revisión manual de la evidencia visual.' }) });
       await loadReports(); setStatus('Estado de la foto actualizado y auditado.');
     } catch (error) { setStatus(error instanceof Error ? error.message : 'No se pudo revisar la foto.'); }
+    finally { setBusy(false); }
+  };
+  const preparePhotoAccess = async (reportId: string, photoId: string) => {
+    setBusy(true);
+    try {
+      const result = await api<{ access: PhotoAccess }>(`/api/private/operator/reports/${encodeURIComponent(reportId)}/photos/${encodeURIComponent(photoId)}`, { method: 'POST' });
+      setPhotoAccess((current) => ({ ...current, [photoId]: result.access }));
+      setStatus('Vista privada preparada. El enlace vence en dos minutos y funciona una sola vez.');
+    } catch (error) { setStatus(error instanceof Error ? error.message : 'No se pudo preparar la vista privada.'); }
     finally { setBusy(false); }
   };
   const toggleFlag = (flag: string) => setModerationFlags((current) => current.includes(flag) ? current.filter((item) => item !== flag) : [...current, flag]);
@@ -204,11 +220,11 @@ export function SecureMessagesPanel({ publicMessages, open, onClose, openerRef }
     {principal && <><section><div className="panel-section-head"><div><h3>Bandeja privada</h3><span>{principal.role.replaceAll('_', ' ')}</span></div><button type="button" className="ui-button ui-button--secondary" disabled={busy} onClick={() => void logout()}>Cerrar sesión</button></div>
       {isOperator(principal) && conversations.length > 0 && <label>Conversación<select value={conversation?.id ?? ''} onChange={(event) => { const selected = conversations.find((item) => item.id === event.target.value) ?? null; setConversation(selected); if (selected) void loadMessages(selected.id); }}>{conversations.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select></label>}
       <div className="private-message-list">{messages.map((message) => <article key={message.id} className={message.verifiedOperator ? 'operator-message' : 'user-message'}><div><strong>{message.verifiedOperator ? 'Operador verificado' : 'Usuario'}</strong><time>{displayTime(message.createdAt)}</time></div><p>{message.body}</p><small>{message.status.replaceAll('_', ' ')}</small></article>)}</div>
-      {conversation && <><label>Mensaje<textarea rows={3} maxLength={280} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Texto sin emoji, máximo 280 caracteres"/><small>{draft.length}/280</small></label><button type="button" className="ui-button ui-button--primary" disabled={busy || !draft.trim()} onClick={() => void send()}>{busy ? 'Procesando…' : 'Enviar'}</button></>}
+      {conversation && <><label>Mensaje<textarea rows={3} maxLength={280} value={draft} onChange={(event) => { setDraft(event.target.value); setMessageKey(nextMessageKey()); }} placeholder="Texto sin emoji, máximo 280 caracteres"/><small>{draft.length}/280</small></label><button type="button" className="ui-button ui-button--primary" disabled={busy || !draft.trim()} onClick={() => void send()}>{busy ? 'Procesando…' : 'Enviar'}</button></>}
     </section>
     {isOperator(principal) && <section className="operator-queue"><h3>Cola de informes</h3><fieldset><legend>Moderación para la próxima actualización</legend>{['PERSONAL_DATA', 'DUPLICATE', 'UNVERIFIED', 'ABUSIVE', 'OUT_OF_SCOPE', 'SAFETY_SENSITIVE'].map((flag) => <label key={flag}><input type="checkbox" checked={moderationFlags.includes(flag)} onChange={() => toggleFlag(flag)}/>{flag.replaceAll('_', ' ')}</label>)}<label>Nota del operador<textarea rows={2} value={operatorNote} onChange={(event) => setOperatorNote(event.target.value)} maxLength={1000}/></label><label>Descripción redactada opcional<textarea rows={2} value={redactedDescription} onChange={(event) => setRedactedDescription(event.target.value)} maxLength={500}/></label></fieldset>
       {reports.map((report) => <article key={report.id}><div><strong>{report.category}</strong><span>{report.status}</span></div><p>{report.redacted_description || report.description}</p><small>{report.location_label || 'Sin referencia manual'} · {displayTime(report.created_at)}</small>{flags(report.moderation_flags_json).length > 0 && <p><strong>Flags:</strong> {flags(report.moderation_flags_json).join(', ')}</p>}
-        {report.photos?.length ? <div className="report-photo-list">{report.photos.map((photo) => <article key={photo.id}><a href={`/api/private/operator/reports/${encodeURIComponent(report.id)}/photos/${encodeURIComponent(photo.id)}`} target="_blank" rel="noreferrer">Abrir foto privada ({Math.round(photo.bytes / 1024)} KiB)</a><span>{photo.review_status}</span><div><button type="button" onClick={() => void reviewPhoto(report.id, photo.id, 'APPROVED')}>Aprobar</button><button type="button" onClick={() => void reviewPhoto(report.id, photo.id, 'REDACTED')}>Marcar redactada</button><button type="button" onClick={() => void reviewPhoto(report.id, photo.id, 'REJECTED')}>Rechazar</button></div></article>)}</div> : <p>Sin fotos adjuntas.</p>}
+        {report.photos?.length ? <div className="report-photo-list">{report.photos.map((photo) => <article key={photo.id}><span>Foto privada ({Math.round(photo.bytes / 1024)} KiB)</span><span>{photo.review_status}</span>{photoAccess[photo.id] ? <a href={photoAccess[photo.id]!.url} target="_blank" rel="noreferrer" onClick={() => setPhotoAccess((current) => { const next = { ...current }; delete next[photo.id]; return next; })}>Abrir una vez antes de {displayTime(photoAccess[photo.id]!.expiresAt)}</a> : <button type="button" disabled={busy} onClick={() => void preparePhotoAccess(report.id, photo.id)}>Preparar vista privada</button>}<div><button type="button" onClick={() => void reviewPhoto(report.id, photo.id, 'APPROVED')}>Aprobar</button><button type="button" onClick={() => void reviewPhoto(report.id, photo.id, 'REDACTED')}>Marcar redactada</button><button type="button" onClick={() => void reviewPhoto(report.id, photo.id, 'REJECTED')}>Rechazar</button></div></article>)}</div> : <p>Sin fotos adjuntas.</p>}
         <div className="queue-actions">{report.status === 'NEW' && <button type="button" onClick={() => void transition(report, 'UNDER_REVIEW')}>Tomar revisión</button>}{report.status === 'UNDER_REVIEW' && <><button type="button" onClick={() => void transition(report, 'ESCALATION_READY')}>Preparar derivación</button><button type="button" onClick={() => void transition(report, 'REJECTED')}>Rechazar</button></>}{report.status === 'ESCALATION_READY' && <><input aria-label="Destino de derivación" placeholder="Destino" value={forwardDestination} onChange={(event) => setForwardDestination(event.target.value)}/><input aria-label="Referencia de derivación" placeholder="Referencia" value={forwardReference} onChange={(event) => setForwardReference(event.target.value)}/><button type="button" onClick={() => void transition(report, 'FORWARDED')}>Registrar derivación</button></>}{['REJECTED', 'FORWARDED'].includes(report.status) && <button type="button" onClick={() => void transition(report, 'CLOSED')}>Cerrar</button>}</div>
       </article>)}{reports.length === 0 && <p>No hay informes en la cola.</p>}
     </section>}</>}

@@ -93,6 +93,28 @@ describe('public read-only API contract', () => {
     expect(config.headers.get('cache-control')).toBe('no-store');
   });
 
+  it('enables reporting only when the protected D1 and KV bindings are both present', async () => {
+    const protectedEnv: WorkerEnv = {
+      ...env,
+      PRIVATE_MESSAGING_ENABLED: 'true',
+      GOOGLE_CLIENT_ID: '123-example.apps.googleusercontent.com',
+      SESSION_SIGNING_KEY: 'x'.repeat(48),
+      MESSAGES_DB: {} as NonNullable<WorkerEnv['MESSAGES_DB']>,
+      REPORTS_KV: {} as NonNullable<WorkerEnv['REPORTS_KV']>,
+    };
+    const response = await worker.fetch(new Request('https://sos-sf.test/api/auth/config'), protectedEnv);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      data: {
+        enabled: true,
+        reportingEnabled: true,
+        activationState: 'ACTIVE',
+      },
+    });
+    expect(JSON.stringify(body)).not.toContain('REPORTS_BUCKET');
+  });
+
   it('isolates private endpoints with no-store/noindex and no login wall', async () => {
     const session = await request('/api/session');
     expect(session.status).toBe(200);

@@ -1,12 +1,13 @@
 import { MessagingService } from '../domain/private-messaging/service';
 import type { SessionPrincipal } from '../domain/private-messaging/types';
-import { clearSessionCookie, createSessionCookieForPrincipal, createSessionPrincipal, readSession, roleForEmail, verifyGoogleIdToken } from './auth';
+import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookieForPrincipal, createSessionPrincipal, randomSecurityToken, readSession, roleForEmail, securityTokenHash, verifyGoogleIdToken } from './auth';
 import { D1MessageStore, type D1DatabaseLike } from './d1-message-store';
 import { buildLiveSnapshot, liveProviderHealth, type LiveDataEnv } from './live-data';
 import { liteResponse } from './lite';
-import { createReport, listReports, reportPhoto, updatePhotoReview, updateReport, type R2BucketLike, type ReportEnv } from './reports';
+import { consumeReportPhotoAccess, createReport, createReportPhotoAccess, listReports, updatePhotoReview, updateReport, type KVNamespaceLike, type ReportEnv } from './reports';
 import { errorResponse, jsonResponse, privateErrorResponse, privateJsonResponse } from './responses';
 import { withSecurityHeaders } from './security';
+import { rotateSession } from './session-store';
 
 export interface AssetFetcher { fetch(request: Request): Promise<Response> }
 export interface WorkerEnv extends LiveDataEnv, ReportEnv {
@@ -17,11 +18,13 @@ export interface WorkerEnv extends LiveDataEnv, ReportEnv {
   readonly SOS_SF_OPERATOR_EMAILS?: string;
   readonly MESSAGE_BLOCKLIST?: string;
   readonly MESSAGES_DB?: D1DatabaseLike;
-  readonly REPORTS_BUCKET?: R2BucketLike;
+  readonly REPORTS_KV?: KVNamespaceLike;
 }
 
 const PUBLIC_API_PATHS = new Set(['/api/health', '/api/snapshot', '/api/sources', '/api/messages', '/api/essential-contacts', '/api/auth/config']);
 const PRIVATE_PREFIX = '/api/private/';
+const AUTH_WINDOW_MS = 15 * 60_000;
+const AUTH_NETWORK_LIMIT = 20;
 const ESSENTIAL_CONTACTS = Object.freeze([
   Object.freeze({ id: '911', label: 'Central de Emergencias', number: '911', href: 'tel:911' }),
   Object.freeze({ id: '103', label: 'COBEM', number: '103', href: 'tel:103' }),
@@ -34,7 +37,7 @@ const ESSENTIAL_CONTACTS = Object.freeze([
 function privateMessagingEnabled(env: WorkerEnv): boolean {
   return env.PRIVATE_MESSAGING_ENABLED === 'true' && Boolean(env.GOOGLE_CLIENT_ID && env.SESSION_SIGNING_KEY && env.SESSION_SIGNING_KEY.length >= 32 && env.MESSAGES_DB);
 }
-function reportingEnabled(env: WorkerEnv): boolean { return privateMessagingEnabled(env) && Boolean(env.REPORTS_BUCKET); }
+function reportingEnabled(env: WorkerEnv): boolean { return privateMessagingEnabled(env) && Boolean(env.REPORTS_KV); }
 function publicMode(mode: 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' | 'DEMO'): 'LIVE' | 'UNAVAILABLE' | 'OFFLINE' { return mode === 'DEMO' ? 'UNAVAILABLE' : mode; }
 
 async function publicApiResponse(pathname: string, env: WorkerEnv): Promise<Response> {
@@ -73,6 +76,8 @@ async function parseJsonBody(request: Request, maxBytes = 4096): Promise<unknown
 function requireSameOrigin(request: Request): void {
   const origin = request.headers.get('Origin');
   if (!origin || origin !== new URL(request.url).origin) throw new Error('CSRF_ORIGIN_REJECTED');
+  const fetchSite = request.headers.get('Sec-Fetch-Site');
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') throw new Error('CSRF_FETCH_SITE_REJECTED');
 }
 
 async function networkActorId(request: Request, secret: string): Promise<string> {
@@ -81,96 +86,132 @@ async function networkActorId(request: Request, secret: string): Promise<string>
   return `network:${Array.from(bytes.slice(0, 12), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
+async function consumeWindow(db: D1DatabaseLike, actorId: string, scope: string, limit: number, windowMs: number, now: Date): Promise<boolean> {
+  const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs).toISOString();
+  const row = await db.prepare('INSERT INTO rate_windows (actor_id,scope,window_start,count,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(actor_id,scope,window_start) DO UPDATE SET count = count + 1, updated_at = excluded.updated_at RETURNING count').bind(actorId, scope, windowStart, 1, now.toISOString()).first<{ count: number }>();
+  return Boolean(row && row.count <= limit);
+}
+
 function messagingService(env: WorkerEnv): MessagingService {
   if (!env.MESSAGES_DB) throw new Error('PRIVATE_MESSAGING_DISABLED');
   return new MessagingService(new D1MessageStore(env.MESSAGES_DB), { now: () => new Date(), id: () => crypto.randomUUID(), retentionDays: 30, rateLimit: 10, rateWindowMinutes: 10, blockedTerms: env.MESSAGE_BLOCKLIST ?? '' });
 }
 
-interface SessionRow { id: string; sub: string; email: string; role: SessionPrincipal['role']; expires_at: string; revoked_at: string | null }
+interface SessionRow { id: string; sub: string; email: string; role: SessionPrincipal['role']; expires_at: string; revoked_at: string | null; csrf_hash: string }
+interface SessionContext { readonly principal: SessionPrincipal; readonly csrfHash: string }
 
 async function revokeSession(env: WorkerEnv, sessionId: string, at: string): Promise<void> {
   if (!env.MESSAGES_DB) return;
   await env.MESSAGES_DB.prepare('UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?').bind(at, sessionId).run();
 }
 
-async function sessionFor(request: Request, env: WorkerEnv): Promise<SessionPrincipal | null> {
+async function sessionFor(request: Request, env: WorkerEnv): Promise<SessionContext | null> {
   if (!env.SESSION_SIGNING_KEY || !env.MESSAGES_DB) return null;
   const signed = await readSession(request, env.SESSION_SIGNING_KEY);
   if (!signed) return null;
-  const row = await env.MESSAGES_DB.prepare('SELECT id,sub,email,role,expires_at,revoked_at FROM auth_sessions WHERE id = ? LIMIT 1').bind(signed.sessionId).first<SessionRow>();
+  const row = await env.MESSAGES_DB.prepare('SELECT id,sub,email,role,expires_at,revoked_at,csrf_hash FROM auth_sessions WHERE id = ? LIMIT 1').bind(signed.sessionId).first<SessionRow>();
   const now = new Date();
-  if (!row || row.revoked_at || row.sub !== signed.sub || row.email.toLowerCase() !== signed.email.toLowerCase() || Date.parse(row.expires_at) <= now.getTime()) return null;
+  if (!row || row.revoked_at || !row.csrf_hash || row.sub !== signed.sub || row.email.toLowerCase() !== signed.email.toLowerCase() || Date.parse(row.expires_at) <= now.getTime()) return null;
   const expectedRole = roleForEmail(row.email, env.SOS_SF_OPERATOR_EMAILS ?? '');
   if ((row.role === 'VERIFIED_OPERATOR' || row.role === 'ADMIN') && expectedRole === 'AUTHENTICATED_USER') {
     await revokeSession(env, row.id, now.toISOString());
     return null;
   }
   if (row.role !== signed.role || row.expires_at !== signed.expiresAt) return null;
-  return Object.freeze({ ...signed, role: row.role });
+  return Object.freeze({ principal: Object.freeze({ ...signed, role: row.role }), csrfHash: row.csrf_hash });
+}
+
+async function requireCsrf(request: Request, session: SessionContext): Promise<void> {
+  requireSameOrigin(request);
+  const token = request.headers.get('X-CSRF-Token') ?? '';
+  if (token.length < 32 || token.length > 160 || await securityTokenHash(token) !== session.csrfHash) throw new Error('CSRF_TOKEN_REJECTED');
 }
 
 function privateFailure(error: unknown): Response {
   const code = error instanceof Error ? error.message : 'PRIVATE_REQUEST_FAILED';
-  const status = code === 'RATE_LIMITED' ? 429 : code === 'BODY_TOO_LARGE' ? 413 : code.includes('FORBIDDEN') || code === 'ROLE_CONFLICT' ? 403 : code.includes('NOT_FOUND') ? 404 : code.includes('INVALID') || code.includes('REQUIRED') || code.includes('UNSUPPORTED') || code.includes('CSRF') || code.includes('TOO_') || code === 'CONTENT_REJECTED' ? 400 : code.startsWith('GOOGLE_') || code === 'AUTHENTICATION_REQUIRED' ? 401 : code.includes('DISABLED') ? 503 : 500;
-  const publicMessage = status === 429 ? 'Demasiados intentos; esperá antes de volver a enviar.' : status === 413 ? 'La solicitud supera el tamaño permitido.' : status === 401 ? 'La sesión o identidad no pudo validarse.' : status === 403 ? 'No tenés acceso a esta operación.' : status === 404 ? 'El recurso solicitado no existe.' : status === 400 ? 'El contenido no cumple las reglas de este servicio.' : status === 503 ? 'La función todavía no está habilitada.' : 'No se pudo completar la operación privada.';
+  const status = code === 'RATE_LIMITED' ? 429 : code === 'BODY_TOO_LARGE' ? 413 : code.includes('FORBIDDEN') || code === 'ROLE_CONFLICT' ? 403 : code.includes('NOT_FOUND') ? 404 : code.includes('INVALID') || code.includes('REQUIRED') || code.includes('UNSUPPORTED') || code.includes('CSRF') || code.includes('TOO_') || code === 'CONTENT_REJECTED' ? 400 : code.startsWith('GOOGLE_') || code === 'AUTHENTICATION_REQUIRED' ? 401 : code.includes('DISABLED') || code.includes('STORAGE_UNAVAILABLE') ? 503 : 500;
+  const publicMessage = status === 429 ? 'Demasiados intentos; esperá antes de volver a enviar.' : status === 413 ? 'La solicitud supera el tamaño permitido.' : status === 401 ? 'La sesión o identidad no pudo validarse.' : status === 403 ? 'No tenés acceso a esta operación.' : status === 404 ? 'El recurso solicitado no existe.' : status === 400 ? 'El contenido no cumple las reglas de este servicio.' : status === 503 && code.includes('STORAGE_UNAVAILABLE') ? 'El almacenamiento privado alcanzó temporalmente su límite gratuito.' : status === 503 ? 'La función todavía no está habilitada.' : 'No se pudo completar la operación privada.';
   return privateErrorResponse(status === 400 ? 'CONTENT_REJECTED' : code, publicMessage, status);
 }
 
 async function handleAuth(request: Request, env: WorkerEnv, pathname: string): Promise<Response> {
   if (pathname === '/api/session' && request.method === 'GET') {
     const enabled = privateMessagingEnabled(env);
-    const principal = enabled ? await sessionFor(request, env) : null;
-    return privateJsonResponse({ enabled, authenticated: Boolean(principal), principal });
+    const session = enabled ? await sessionFor(request, env) : null;
+    return privateJsonResponse({ enabled, authenticated: Boolean(session), principal: session?.principal ?? null, csrfRequired: Boolean(session) });
   }
   if (pathname === '/api/logout' && request.method === 'POST') {
     requireSameOrigin(request);
-    if (env.SESSION_SIGNING_KEY) {
-      const signed = await readSession(request, env.SESSION_SIGNING_KEY);
-      if (signed) await revokeSession(env, signed.sessionId, new Date().toISOString());
+    const session = await sessionFor(request, env);
+    if (session) {
+      await requireCsrf(request, session);
+      await revokeSession(env, session.principal.sessionId, new Date().toISOString());
     }
-    return privateJsonResponse({ authenticated: false }, { headers: { 'Set-Cookie': clearSessionCookie() } });
+    const headers = new Headers();
+    headers.append('Set-Cookie', clearSessionCookie());
+    headers.append('Set-Cookie', clearCsrfCookie());
+    return privateJsonResponse({ authenticated: false }, { headers });
   }
   if (pathname !== '/api/auth/google' || request.method !== 'POST') return privateErrorResponse('NOT_FOUND', 'Ruta privada inexistente', 404);
   if (!privateMessagingEnabled(env) || !env.GOOGLE_CLIENT_ID || !env.SESSION_SIGNING_KEY || !env.MESSAGES_DB) return privateErrorResponse('PRIVATE_MESSAGING_DISABLED', 'La bandeja privada todavía no está activada.', 503);
   requireSameOrigin(request);
+  const now = new Date();
+  const networkActor = await networkActorId(request, env.SESSION_SIGNING_KEY);
+  if (!await consumeWindow(env.MESSAGES_DB, networkActor, 'AUTH_LOGIN', AUTH_NETWORK_LIMIT, AUTH_WINDOW_MS, now)) throw new Error('RATE_LIMITED');
   const body = await parseJsonBody(request);
   if (typeof body !== 'object' || body === null || Array.isArray(body) || Object.keys(body).length !== 1 || typeof (body as { credential?: unknown }).credential !== 'string') throw new Error('GOOGLE_CREDENTIAL_INVALID');
   const claims = await verifyGoogleIdToken((body as { credential: string }).credential, env.GOOGLE_CLIENT_ID);
-  const now = new Date();
   const principal = createSessionPrincipal(claims, env.SOS_SF_OPERATOR_EMAILS ?? '', now.getTime());
-  await env.MESSAGES_DB.prepare('UPDATE auth_sessions SET revoked_at = ? WHERE sub = ? AND revoked_at IS NULL').bind(now.toISOString(), principal.sub).run();
-  await env.MESSAGES_DB.prepare('INSERT INTO auth_sessions (id,sub,email,role,created_at,expires_at,revoked_at,rotated_from) VALUES (?,?,?,?,?,?,NULL,NULL)').bind(principal.sessionId, principal.sub, principal.email, principal.role, now.toISOString(), principal.expiresAt).run();
-  const cookie = await createSessionCookieForPrincipal(principal, env.SESSION_SIGNING_KEY, now.getTime());
-  return privateJsonResponse({ authenticated: true, principal }, { headers: { 'Set-Cookie': cookie } });
+  const csrfToken = randomSecurityToken();
+  const csrfHash = await securityTokenHash(csrfToken);
+  await rotateSession(env.MESSAGES_DB, principal, csrfHash, now);
+  const headers = new Headers();
+  headers.append('Set-Cookie', await createSessionCookieForPrincipal(principal, env.SESSION_SIGNING_KEY, now.getTime()));
+  headers.append('Set-Cookie', createCsrfCookie(csrfToken, principal.expiresAt, now.getTime()));
+  return privateJsonResponse({ authenticated: true, principal }, { headers });
 }
 
-async function handleReportRoutes(request: Request, env: WorkerEnv, url: URL, principal: SessionPrincipal): Promise<Response | null> {
+async function handleReportRoutes(request: Request, env: WorkerEnv, url: URL, session: SessionContext): Promise<Response | null> {
+  const principal = session.principal;
   if (url.pathname === '/api/private/reports') {
     if (request.method === 'GET') return privateJsonResponse(await listReports(env, principal, url.searchParams.get('status')));
     if (request.method === 'POST') {
-      requireSameOrigin(request);
+      await requireCsrf(request, session);
       if (!env.SESSION_SIGNING_KEY) throw new Error('PRIVATE_MESSAGING_DISABLED');
-      return privateJsonResponse(await createReport(request, env, principal, await networkActorId(request, env.SESSION_SIGNING_KEY)), { status: 201 });
+      const result = await createReport(request, env, principal, await networkActorId(request, env.SESSION_SIGNING_KEY));
+      return privateJsonResponse(result, { status: result.duplicate === true ? 200 : 201 });
     }
   }
+  const accessMatch = url.pathname.match(/^\/api\/private\/operator\/photo-access\/([^/]+)$/);
+  if (accessMatch && request.method === 'GET') return consumeReportPhotoAccess(env, principal, decodeURIComponent(accessMatch[1]!));
   const photoMatch = url.pathname.match(/^\/api\/private\/operator\/reports\/([^/]+)\/photos\/([^/]+)$/);
-  if (photoMatch && request.method === 'GET') return reportPhoto(env, principal, decodeURIComponent(photoMatch[1]!), decodeURIComponent(photoMatch[2]!));
-  if (photoMatch && request.method === 'PATCH') { requireSameOrigin(request); return privateJsonResponse(await updatePhotoReview(request, env, principal, decodeURIComponent(photoMatch[1]!), decodeURIComponent(photoMatch[2]!))); }
+  if (photoMatch && request.method === 'POST') {
+    await requireCsrf(request, session);
+    return privateJsonResponse(await createReportPhotoAccess(env, principal, decodeURIComponent(photoMatch[1]!), decodeURIComponent(photoMatch[2]!)), { status: 201 });
+  }
+  if (photoMatch && request.method === 'PATCH') {
+    await requireCsrf(request, session);
+    return privateJsonResponse(await updatePhotoReview(await parseJsonBody(request, 4096), env, principal, decodeURIComponent(photoMatch[1]!), decodeURIComponent(photoMatch[2]!)));
+  }
   const reportMatch = url.pathname.match(/^\/api\/private\/operator\/reports\/([^/]+)$/);
-  if (reportMatch && request.method === 'PATCH') { requireSameOrigin(request); return privateJsonResponse(await updateReport(request, env, principal, decodeURIComponent(reportMatch[1]!))); }
+  if (reportMatch && request.method === 'PATCH') {
+    await requireCsrf(request, session);
+    return privateJsonResponse(await updateReport(await parseJsonBody(request, 8192), env, principal, decodeURIComponent(reportMatch[1]!)));
+  }
   return null;
 }
 
 async function handlePrivate(request: Request, env: WorkerEnv, url: URL): Promise<Response> {
   if (!privateMessagingEnabled(env) || !env.SESSION_SIGNING_KEY) return privateErrorResponse('PRIVATE_MESSAGING_DISABLED', 'Las funciones privadas todavía no están activadas.', 503);
-  const principal = await sessionFor(request, env);
-  if (!principal) return privateErrorResponse('AUTHENTICATION_REQUIRED', 'Iniciá sesión con Google para usar funciones privadas.', 401);
-  const reportResponse = await handleReportRoutes(request, env, url, principal);
+  const session = await sessionFor(request, env);
+  if (!session) return privateErrorResponse('AUTHENTICATION_REQUIRED', 'Iniciá sesión con Google para usar funciones privadas.', 401);
+  const reportResponse = await handleReportRoutes(request, env, url, session);
   if (reportResponse) return reportResponse;
+  const principal = session.principal;
   const service = messagingService(env);
   if (url.pathname === '/api/private/conversations') {
     if (request.method === 'GET') return privateJsonResponse({ conversations: await service.listConversations(principal), limit: 40 });
-    if (request.method === 'POST') { requireSameOrigin(request); return privateJsonResponse({ conversation: await service.getOrCreateConversation(principal) }, { status: 201 }); }
+    if (request.method === 'POST') { await requireCsrf(request, session); return privateJsonResponse({ conversation: await service.getOrCreateConversation(principal) }, { status: 201 }); }
   }
   if (url.pathname === '/api/private/messages') {
     if (request.method === 'GET') {
@@ -179,7 +220,7 @@ async function handlePrivate(request: Request, env: WorkerEnv, url: URL): Promis
       return privateJsonResponse(await service.listMessages(principal, conversationId, url.searchParams.get('before')));
     }
     if (request.method === 'POST') {
-      requireSameOrigin(request);
+      await requireCsrf(request, session);
       const result = await service.send(principal, await parseJsonBody(request), await networkActorId(request, env.SESSION_SIGNING_KEY));
       return privateJsonResponse(result, { status: result.duplicate ? 200 : 201 });
     }
