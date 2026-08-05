@@ -1,4 +1,4 @@
-name: Export Effective V3 Source
+name: Export Effective V3 KV Source
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Reconstruct and apply exact current V3 patches
+      - name: Reconstruct and apply exact current V3 KV patches
         shell: bash
         run: |
           set -euo pipefail
@@ -59,9 +59,18 @@ jobs:
           if hashlib.sha256(fix_patch).hexdigest() != 'e89bdaef77e5e8c9111a6bfc506e2fb63995869fa5d65d09819a92d41313ae4c':
               raise SystemExit('PROVISION_FIX_CONTENT_HASH_MISMATCH')
           Path('/tmp/v3-full-014-provision-fix.patch').write_bytes(fix_patch)
+
+          kv_encoded = Path('.github/v3-full-014-kv-free.patch.gz.b64').read_text().strip()
+          if hashlib.sha256(kv_encoded.encode()).hexdigest() != 'bce53f835ef4ce8770a1bd1464ebcc2d420ef18cd031a035fb8b7e30be023b89':
+              raise SystemExit('KV_FREE_TRANSPORT_HASH_MISMATCH')
+          kv_patch = gzip.decompress(base64.b64decode(kv_encoded, validate=True))
+          if hashlib.sha256(kv_patch).hexdigest() != 'a3b10732ca4c6d4f4cd6649c162ae589c28641c74b050eb0acfa6cd8fd79d220':
+              raise SystemExit('KV_FREE_CONTENT_HASH_MISMATCH')
+          Path('/tmp/v3-full-014-kv-free.patch').write_bytes(kv_patch)
           PY
           git apply --index /tmp/v3-full-014.patch
           git apply --index /tmp/v3-full-014-provision-fix.patch
+          git apply --index /tmp/v3-full-014-kv-free.patch
           git diff --cached --check
           git diff --cached --stat
 
@@ -79,7 +88,7 @@ jobs:
       - name: Upload effective source
         uses: actions/upload-artifact@v4
         with:
-          name: effective-v3-source-${{ github.sha }}-${{ github.run_id }}
+          name: effective-v3-kv-source-${{ github.sha }}-${{ github.run_id }}
           path: /tmp/effective-v3/
           if-no-files-found: error
           retention-days: 7
