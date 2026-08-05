@@ -1,6 +1,6 @@
 import { unavailableSnapshot } from '../data/unavailable-snapshot';
 import type { ChangeItem, DataStatus, HydrologicalSystem, PublicState, RiverPoint, RiverThreshold, Snapshot, Source } from '../domain/snapshot';
-import { providerHealth, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core';
+import { providerHealth, publishProviderBlock, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core';
 import { fetchInaSeries, fetchInaWaterMl } from './providers/ina';
 import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa';
 import { fetchPortsHydrometers, type PortsHydrometerReading } from './providers/ports';
@@ -15,7 +15,9 @@ export interface LiveDataEnv {
 }
 
 const INA_BASE = 'https://alerta.ina.gob.ar/a5/getObservaciones';
-const LIVE_DATA_CACHE_VERSION = 'a5-live-v2';
+const LIVE_DATA_CACHE_VERSION = 'all-sources-013-v2';
+const SMN_CAP_URL = 'https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml';
+const NASA_GPM_URL = 'https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer';
 const STATION_FRESH_MS = 36 * 60 * 60_000;
 const SNAPSHOT_CACHE_MS = 60_000;
 const STATIONS = Object.freeze([
@@ -115,7 +117,7 @@ function sourceStatus(result: ProviderResult<unknown>): Source['status'] {
 }
 
 async function stationSystem(station: typeof STATIONS[number], now: Date): Promise<{ system: HydrologicalSystem; source: Source }> {
-  const start = new Date(now.getTime() - 72 * 3_600_000).toISOString().slice(0, 10);
+  const start = new Date(now.getTime() - 180 * 24 * 3_600_000).toISOString().slice(0, 10);
   const end = new Date(now.getTime() + 24 * 3_600_000).toISOString().slice(0, 10);
   const endpoint = new URL(INA_BASE);
   endpoint.searchParams.set('tipo', 'puntual');
@@ -176,23 +178,23 @@ async function waterMlSource(url: string | undefined, id: string, name: string):
     observedAt: result.observedAt ?? result.fetchedAt,
     validUntil: new Date(Date.parse(result.observedAt ?? result.fetchedAt) + 12 * 3_600_000).toISOString(),
     contribution: result.value ? `WaterML interpretado: ${result.value.length} lecturas publicadas.` : 'WaterML no disponible o incompatible.',
-    official: true, connected: Boolean(result.value), qualityNote: 'Formato verificado; la calidad hidrológica depende de la marca explícita del proveedor.',
+    official: true, connected: result.value !== null, url, qualityNote: 'WaterML 2.0 interpretado; la calidad hidrológica depende de la marca explícita del proveedor.',
   });
 }
 
 async function portsSource(url: string | undefined): Promise<Source> {
-  if (!url) return unavailableSource('ports-hydrometers', 'Agencia Nacional de Puertos y Navegación', 'OFFICIAL_OBSERVATION', 'No se encontró un endpoint machine-readable estable configurado.');
+  if (!url) return Object.freeze({ ...unavailableSource('ports-hydrometers', 'Agencia Nacional de Puertos y Navegación', 'OFFICIAL_OBSERVATION', 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE: la página oficial sólo publica enlaces HTML/HTTP por estación y no un endpoint estable legible por máquina.'), url: 'https://www.argentina.gob.ar/economia/agencia-nacional-de-puertos-y-navegacion/navegacion/navegable-troncal/hidrometros' });
   const result: ProviderResult<readonly PortsHydrometerReading[]> = await fetchPortsHydrometers(url);
   return Object.freeze({
     id: 'ports-hydrometers', name: 'Agencia Nacional de Puertos y Navegación', kind: 'OFFICIAL_OBSERVATION', status: sourceStatus(result),
     observedAt: result.observedAt ?? result.fetchedAt, validUntil: new Date(Date.parse(result.observedAt ?? result.fetchedAt) + 12 * 3_600_000).toISOString(),
     contribution: result.value ? `${result.value.length} lecturas de hidrómetros con estación, nivel y timestamp interpretados.` : 'Fuente no disponible o esquema incompatible.',
-    official: true, connected: Boolean(result.value), qualityNote: 'Lecturas publicadas por la fuente; no se sustituyen estaciones de forma silenciosa.',
+    official: true, connected: result.value !== null, url, qualityNote: 'Lecturas publicadas por la fuente; no se sustituyen estaciones de forma silenciosa.',
   });
 }
 
 async function smnObservationSource(url: string | undefined): Promise<Source> {
-  if (!url) return unavailableSource('smn-observations', 'Servicio Meteorológico Nacional · observaciones', 'OFFICIAL_OBSERVATION', 'Endpoint de observaciones no configurado.');
+  if (!url) return Object.freeze({ ...unavailableSource('smn-observations', 'Servicio Meteorológico Nacional · observaciones', 'OFFICIAL_OBSERVATION', 'CREDENTIAL_REQUIRED: la API oficial ws1 requiere JWT no provisto como endpoint público estable; no se extrae token desde HTML.'), url: 'https://ws2.smn.gob.ar/observaciones' });
   const result: ProviderResult<SmnObservationSummary> = await fetchSmnObservations(url);
   return Object.freeze({
     id: 'smn-observations', name: 'Servicio Meteorológico Nacional · observaciones', kind: 'OFFICIAL_OBSERVATION', status: sourceStatus(result),
@@ -209,23 +211,34 @@ async function smnAlertSource(url: string | undefined): Promise<Source> {
     id: 'smn-alerts', name: 'Servicio Meteorológico Nacional · alertas', kind: 'OFFICIAL_ALERT', status: sourceStatus(result),
     observedAt: result.observedAt ?? result.fetchedAt, validUntil: new Date(Date.parse(result.observedAt ?? result.fetchedAt) + 6 * 3_600_000).toISOString(),
     contribution: result.value ? `${result.value.length} alertas con título y timestamp interpretados.` : 'Fuente no disponible o esquema incompatible.',
-    official: true, connected: Boolean(result.value),
+    official: true, connected: result.value !== null, url,
   });
 }
 
 async function nasaSource(): Promise<Source> {
-  const query = new URL('https://maps.disasters.nasa.gov/ags03/rest/services/NRT_Latest/GPM_NRT_30min_Latest/ImageServer/identify');
-  query.searchParams.set('geometry', JSON.stringify({ x: -60.7, y: -31.63, spatialReference: { wkid: 4326 } }));
-  query.searchParams.set('geometryType', 'esriGeometryPoint');
-  query.searchParams.set('returnGeometry', 'false');
-  query.searchParams.set('f', 'json');
-  const result: ProviderResult<NasaGpmReading> = await fetchNasaGpm(query.toString());
+  const result: ProviderResult<NasaGpmReading> = await fetchNasaGpm(NASA_GPM_URL);
+  const connected = result.value !== null
+    && Number.isFinite(result.value.value)
+    && Number.isFinite(Date.parse(result.value.observedAt));
+  const observedAt = connected ? result.value!.observedAt : result.fetchedAt;
   return Object.freeze({
-    id: 'nasa-gpm-imerg-early', name: 'NASA GPM IMERG Early', kind: 'SATELLITE_OBSERVATION', status: sourceStatus(result),
-    observedAt: result.observedAt ?? result.fetchedAt, validUntil: new Date(Date.parse(result.observedAt ?? result.fetchedAt) + 6 * 3_600_000).toISOString(),
-    contribution: result.value ? 'Estimación satelital suplementaria disponible; no se transforma en un nivel o pluviómetro local.' : 'Estimación satelital suplementaria no disponible.',
-    official: true, connected: Boolean(result.value), latencyMinutes: result.value?.latencyMinutes ?? 240,
-    resolution: result.value?.resolution ?? 'aprox. 0,1° / 30 minutos', uncertainty: result.value?.uncertainty ?? 'Estimación temprana con incertidumbre espacial y temporal.',
+    id: 'nasa-gpm-imerg-early',
+    name: 'NASA GPM IMERG Early',
+    kind: 'SATELLITE_OBSERVATION',
+    status: connected ? sourceStatus(result) : 'UNAVAILABLE',
+    observedAt,
+    validUntil: new Date(Date.parse(observedAt) + 6 * 3_600_000).toISOString(),
+    contribution: connected
+      ? `Muestra satelital real en Santa Fe: ${result.value!.value.toFixed(2)} mm/h, raster ${result.value!.objectId}.`
+      : `NASA GPM no entregó una muestra numérica acotada (${result.errorClass ?? 'SIN_MUESTRA'}).`,
+    official: true,
+    connected,
+    url: connected ? result.value!.sourceUrl : `${NASA_GPM_URL}/query`,
+    latencyMinutes: connected ? result.value!.latencyMinutes : undefined,
+    resolution: connected ? result.value!.resolution : '0,1° / 30 minutos',
+    uncertainty: connected
+      ? result.value!.uncertainty
+      : 'Fuente suplementaria no utilizada para determinar el estado hídrico principal.',
   });
 }
 
@@ -234,14 +247,19 @@ function highestState(systems: readonly HydrologicalSystem[]): PublicState {
   return systems.map(systemState).reduce((current, next) => order.indexOf(next) > order.indexOf(current) ? next : current, 'UNKNOWN');
 }
 
-async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
+async function buildUncached(_env: LiveDataEnv, now: Date): Promise<Snapshot> {
+  publishProviderBlock('ports-hydrometers', 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE');
+  publishProviderBlock('smn-observations', 'CREDENTIAL_REQUIRED');
+  const from = new Date(now.getTime() - 180 * 24 * 3_600_000).toISOString().slice(0, 10);
+  const to = new Date(now.getTime() + 24 * 3_600_000).toISOString().slice(0, 10);
+  const waterMlUrl = (series: string) => `https://alerta.ina.gob.ar/a5/obs/puntual/series/${series}?timestart=${from}&timeend=${to}&format=waterml2`;
   const stationPromise = Promise.all(STATIONS.map((station) => stationSystem(station, now)));
   const optionalPromise = Promise.all([
-    waterMlSource(env.INA_WATERML_PARANA_URL, 'ina-waterml-parana', 'INA WaterOneFlow · Paraná'),
-    waterMlSource(env.INA_WATERML_SALADO_URL, 'ina-waterml-salado', 'INA WaterOneFlow · Salado'),
-    portsSource(env.PORTS_HYDROMETER_JSON_URL),
-    smnObservationSource(env.SMN_OBSERVATIONS_JSON_URL),
-    smnAlertSource(env.SMN_ALERTS_JSON_URL),
+    waterMlSource(waterMlUrl('30'), 'ina-waterml-parana', 'INA WaterML 2.0 · Paraná'),
+    waterMlSource(waterMlUrl('3044'), 'ina-waterml-salado', 'INA WaterML 2.0 · Salado'),
+    portsSource(undefined),
+    smnObservationSource(undefined),
+    smnAlertSource(SMN_CAP_URL),
     nasaSource(),
   ]);
   const [stationResults, optionalSources] = await Promise.all([stationPromise, optionalPromise]);

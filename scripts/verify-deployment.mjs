@@ -17,7 +17,7 @@ async function request(path, options = {}) {
       const url = `${baseUrl}${path}${separator}arq_verify=${encodeURIComponent(verificationNonce)}&attempt=${attempt}`;
       const response = await fetch(url, {
         redirect: 'error',
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(40_000),
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache', ...(options.headers ?? {}) },
         ...options,
@@ -100,6 +100,61 @@ const results = checks.map((item) => {
   }
   return { path: item.path, status: item.status, contentType: item.contentType, cacheControl: item.cacheControl, security, semantic, detail, pass: security && semantic };
 });
+
+const healthData = payload(checks.find((item) => item.path === '/api/health'));
+const sourcesData = payload(checks.find((item) => item.path === '/api/sources'));
+const providers = Array.isArray(healthData?.providers) ? healthData.providers : [];
+const sources = Array.isArray(sourcesData?.sources) ? sourcesData.sources : [];
+const provider = (id) => providers.find((item) => item.id === id);
+const source = (id) => sources.find((item) => item.id === id);
+const primaryPairs = [
+  ['ina-rest-30', 'ina:30'],
+  ['ina-rest-3044', 'ina:3044'],
+  ['ina-waterml-parana', 'ina-waterml-parana'],
+  ['ina-waterml-salado', 'ina-waterml-salado'],
+  ['smn-alerts', 'smn-alerts'],
+];
+const primaryPass = primaryPairs.every(([healthId, sourceId]) => {
+  const health = provider(healthId);
+  const item = source(sourceId);
+  return ['FRESH', 'STALE'].includes(health?.status)
+    && health?.errorClass === null
+    && health?.circuitOpenUntil === null
+    && Number.isFinite(Date.parse(health?.lastSuccessAt))
+    && Number.isFinite(Date.parse(health?.lastObservedAt))
+    && item?.connected === true
+    && ['FRESH', 'STALE'].includes(item?.status)
+    && Number.isFinite(Date.parse(item?.observedAt))
+    && typeof item?.url === 'string';
+});
+const blockedPass = [
+  ['ports-hydrometers', 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE'],
+  ['smn-observations', 'CREDENTIAL_REQUIRED'],
+].every(([id, errorClass]) => provider(id)?.status === 'UNAVAILABLE'
+  && provider(id)?.errorClass === errorClass
+  && provider(id)?.circuitOpenUntil === null
+  && source(id)?.connected === false
+  && source(id)?.status === 'UNAVAILABLE'
+  && typeof source(id)?.url === 'string');
+const nasaHealth = provider('nasa-gpm-imerg-early');
+const nasaSource = source('nasa-gpm-imerg-early');
+const nasaConnectedPass = nasaSource?.connected === true
+  && ['FRESH', 'STALE'].includes(nasaHealth?.status)
+  && nasaHealth?.errorClass === null
+  && Number.isFinite(Date.parse(nasaHealth?.lastSuccessAt))
+  && Number.isFinite(Date.parse(nasaHealth?.lastObservedAt))
+  && Number.isFinite(nasaSource?.latencyMinutes)
+  && nasaSource.latencyMinutes >= 0
+  && /[-+]?\d+(?:[.,]\d+)? mm\/h/.test(String(nasaSource?.contribution ?? ''))
+  && String(nasaSource?.url ?? '').includes('/getSamples?')
+  && String(nasaSource?.url ?? '').includes('mosaicRule=');
+const nasaUnavailablePass = nasaSource?.connected === false
+  && nasaSource?.status === 'UNAVAILABLE'
+  && nasaHealth?.status === 'UNAVAILABLE'
+  && ['TIMEOUT', 'HTTP', 'PARSE', 'NETWORK', 'CONTENT_TYPE', 'BODY_TOO_LARGE', 'CIRCUIT_OPEN'].includes(nasaHealth?.errorClass)
+  && String(nasaSource?.url ?? '').endsWith('/query');
+const matrixPass = primaryPass && blockedPass && (nasaConnectedPass || nasaUnavailablePass);
+results.push({ path: '/api/source-matrix', status: matrixPass ? 200 : 500, contentType: 'application/json', cacheControl: 'no-store', security: true, semantic: matrixPass, detail: 'ALL-SOURCES-013 primary matrix + conditional real NASA sample', pass: matrixPass });
 
 const pass = results.every((result) => result.pass);
 const proof = { schemaVersion: '1.0', worker_name: 'sos-sf', workers_dev_url: baseUrl, deployed_at_utc: new Date().toISOString(), remote_status: pass ? 'PASS' : 'FAIL', private_features_expected: expectPrivateFeatures, verified_paths: results, source_commit: process.env.GITHUB_SHA ?? 'unknown', cloudflare_account_identity: 'GitHub Actions protected configuration; no secret readback' };

@@ -1,0 +1,5597 @@
+{
+  "status": "VERIFIED_NOT_ACCEPTED",
+  "workerVersion": "44dd8390-9f73-40c6-b487-8070445e6b9e",
+  "round": {
+    "health": {
+      "service": "sos-sf",
+      "status": "healthy",
+      "dataMode": "LIVE_AGGREGATION",
+      "privateMessaging": "FEATURE_DISABLED",
+      "reporting": "FEATURE_DISABLED",
+      "snapshot": {
+        "id": "live-2026-08-05T00:57:50.165Z",
+        "dataStatus": "STALE",
+        "generatedAt": "2026-08-05T00:57:50.165Z"
+      },
+      "providers": [
+        {
+          "id": "ina-rest-30",
+          "status": "FRESH",
+          "lastSuccessAt": "2026-08-05T00:57:52.054Z",
+          "lastObservedAt": "2026-08-04T03:00:00.000Z",
+          "errorClass": null,
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "ina-rest-3044",
+          "status": "STALE",
+          "lastSuccessAt": "2026-08-05T00:57:52.035Z",
+          "lastObservedAt": "2026-07-08T12:38:00.000Z",
+          "errorClass": null,
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "ina-waterml-parana",
+          "status": "FRESH",
+          "lastSuccessAt": "2026-08-05T00:57:52.028Z",
+          "lastObservedAt": "2026-08-04T03:00:00.000Z",
+          "errorClass": null,
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "ina-waterml-salado",
+          "status": "STALE",
+          "lastSuccessAt": "2026-08-05T00:57:52.337Z",
+          "lastObservedAt": "2026-07-08T12:38:00.000Z",
+          "errorClass": null,
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "nasa-gpm-imerg-early",
+          "status": "UNAVAILABLE",
+          "lastSuccessAt": null,
+          "lastObservedAt": null,
+          "errorClass": "PARSE",
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "ports-hydrometers",
+          "status": "UNAVAILABLE",
+          "lastSuccessAt": null,
+          "lastObservedAt": null,
+          "errorClass": "OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE",
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "smn-alerts",
+          "status": "FRESH",
+          "lastSuccessAt": "2026-08-04T23:49:09.015Z",
+          "lastObservedAt": "2026-08-04T22:00:02.000Z",
+          "errorClass": null,
+          "circuitOpenUntil": null
+        },
+        {
+          "id": "smn-observations",
+          "status": "UNAVAILABLE",
+          "lastSuccessAt": null,
+          "lastObservedAt": null,
+          "errorClass": "CREDENTIAL_REQUIRED",
+          "circuitOpenUntil": null
+        }
+      ],
+      "connectedProviders": [
+        "ina-rest-30",
+        "ina-rest-3044",
+        "ina-waterml-parana",
+        "ina-waterml-salado",
+        "smn-alerts"
+      ]
+    },
+    "sources": {
+      "snapshotId": "live-2026-08-05T00:57:50.165Z",
+      "systems": [
+        {
+          "id": "parana-santa-fe",
+          "label": "Sistema Paraná",
+          "watercourse": "Río Paraná",
+          "stationName": "Santa Fe",
+          "stationCode": "30",
+          "available": true,
+          "dataStatus": "LIVE",
+          "currentMetres": 3.26,
+          "observedAt": "2026-08-04T03:00:00.000Z",
+          "sourceId": "ina:30",
+          "sourceName": "INA · Sistema de Información Hidrológica",
+          "points": [
+            {
+              "at": "2026-02-06T03:00:00.000Z",
+              "metres": 2.28,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-07T03:00:00.000Z",
+              "metres": 2.22,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-08T03:00:00.000Z",
+              "metres": 2.13,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-09T03:00:00.000Z",
+              "metres": 2.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-10T03:00:00.000Z",
+              "metres": 1.97,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-11T03:00:00.000Z",
+              "metres": 1.93,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-12T03:00:00.000Z",
+              "metres": 1.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-13T03:00:00.000Z",
+              "metres": 1.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-14T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-15T03:00:00.000Z",
+              "metres": 1.98,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T15:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-17T03:00:00.000Z",
+              "metres": 2.05,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-17T15:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-18T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-19T03:00:00.000Z",
+              "metres": 2.15,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-20T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-21T03:00:00.000Z",
+              "metres": 2.48,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-22T03:00:00.000Z",
+              "metres": 2.22,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-23T03:00:00.000Z",
+              "metres": 2.22,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-24T03:00:00.000Z",
+              "metres": 2.18,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-25T03:00:00.000Z",
+              "metres": 2.02,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-26T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-27T03:00:00.000Z",
+              "metres": 1.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-28T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-01T03:00:00.000Z",
+              "metres": 1.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-02T03:00:00.000Z",
+              "metres": 1.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-03T03:00:00.000Z",
+              "metres": 1.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-04T03:00:00.000Z",
+              "metres": 1.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-05T03:00:00.000Z",
+              "metres": 1.9,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-06T03:00:00.000Z",
+              "metres": 1.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-07T03:00:00.000Z",
+              "metres": 1.84,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-08T03:00:00.000Z",
+              "metres": 1.84,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-09T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-10T03:00:00.000Z",
+              "metres": 1.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-11T03:00:00.000Z",
+              "metres": 1.72,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-12T03:00:00.000Z",
+              "metres": 1.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-13T03:00:00.000Z",
+              "metres": 1.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-14T03:00:00.000Z",
+              "metres": 1.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-15T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-16T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-17T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-18T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-19T03:00:00.000Z",
+              "metres": 1.56,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-20T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-21T03:00:00.000Z",
+              "metres": 1.5,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-22T03:00:00.000Z",
+              "metres": 1.5,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-23T03:00:00.000Z",
+              "metres": 1.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-24T03:00:00.000Z",
+              "metres": 1.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-25T03:00:00.000Z",
+              "metres": 1.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-26T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-27T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-28T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-29T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-30T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-31T03:00:00.000Z",
+              "metres": 1.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-01T03:00:00.000Z",
+              "metres": 1.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-02T03:00:00.000Z",
+              "metres": 1.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-03T03:00:00.000Z",
+              "metres": 1.92,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-04T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-05T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-06T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-07T03:00:00.000Z",
+              "metres": 2.2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-08T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-09T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-10T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-11T03:00:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-12T03:00:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-13T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-14T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-15T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-16T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-17T03:00:00.000Z",
+              "metres": 2.45,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-18T03:00:00.000Z",
+              "metres": 2.77,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-19T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-20T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-21T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-22T03:00:00.000Z",
+              "metres": 2.83,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-23T03:00:00.000Z",
+              "metres": 2.86,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-24T03:00:00.000Z",
+              "metres": 2.86,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-25T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-26T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-27T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-28T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-29T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-30T03:00:00.000Z",
+              "metres": 2.63,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-01T03:00:00.000Z",
+              "metres": 2.65,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-02T03:00:00.000Z",
+              "metres": 2.61,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-03T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-04T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-05T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-06T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-07T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-08T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-09T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-10T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-11T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-12T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-13T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-14T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-15T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-16T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-17T03:00:00.000Z",
+              "metres": 2.65,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-18T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-19T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-20T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-21T03:00:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-22T03:00:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-23T03:00:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-24T03:00:00.000Z",
+              "metres": 2.47,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-25T03:00:00.000Z",
+              "metres": 2.39,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-26T03:00:00.000Z",
+              "metres": 2.37,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-27T03:00:00.000Z",
+              "metres": 2.37,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-28T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-29T03:00:00.000Z",
+              "metres": 2.43,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-30T03:00:00.000Z",
+              "metres": 2.45,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-31T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-01T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-02T03:00:00.000Z",
+              "metres": 2.33,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-03T03:00:00.000Z",
+              "metres": 2.33,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-04T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-05T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-06T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-06T15:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-07T03:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-07T15:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-08T03:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-08T15:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-09T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-10T03:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-11T03:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-12T03:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-13T03:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-14T03:00:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-15T03:00:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-16T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-17T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-18T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-19T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-20T03:00:00.000Z",
+              "metres": 2.25,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-21T03:00:00.000Z",
+              "metres": 2.34,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-22T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-23T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-24T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-25T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-26T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-27T03:00:00.000Z",
+              "metres": 2.44,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-28T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T15:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-30T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-01T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-01T15:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-02T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-03T03:00:00.000Z",
+              "metres": 2.45,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-04T03:00:00.000Z",
+              "metres": 2.48,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-05T03:00:00.000Z",
+              "metres": 2.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-06T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-07T03:00:00.000Z",
+              "metres": 2.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-08T03:00:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-09T03:00:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-10T03:00:00.000Z",
+              "metres": 2.96,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-11T03:00:00.000Z",
+              "metres": 3.01,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-12T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-13T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-14T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-15T03:00:00.000Z",
+              "metres": 3.15,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-16T03:00:00.000Z",
+              "metres": 3.17,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-17T03:00:00.000Z",
+              "metres": 3.2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-18T03:00:00.000Z",
+              "metres": 3.17,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-19T03:00:00.000Z",
+              "metres": 3.11,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-20T03:00:00.000Z",
+              "metres": 3.11,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-21T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-22T03:00:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-23T03:00:00.000Z",
+              "metres": 3.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-24T03:00:00.000Z",
+              "metres": 3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-25T03:00:00.000Z",
+              "metres": 3.01,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-26T03:00:00.000Z",
+              "metres": 3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-27T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-28T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-29T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-30T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-31T03:00:00.000Z",
+              "metres": 3.03,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-01T03:00:00.000Z",
+              "metres": 3.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-02T03:00:00.000Z",
+              "metres": 3.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-03T03:00:00.000Z",
+              "metres": 3.28,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-04T03:00:00.000Z",
+              "metres": 3.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            }
+          ],
+          "thresholds": [
+            {
+              "id": "NORMAL",
+              "label": "Referencia baja",
+              "metres": 2
+            },
+            {
+              "id": "ALERTA",
+              "label": "Alerta",
+              "metres": 5.3
+            },
+            {
+              "id": "EVACUACION",
+              "label": "Umbral de evacuación",
+              "metres": 5.7
+            }
+          ],
+          "trend": "FALLING",
+          "delta1h": -0.020000000000000018,
+          "delta6h": -0.020000000000000018,
+          "delta24h": -0.020000000000000018
+        },
+        {
+          "id": "salado-santo-tome",
+          "label": "Sistema Salado",
+          "watercourse": "Río Salado",
+          "stationName": "Santo Tomé",
+          "stationCode": "1679",
+          "available": true,
+          "dataStatus": "STALE",
+          "currentMetres": 3.08,
+          "observedAt": "2026-07-08T12:38:00.000Z",
+          "sourceId": "ina:3044",
+          "sourceName": "INA · Sistema de Información Hidrológica",
+          "points": [
+            {
+              "at": "2026-02-06T12:40:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-08T01:44:00.000Z",
+              "metres": 2.44,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-09T02:23:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-09T14:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-10T15:01:00.000Z",
+              "metres": 2.21,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-11T15:52:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-12T16:22:00.000Z",
+              "metres": 2.24,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-13T15:05:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-14T20:29:00.000Z",
+              "metres": 2.29,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T00:11:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T12:26:00.000Z",
+              "metres": 2.39,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-17T13:04:00.000Z",
+              "metres": 2.53,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-18T12:30:00.000Z",
+              "metres": 2.61,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-19T12:34:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-21T12:05:00.000Z",
+              "metres": 2.86,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-22T13:48:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-23T09:09:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-24T14:59:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-26T02:09:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-26T13:58:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-27T13:21:00.000Z",
+              "metres": 2.59,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-01T01:21:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-02T01:24:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-02T15:45:00.000Z",
+              "metres": 2.56,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-03T14:16:00.000Z",
+              "metres": 2.5,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-05T01:38:00.000Z",
+              "metres": 2.51,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-05T12:55:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-06T11:13:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-07T21:09:00.000Z",
+              "metres": 2.29,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-08T20:43:00.000Z",
+              "metres": 2.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-10T00:51:00.000Z",
+              "metres": 2.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-11T00:54:00.000Z",
+              "metres": 2.09,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-12T01:23:00.000Z",
+              "metres": 2.05,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-12T15:20:00.000Z",
+              "metres": 2.07,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-13T14:59:00.000Z",
+              "metres": 2.04,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-14T14:54:00.000Z",
+              "metres": 1.79,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-15T14:57:00.000Z",
+              "metres": 1.91,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-16T15:10:00.000Z",
+              "metres": 1.87,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-17T13:12:00.000Z",
+              "metres": 1.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-18T14:06:00.000Z",
+              "metres": 1.84,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-20T01:34:00.000Z",
+              "metres": 1.87,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-20T14:16:00.000Z",
+              "metres": 1.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-21T12:26:00.000Z",
+              "metres": 1.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-22T13:32:00.000Z",
+              "metres": 1.93,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-24T01:39:00.000Z",
+              "metres": 1.97,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-26T01:16:00.000Z",
+              "metres": 2.04,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-26T14:12:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-27T14:49:00.000Z",
+              "metres": 2.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-28T16:52:00.000Z",
+              "metres": 2.2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-29T20:29:00.000Z",
+              "metres": 2.18,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-30T15:27:00.000Z",
+              "metres": 2.09,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-31T09:30:00.000Z",
+              "metres": 2.04,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-01T12:52:00.000Z",
+              "metres": 2.05,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-02T21:54:00.000Z",
+              "metres": 2.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-04T01:51:00.000Z",
+              "metres": 2.14,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-04T12:32:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-05T12:40:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-06T15:09:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-12T22:31:00.000Z",
+              "metres": 2.63,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-13T09:22:00.000Z",
+              "metres": 2.61,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-14T21:18:00.000Z",
+              "metres": 2.64,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-15T12:29:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-16T14:26:00.000Z",
+              "metres": 2.97,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-17T15:38:00.000Z",
+              "metres": 3.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-18T11:51:00.000Z",
+              "metres": 3.24,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-19T11:55:00.000Z",
+              "metres": 3.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-20T12:01:00.000Z",
+              "metres": 3.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-21T15:17:00.000Z",
+              "metres": 3.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-22T12:32:00.000Z",
+              "metres": 3.41,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-23T15:36:00.000Z",
+              "metres": 3.42,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-24T15:34:00.000Z",
+              "metres": 3.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-25T12:35:00.000Z",
+              "metres": 3.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-26T13:56:00.000Z",
+              "metres": 3.31,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-27T13:24:00.000Z",
+              "metres": 3.18,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-28T12:53:00.000Z",
+              "metres": 3.21,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-30T13:29:00.000Z",
+              "metres": 3.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-01T14:33:00.000Z",
+              "metres": 3.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-02T17:53:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-03T12:49:00.000Z",
+              "metres": 3.11,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-04T14:44:00.000Z",
+              "metres": 3.09,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-05T14:38:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-06T13:25:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-09T15:31:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-10T15:35:00.000Z",
+              "metres": 2.98,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-11T15:38:00.000Z",
+              "metres": 2.96,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-12T15:31:00.000Z",
+              "metres": 2.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-13T15:24:00.000Z",
+              "metres": 2.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-14T14:19:00.000Z",
+              "metres": 2.96,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-15T15:26:00.000Z",
+              "metres": 2.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-16T12:29:00.000Z",
+              "metres": 2.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-17T16:12:00.000Z",
+              "metres": 2.88,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-18T12:39:00.000Z",
+              "metres": 2.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-19T14:57:00.000Z",
+              "metres": 2.83,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-20T15:33:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-21T15:16:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-22T17:19:00.000Z",
+              "metres": 2.78,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-23T12:06:00.000Z",
+              "metres": 2.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-24T12:25:00.000Z",
+              "metres": 2.71,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-25T13:02:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-26T14:37:00.000Z",
+              "metres": 2.64,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-27T13:10:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-28T16:49:00.000Z",
+              "metres": 2.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-29T13:37:00.000Z",
+              "metres": 2.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-30T14:22:00.000Z",
+              "metres": 2.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-31T16:54:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-01T15:14:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-02T13:47:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-03T13:58:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-04T15:42:00.000Z",
+              "metres": 2.59,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-05T15:36:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-06T11:44:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-07T14:49:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-08T13:53:00.000Z",
+              "metres": 2.53,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-09T16:04:00.000Z",
+              "metres": 2.53,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-10T15:42:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-11T15:12:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-13T02:12:00.000Z",
+              "metres": 2.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-13T17:02:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-14T13:32:00.000Z",
+              "metres": 2.48,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-15T13:09:00.000Z",
+              "metres": 2.44,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-16T13:15:00.000Z",
+              "metres": 2.41,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-17T16:02:00.000Z",
+              "metres": 2.42,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-18T14:08:00.000Z",
+              "metres": 2.46,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-19T15:13:00.000Z",
+              "metres": 2.49,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-20T12:46:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-22T00:22:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-22T13:26:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-23T14:41:00.000Z",
+              "metres": 2.63,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-24T13:16:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-25T15:20:00.000Z",
+              "metres": 2.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-26T13:24:00.000Z",
+              "metres": 2.73,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-28T01:19:00.000Z",
+              "metres": 2.74,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T01:15:00.000Z",
+              "metres": 2.73,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T13:21:00.000Z",
+              "metres": 2.72,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-30T15:10:00.000Z",
+              "metres": 2.72,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-01T12:51:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-02T14:52:00.000Z",
+              "metres": 2.79,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-03T21:34:00.000Z",
+              "metres": 2.83,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-04T12:08:00.000Z",
+              "metres": 2.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-05T12:11:00.000Z",
+              "metres": 2.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-06T13:55:00.000Z",
+              "metres": 2.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-08T00:51:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-08T12:38:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            }
+          ],
+          "thresholds": [
+            {
+              "id": "NORMAL",
+              "label": "Referencia baja",
+              "metres": 0
+            },
+            {
+              "id": "ALERTA",
+              "label": "Alerta",
+              "metres": 4.7
+            }
+          ],
+          "trend": "RISING_SLOWLY",
+          "delta1h": 0.08999999999999986,
+          "delta6h": 0.08999999999999986,
+          "delta24h": 0.14000000000000012
+        }
+      ],
+      "sources": [
+        {
+          "id": "ina:30",
+          "name": "INA · Sistema de Información Hidrológica",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "FRESH",
+          "observedAt": "2026-08-04T03:00:00.000Z",
+          "validUntil": "2026-08-04T15:00:00.000Z",
+          "contribution": "Río Paraná, estación Santa Fe, serie 30; lectura publicada por la fuente.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=30&timestart=2026-02-06&timeend=2026-08-06",
+          "qualityNote": "Dato operativo en tiempo real sin garantía de control de calidad o validación definitiva por INA."
+        },
+        {
+          "id": "ina:3044",
+          "name": "INA · Sistema de Información Hidrológica",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "STALE",
+          "observedAt": "2026-07-08T12:38:00.000Z",
+          "validUntil": "2026-07-09T00:38:00.000Z",
+          "contribution": "Río Salado, estación Santo Tomé, serie 3044; lectura publicada por la fuente.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=3044&timestart=2026-02-06&timeend=2026-08-06",
+          "qualityNote": "Dato operativo en tiempo real sin garantía de control de calidad o validación definitiva por INA."
+        },
+        {
+          "id": "ina-waterml-parana",
+          "name": "INA WaterML 2.0 · Paraná",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "FRESH",
+          "observedAt": "2026-08-04T03:00:00.000Z",
+          "validUntil": "2026-08-04T15:00:00.000Z",
+          "contribution": "WaterML interpretado: 187 lecturas publicadas.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/obs/puntual/series/30?timestart=2026-02-06&timeend=2026-08-06&format=waterml2",
+          "qualityNote": "WaterML 2.0 interpretado; la calidad hidrológica depende de la marca explícita del proveedor."
+        },
+        {
+          "id": "ina-waterml-salado",
+          "name": "INA WaterML 2.0 · Salado",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "STALE",
+          "observedAt": "2026-07-08T12:38:00.000Z",
+          "validUntil": "2026-07-09T00:38:00.000Z",
+          "contribution": "WaterML interpretado: 143 lecturas publicadas.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/obs/puntual/series/3044?timestart=2026-02-06&timeend=2026-08-06&format=waterml2",
+          "qualityNote": "WaterML 2.0 interpretado; la calidad hidrológica depende de la marca explícita del proveedor."
+        },
+        {
+          "id": "ports-hydrometers",
+          "name": "Agencia Nacional de Puertos y Navegación",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "UNAVAILABLE",
+          "observedAt": "1970-01-01T00:00:00.000Z",
+          "validUntil": "1970-01-01T00:00:00.000Z",
+          "contribution": "OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE: la página oficial sólo publica enlaces HTML/HTTP por estación y no un endpoint estable legible por máquina.",
+          "official": true,
+          "connected": false,
+          "url": "https://www.argentina.gob.ar/economia/agencia-nacional-de-puertos-y-navegacion/navegacion/navegable-troncal/hidrometros"
+        },
+        {
+          "id": "smn-observations",
+          "name": "Servicio Meteorológico Nacional · observaciones",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "UNAVAILABLE",
+          "observedAt": "1970-01-01T00:00:00.000Z",
+          "validUntil": "1970-01-01T00:00:00.000Z",
+          "contribution": "CREDENTIAL_REQUIRED: la API oficial ws1 requiere JWT no provisto como endpoint público estable; no se extrae token desde HTML.",
+          "official": true,
+          "connected": false,
+          "url": "https://ws2.smn.gob.ar/observaciones"
+        },
+        {
+          "id": "smn-alerts",
+          "name": "Servicio Meteorológico Nacional · alertas",
+          "kind": "OFFICIAL_ALERT",
+          "status": "FRESH",
+          "observedAt": "2026-08-04T22:00:02.000Z",
+          "validUntil": "2026-08-05T04:00:02.000Z",
+          "contribution": "100 alertas con título y timestamp interpretados.",
+          "official": true,
+          "connected": true,
+          "url": "https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml"
+        },
+        {
+          "id": "nasa-gpm-imerg-early",
+          "name": "NASA GPM IMERG Early",
+          "kind": "SATELLITE_OBSERVATION",
+          "status": "UNAVAILABLE",
+          "observedAt": "2026-08-05T00:57:50.858Z",
+          "validUntil": "2026-08-05T06:57:50.858Z",
+          "contribution": "NASA GPM no entregó una muestra numérica acotada (PARSE).",
+          "official": true,
+          "connected": false,
+          "url": "https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer/query",
+          "resolution": "0,1° / 30 minutos",
+          "uncertainty": "Fuente suplementaria no utilizada para determinar el estado hídrico principal."
+        }
+      ],
+      "contradictions": []
+    },
+    "snapshot": {
+      "schemaVersion": "1.0",
+      "id": "live-2026-08-05T00:57:50.165Z",
+      "mode": "LIVE",
+      "dataStatus": "STALE",
+      "generatedAt": "2026-08-05T00:57:50.165Z",
+      "previousSnapshotAt": "2026-08-05T00:42:50.165Z",
+      "state": "NORMAL",
+      "stateLabel": "Sin umbral de alerta alcanzado",
+      "summary": "Río Paraná, estación Santa Fe: 3.26 m. Cada sistema se presenta en su propia escala; son datos operativos sin validación definitiva salvo marca expresa.",
+      "dominantSourceId": "ina:30",
+      "validUntil": "2026-08-05T01:12:50.165Z",
+      "recommendedAction": "Mantenete informado mediante fuentes oficiales y revisá tu plan familiar.",
+      "emergencyDisclaimer": "SOS Santa Fe agrega fuentes públicas y no reemplaza al 911, 103 ni a los organismos oficiales. Un umbral numérico no constituye una orden de evacuación.",
+      "changes": [
+        {
+          "id": "primary-24h",
+          "label": "Río Paraná · Santa Fe",
+          "direction": "DOWN",
+          "detail": "-2 cm en 24 horas"
+        }
+      ],
+      "systems": [
+        {
+          "id": "parana-santa-fe",
+          "label": "Sistema Paraná",
+          "watercourse": "Río Paraná",
+          "stationName": "Santa Fe",
+          "stationCode": "30",
+          "available": true,
+          "dataStatus": "LIVE",
+          "currentMetres": 3.26,
+          "observedAt": "2026-08-04T03:00:00.000Z",
+          "sourceId": "ina:30",
+          "sourceName": "INA · Sistema de Información Hidrológica",
+          "points": [
+            {
+              "at": "2026-02-06T03:00:00.000Z",
+              "metres": 2.28,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-07T03:00:00.000Z",
+              "metres": 2.22,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-08T03:00:00.000Z",
+              "metres": 2.13,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-09T03:00:00.000Z",
+              "metres": 2.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-10T03:00:00.000Z",
+              "metres": 1.97,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-11T03:00:00.000Z",
+              "metres": 1.93,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-12T03:00:00.000Z",
+              "metres": 1.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-13T03:00:00.000Z",
+              "metres": 1.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-14T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-15T03:00:00.000Z",
+              "metres": 1.98,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T15:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-17T03:00:00.000Z",
+              "metres": 2.05,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-17T15:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-18T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-19T03:00:00.000Z",
+              "metres": 2.15,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-20T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-21T03:00:00.000Z",
+              "metres": 2.48,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-22T03:00:00.000Z",
+              "metres": 2.22,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-23T03:00:00.000Z",
+              "metres": 2.22,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-24T03:00:00.000Z",
+              "metres": 2.18,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-25T03:00:00.000Z",
+              "metres": 2.02,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-26T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-27T03:00:00.000Z",
+              "metres": 1.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-28T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-01T03:00:00.000Z",
+              "metres": 1.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-02T03:00:00.000Z",
+              "metres": 1.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-03T03:00:00.000Z",
+              "metres": 1.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-04T03:00:00.000Z",
+              "metres": 1.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-05T03:00:00.000Z",
+              "metres": 1.9,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-06T03:00:00.000Z",
+              "metres": 1.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-07T03:00:00.000Z",
+              "metres": 1.84,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-08T03:00:00.000Z",
+              "metres": 1.84,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-09T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-10T03:00:00.000Z",
+              "metres": 1.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-11T03:00:00.000Z",
+              "metres": 1.72,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-12T03:00:00.000Z",
+              "metres": 1.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-13T03:00:00.000Z",
+              "metres": 1.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-14T03:00:00.000Z",
+              "metres": 1.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-15T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-16T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-17T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-18T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-19T03:00:00.000Z",
+              "metres": 1.56,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-20T03:00:00.000Z",
+              "metres": 1.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-21T03:00:00.000Z",
+              "metres": 1.5,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-22T03:00:00.000Z",
+              "metres": 1.5,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-23T03:00:00.000Z",
+              "metres": 1.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-24T03:00:00.000Z",
+              "metres": 1.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-25T03:00:00.000Z",
+              "metres": 1.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-26T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-27T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-28T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-29T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-30T03:00:00.000Z",
+              "metres": 1.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-31T03:00:00.000Z",
+              "metres": 1.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-01T03:00:00.000Z",
+              "metres": 1.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-02T03:00:00.000Z",
+              "metres": 1.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-03T03:00:00.000Z",
+              "metres": 1.92,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-04T03:00:00.000Z",
+              "metres": 2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-05T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-06T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-07T03:00:00.000Z",
+              "metres": 2.2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-08T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-09T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-10T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-11T03:00:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-12T03:00:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-13T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-14T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-15T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-16T03:00:00.000Z",
+              "metres": 2.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-17T03:00:00.000Z",
+              "metres": 2.45,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-18T03:00:00.000Z",
+              "metres": 2.77,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-19T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-20T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-21T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-22T03:00:00.000Z",
+              "metres": 2.83,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-23T03:00:00.000Z",
+              "metres": 2.86,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-24T03:00:00.000Z",
+              "metres": 2.86,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-25T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-26T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-27T03:00:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-28T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-29T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-30T03:00:00.000Z",
+              "metres": 2.63,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-01T03:00:00.000Z",
+              "metres": 2.65,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-02T03:00:00.000Z",
+              "metres": 2.61,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-03T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-04T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-05T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-06T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-07T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-08T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-09T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-10T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-11T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-12T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-13T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-14T03:00:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-15T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-16T03:00:00.000Z",
+              "metres": 2.68,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-17T03:00:00.000Z",
+              "metres": 2.65,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-18T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-19T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-20T03:00:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-21T03:00:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-22T03:00:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-23T03:00:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-24T03:00:00.000Z",
+              "metres": 2.47,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-25T03:00:00.000Z",
+              "metres": 2.39,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-26T03:00:00.000Z",
+              "metres": 2.37,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-27T03:00:00.000Z",
+              "metres": 2.37,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-28T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-29T03:00:00.000Z",
+              "metres": 2.43,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-30T03:00:00.000Z",
+              "metres": 2.45,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-31T03:00:00.000Z",
+              "metres": 2.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-01T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-02T03:00:00.000Z",
+              "metres": 2.33,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-03T03:00:00.000Z",
+              "metres": 2.33,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-04T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-05T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-06T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-06T15:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-07T03:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-07T15:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-08T03:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-08T15:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-09T03:00:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-10T03:00:00.000Z",
+              "metres": 2.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-11T03:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-12T03:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-13T03:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-14T03:00:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-15T03:00:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-16T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-17T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-18T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-19T03:00:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-20T03:00:00.000Z",
+              "metres": 2.25,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-21T03:00:00.000Z",
+              "metres": 2.34,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-22T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-23T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-24T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-25T03:00:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-26T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-27T03:00:00.000Z",
+              "metres": 2.44,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-28T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T15:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-30T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-01T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-01T15:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-02T03:00:00.000Z",
+              "metres": 2.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-03T03:00:00.000Z",
+              "metres": 2.45,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-04T03:00:00.000Z",
+              "metres": 2.48,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-05T03:00:00.000Z",
+              "metres": 2.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-06T03:00:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-07T03:00:00.000Z",
+              "metres": 2.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-08T03:00:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-09T03:00:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-10T03:00:00.000Z",
+              "metres": 2.96,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-11T03:00:00.000Z",
+              "metres": 3.01,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-12T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-13T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-14T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-15T03:00:00.000Z",
+              "metres": 3.15,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-16T03:00:00.000Z",
+              "metres": 3.17,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-17T03:00:00.000Z",
+              "metres": 3.2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-18T03:00:00.000Z",
+              "metres": 3.17,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-19T03:00:00.000Z",
+              "metres": 3.11,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-20T03:00:00.000Z",
+              "metres": 3.11,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-21T03:00:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-22T03:00:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-23T03:00:00.000Z",
+              "metres": 3.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-24T03:00:00.000Z",
+              "metres": 3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-25T03:00:00.000Z",
+              "metres": 3.01,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-26T03:00:00.000Z",
+              "metres": 3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-27T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-28T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-29T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-30T03:00:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-31T03:00:00.000Z",
+              "metres": 3.03,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-01T03:00:00.000Z",
+              "metres": 3.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-02T03:00:00.000Z",
+              "metres": 3.06,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-03T03:00:00.000Z",
+              "metres": 3.28,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-08-04T03:00:00.000Z",
+              "metres": 3.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            }
+          ],
+          "thresholds": [
+            {
+              "id": "NORMAL",
+              "label": "Referencia baja",
+              "metres": 2
+            },
+            {
+              "id": "ALERTA",
+              "label": "Alerta",
+              "metres": 5.3
+            },
+            {
+              "id": "EVACUACION",
+              "label": "Umbral de evacuación",
+              "metres": 5.7
+            }
+          ],
+          "trend": "FALLING",
+          "delta1h": -0.020000000000000018,
+          "delta6h": -0.020000000000000018,
+          "delta24h": -0.020000000000000018
+        },
+        {
+          "id": "salado-santo-tome",
+          "label": "Sistema Salado",
+          "watercourse": "Río Salado",
+          "stationName": "Santo Tomé",
+          "stationCode": "1679",
+          "available": true,
+          "dataStatus": "STALE",
+          "currentMetres": 3.08,
+          "observedAt": "2026-07-08T12:38:00.000Z",
+          "sourceId": "ina:3044",
+          "sourceName": "INA · Sistema de Información Hidrológica",
+          "points": [
+            {
+              "at": "2026-02-06T12:40:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-08T01:44:00.000Z",
+              "metres": 2.44,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-09T02:23:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-09T14:00:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-10T15:01:00.000Z",
+              "metres": 2.21,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-11T15:52:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-12T16:22:00.000Z",
+              "metres": 2.24,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-13T15:05:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-14T20:29:00.000Z",
+              "metres": 2.29,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T00:11:00.000Z",
+              "metres": 2.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-16T12:26:00.000Z",
+              "metres": 2.39,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-17T13:04:00.000Z",
+              "metres": 2.53,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-18T12:30:00.000Z",
+              "metres": 2.61,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-19T12:34:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-21T12:05:00.000Z",
+              "metres": 2.86,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-22T13:48:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-23T09:09:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-24T14:59:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-26T02:09:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-26T13:58:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-02-27T13:21:00.000Z",
+              "metres": 2.59,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-01T01:21:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-02T01:24:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-02T15:45:00.000Z",
+              "metres": 2.56,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-03T14:16:00.000Z",
+              "metres": 2.5,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-05T01:38:00.000Z",
+              "metres": 2.51,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-05T12:55:00.000Z",
+              "metres": 2.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-06T11:13:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-07T21:09:00.000Z",
+              "metres": 2.29,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-08T20:43:00.000Z",
+              "metres": 2.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-10T00:51:00.000Z",
+              "metres": 2.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-11T00:54:00.000Z",
+              "metres": 2.09,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-12T01:23:00.000Z",
+              "metres": 2.05,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-12T15:20:00.000Z",
+              "metres": 2.07,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-13T14:59:00.000Z",
+              "metres": 2.04,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-14T14:54:00.000Z",
+              "metres": 1.79,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-15T14:57:00.000Z",
+              "metres": 1.91,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-16T15:10:00.000Z",
+              "metres": 1.87,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-17T13:12:00.000Z",
+              "metres": 1.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-18T14:06:00.000Z",
+              "metres": 1.84,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-20T01:34:00.000Z",
+              "metres": 1.87,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-20T14:16:00.000Z",
+              "metres": 1.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-21T12:26:00.000Z",
+              "metres": 1.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-22T13:32:00.000Z",
+              "metres": 1.93,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-24T01:39:00.000Z",
+              "metres": 1.97,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-26T01:16:00.000Z",
+              "metres": 2.04,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-26T14:12:00.000Z",
+              "metres": 2.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-27T14:49:00.000Z",
+              "metres": 2.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-28T16:52:00.000Z",
+              "metres": 2.2,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-29T20:29:00.000Z",
+              "metres": 2.18,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-30T15:27:00.000Z",
+              "metres": 2.09,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-03-31T09:30:00.000Z",
+              "metres": 2.04,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-01T12:52:00.000Z",
+              "metres": 2.05,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-02T21:54:00.000Z",
+              "metres": 2.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-04T01:51:00.000Z",
+              "metres": 2.14,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-04T12:32:00.000Z",
+              "metres": 2.19,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-05T12:40:00.000Z",
+              "metres": 2.26,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-06T15:09:00.000Z",
+              "metres": 2.3,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-12T22:31:00.000Z",
+              "metres": 2.63,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-13T09:22:00.000Z",
+              "metres": 2.61,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-14T21:18:00.000Z",
+              "metres": 2.64,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-15T12:29:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-16T14:26:00.000Z",
+              "metres": 2.97,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-17T15:38:00.000Z",
+              "metres": 3.12,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-18T11:51:00.000Z",
+              "metres": 3.24,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-19T11:55:00.000Z",
+              "metres": 3.27,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-20T12:01:00.000Z",
+              "metres": 3.32,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-21T15:17:00.000Z",
+              "metres": 3.38,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-22T12:32:00.000Z",
+              "metres": 3.41,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-23T15:36:00.000Z",
+              "metres": 3.42,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-24T15:34:00.000Z",
+              "metres": 3.4,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-25T12:35:00.000Z",
+              "metres": 3.35,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-26T13:56:00.000Z",
+              "metres": 3.31,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-27T13:24:00.000Z",
+              "metres": 3.18,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-28T12:53:00.000Z",
+              "metres": 3.21,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-04-30T13:29:00.000Z",
+              "metres": 3.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-01T14:33:00.000Z",
+              "metres": 3.16,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-02T17:53:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-03T12:49:00.000Z",
+              "metres": 3.11,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-04T14:44:00.000Z",
+              "metres": 3.09,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-05T14:38:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-06T13:25:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-09T15:31:00.000Z",
+              "metres": 3.1,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-10T15:35:00.000Z",
+              "metres": 2.98,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-11T15:38:00.000Z",
+              "metres": 2.96,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-12T15:31:00.000Z",
+              "metres": 2.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-13T15:24:00.000Z",
+              "metres": 2.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-14T14:19:00.000Z",
+              "metres": 2.96,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-15T15:26:00.000Z",
+              "metres": 2.95,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-16T12:29:00.000Z",
+              "metres": 2.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-17T16:12:00.000Z",
+              "metres": 2.88,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-18T12:39:00.000Z",
+              "metres": 2.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-19T14:57:00.000Z",
+              "metres": 2.83,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-20T15:33:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-21T15:16:00.000Z",
+              "metres": 2.8,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-22T17:19:00.000Z",
+              "metres": 2.78,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-23T12:06:00.000Z",
+              "metres": 2.75,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-24T12:25:00.000Z",
+              "metres": 2.71,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-25T13:02:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-26T14:37:00.000Z",
+              "metres": 2.64,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-27T13:10:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-28T16:49:00.000Z",
+              "metres": 2.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-29T13:37:00.000Z",
+              "metres": 2.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-30T14:22:00.000Z",
+              "metres": 2.7,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-05-31T16:54:00.000Z",
+              "metres": 2.67,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-01T15:14:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-02T13:47:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-03T13:58:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-04T15:42:00.000Z",
+              "metres": 2.59,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-05T15:36:00.000Z",
+              "metres": 2.58,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-06T11:44:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-07T14:49:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-08T13:53:00.000Z",
+              "metres": 2.53,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-09T16:04:00.000Z",
+              "metres": 2.53,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-10T15:42:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-11T15:12:00.000Z",
+              "metres": 2.54,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-13T02:12:00.000Z",
+              "metres": 2.55,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-13T17:02:00.000Z",
+              "metres": 2.52,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-14T13:32:00.000Z",
+              "metres": 2.48,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-15T13:09:00.000Z",
+              "metres": 2.44,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-16T13:15:00.000Z",
+              "metres": 2.41,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-17T16:02:00.000Z",
+              "metres": 2.42,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-18T14:08:00.000Z",
+              "metres": 2.46,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-19T15:13:00.000Z",
+              "metres": 2.49,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-20T12:46:00.000Z",
+              "metres": 2.57,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-22T00:22:00.000Z",
+              "metres": 2.6,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-22T13:26:00.000Z",
+              "metres": 2.62,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-23T14:41:00.000Z",
+              "metres": 2.63,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-24T13:16:00.000Z",
+              "metres": 2.66,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-25T15:20:00.000Z",
+              "metres": 2.69,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-26T13:24:00.000Z",
+              "metres": 2.73,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-28T01:19:00.000Z",
+              "metres": 2.74,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T01:15:00.000Z",
+              "metres": 2.73,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-29T13:21:00.000Z",
+              "metres": 2.72,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-06-30T15:10:00.000Z",
+              "metres": 2.72,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-01T12:51:00.000Z",
+              "metres": 2.76,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-02T14:52:00.000Z",
+              "metres": 2.79,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-03T21:34:00.000Z",
+              "metres": 2.83,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-04T12:08:00.000Z",
+              "metres": 2.85,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-05T12:11:00.000Z",
+              "metres": 2.89,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-06T13:55:00.000Z",
+              "metres": 2.94,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-08T00:51:00.000Z",
+              "metres": 2.99,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            },
+            {
+              "at": "2026-07-08T12:38:00.000Z",
+              "metres": 3.08,
+              "measured": true,
+              "quality": "PUBLISHED_OPERATIONAL"
+            }
+          ],
+          "thresholds": [
+            {
+              "id": "NORMAL",
+              "label": "Referencia baja",
+              "metres": 0
+            },
+            {
+              "id": "ALERTA",
+              "label": "Alerta",
+              "metres": 4.7
+            }
+          ],
+          "trend": "RISING_SLOWLY",
+          "delta1h": 0.08999999999999986,
+          "delta6h": 0.08999999999999986,
+          "delta24h": 0.14000000000000012
+        }
+      ],
+      "river": {
+        "systemId": "parana-santa-fe",
+        "available": true,
+        "dataStatus": "LIVE",
+        "stationName": "Santa Fe",
+        "currentMetres": 3.26,
+        "delta1h": -0.020000000000000018,
+        "delta6h": -0.020000000000000018,
+        "delta24h": -0.020000000000000018,
+        "trend": "FALLING",
+        "observedAt": "2026-08-04T03:00:00.000Z",
+        "sourceId": "ina:30",
+        "sourceName": "INA · Sistema de Información Hidrológica",
+        "points": [
+          {
+            "at": "2026-02-06T03:00:00.000Z",
+            "metres": 2.28,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-07T03:00:00.000Z",
+            "metres": 2.22,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-08T03:00:00.000Z",
+            "metres": 2.13,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-09T03:00:00.000Z",
+            "metres": 2.06,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-10T03:00:00.000Z",
+            "metres": 1.97,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-11T03:00:00.000Z",
+            "metres": 1.93,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-12T03:00:00.000Z",
+            "metres": 1.94,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-13T03:00:00.000Z",
+            "metres": 1.94,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-14T03:00:00.000Z",
+            "metres": 2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-15T03:00:00.000Z",
+            "metres": 1.98,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-16T03:00:00.000Z",
+            "metres": 2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-16T15:00:00.000Z",
+            "metres": 2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-17T03:00:00.000Z",
+            "metres": 2.05,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-17T15:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-18T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-19T03:00:00.000Z",
+            "metres": 2.15,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-20T03:00:00.000Z",
+            "metres": 2.4,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-21T03:00:00.000Z",
+            "metres": 2.48,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-22T03:00:00.000Z",
+            "metres": 2.22,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-23T03:00:00.000Z",
+            "metres": 2.22,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-24T03:00:00.000Z",
+            "metres": 2.18,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-25T03:00:00.000Z",
+            "metres": 2.02,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-26T03:00:00.000Z",
+            "metres": 2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-27T03:00:00.000Z",
+            "metres": 1.95,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-02-28T03:00:00.000Z",
+            "metres": 2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-01T03:00:00.000Z",
+            "metres": 1.95,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-02T03:00:00.000Z",
+            "metres": 1.95,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-03T03:00:00.000Z",
+            "metres": 1.85,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-04T03:00:00.000Z",
+            "metres": 1.85,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-05T03:00:00.000Z",
+            "metres": 1.9,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-06T03:00:00.000Z",
+            "metres": 1.89,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-07T03:00:00.000Z",
+            "metres": 1.84,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-08T03:00:00.000Z",
+            "metres": 1.84,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-09T03:00:00.000Z",
+            "metres": 1.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-10T03:00:00.000Z",
+            "metres": 1.76,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-11T03:00:00.000Z",
+            "metres": 1.72,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-12T03:00:00.000Z",
+            "metres": 1.7,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-13T03:00:00.000Z",
+            "metres": 1.7,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-14T03:00:00.000Z",
+            "metres": 1.7,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-15T03:00:00.000Z",
+            "metres": 1.55,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-16T03:00:00.000Z",
+            "metres": 1.55,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-17T03:00:00.000Z",
+            "metres": 1.55,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-18T03:00:00.000Z",
+            "metres": 1.55,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-19T03:00:00.000Z",
+            "metres": 1.56,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-20T03:00:00.000Z",
+            "metres": 1.55,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-21T03:00:00.000Z",
+            "metres": 1.5,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-22T03:00:00.000Z",
+            "metres": 1.5,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-23T03:00:00.000Z",
+            "metres": 1.6,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-24T03:00:00.000Z",
+            "metres": 1.69,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-25T03:00:00.000Z",
+            "metres": 1.69,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-26T03:00:00.000Z",
+            "metres": 1.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-27T03:00:00.000Z",
+            "metres": 1.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-28T03:00:00.000Z",
+            "metres": 1.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-29T03:00:00.000Z",
+            "metres": 1.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-30T03:00:00.000Z",
+            "metres": 1.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-03-31T03:00:00.000Z",
+            "metres": 1.75,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-01T03:00:00.000Z",
+            "metres": 1.75,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-02T03:00:00.000Z",
+            "metres": 1.75,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-03T03:00:00.000Z",
+            "metres": 1.92,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-04T03:00:00.000Z",
+            "metres": 2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-05T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-06T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-07T03:00:00.000Z",
+            "metres": 2.2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-08T03:00:00.000Z",
+            "metres": 2.35,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-09T03:00:00.000Z",
+            "metres": 2.4,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-10T03:00:00.000Z",
+            "metres": 2.4,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-11T03:00:00.000Z",
+            "metres": 2.3,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-12T03:00:00.000Z",
+            "metres": 2.3,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-13T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-14T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-15T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-16T03:00:00.000Z",
+            "metres": 2.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-17T03:00:00.000Z",
+            "metres": 2.45,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-18T03:00:00.000Z",
+            "metres": 2.77,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-19T03:00:00.000Z",
+            "metres": 2.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-20T03:00:00.000Z",
+            "metres": 2.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-21T03:00:00.000Z",
+            "metres": 2.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-22T03:00:00.000Z",
+            "metres": 2.83,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-23T03:00:00.000Z",
+            "metres": 2.86,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-24T03:00:00.000Z",
+            "metres": 2.86,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-25T03:00:00.000Z",
+            "metres": 2.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-26T03:00:00.000Z",
+            "metres": 2.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-27T03:00:00.000Z",
+            "metres": 2.8,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-28T03:00:00.000Z",
+            "metres": 2.68,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-29T03:00:00.000Z",
+            "metres": 2.68,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-04-30T03:00:00.000Z",
+            "metres": 2.63,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-01T03:00:00.000Z",
+            "metres": 2.65,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-02T03:00:00.000Z",
+            "metres": 2.61,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-03T03:00:00.000Z",
+            "metres": 2.6,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-04T03:00:00.000Z",
+            "metres": 2.6,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-05T03:00:00.000Z",
+            "metres": 2.6,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-06T03:00:00.000Z",
+            "metres": 2.62,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-07T03:00:00.000Z",
+            "metres": 2.62,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-08T03:00:00.000Z",
+            "metres": 2.62,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-09T03:00:00.000Z",
+            "metres": 2.68,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-10T03:00:00.000Z",
+            "metres": 2.68,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-11T03:00:00.000Z",
+            "metres": 2.66,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-12T03:00:00.000Z",
+            "metres": 2.66,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-13T03:00:00.000Z",
+            "metres": 2.66,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-14T03:00:00.000Z",
+            "metres": 2.66,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-15T03:00:00.000Z",
+            "metres": 2.68,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-16T03:00:00.000Z",
+            "metres": 2.68,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-17T03:00:00.000Z",
+            "metres": 2.65,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-18T03:00:00.000Z",
+            "metres": 2.62,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-19T03:00:00.000Z",
+            "metres": 2.62,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-20T03:00:00.000Z",
+            "metres": 2.62,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-21T03:00:00.000Z",
+            "metres": 2.54,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-22T03:00:00.000Z",
+            "metres": 2.52,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-23T03:00:00.000Z",
+            "metres": 2.52,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-24T03:00:00.000Z",
+            "metres": 2.47,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-25T03:00:00.000Z",
+            "metres": 2.39,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-26T03:00:00.000Z",
+            "metres": 2.37,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-27T03:00:00.000Z",
+            "metres": 2.37,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-28T03:00:00.000Z",
+            "metres": 2.4,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-29T03:00:00.000Z",
+            "metres": 2.43,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-30T03:00:00.000Z",
+            "metres": 2.45,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-05-31T03:00:00.000Z",
+            "metres": 2.4,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-01T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-02T03:00:00.000Z",
+            "metres": 2.33,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-03T03:00:00.000Z",
+            "metres": 2.33,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-04T03:00:00.000Z",
+            "metres": 2.32,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-05T03:00:00.000Z",
+            "metres": 2.32,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-06T03:00:00.000Z",
+            "metres": 2.32,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-06T15:00:00.000Z",
+            "metres": 2.27,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-07T03:00:00.000Z",
+            "metres": 2.27,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-07T15:00:00.000Z",
+            "metres": 2.27,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-08T03:00:00.000Z",
+            "metres": 2.27,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-08T15:00:00.000Z",
+            "metres": 2.27,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-09T03:00:00.000Z",
+            "metres": 2.32,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-10T03:00:00.000Z",
+            "metres": 2.27,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-11T03:00:00.000Z",
+            "metres": 2.26,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-12T03:00:00.000Z",
+            "metres": 2.26,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-13T03:00:00.000Z",
+            "metres": 2.26,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-14T03:00:00.000Z",
+            "metres": 2.19,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-15T03:00:00.000Z",
+            "metres": 2.19,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-16T03:00:00.000Z",
+            "metres": 2.12,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-17T03:00:00.000Z",
+            "metres": 2.12,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-18T03:00:00.000Z",
+            "metres": 2.12,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-19T03:00:00.000Z",
+            "metres": 2.12,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-20T03:00:00.000Z",
+            "metres": 2.25,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-21T03:00:00.000Z",
+            "metres": 2.34,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-22T03:00:00.000Z",
+            "metres": 2.35,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-23T03:00:00.000Z",
+            "metres": 2.35,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-24T03:00:00.000Z",
+            "metres": 2.35,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-25T03:00:00.000Z",
+            "metres": 2.35,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-26T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-27T03:00:00.000Z",
+            "metres": 2.44,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-28T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-29T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-29T15:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-06-30T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-01T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-01T15:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-02T03:00:00.000Z",
+            "metres": 2.38,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-03T03:00:00.000Z",
+            "metres": 2.45,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-04T03:00:00.000Z",
+            "metres": 2.48,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-05T03:00:00.000Z",
+            "metres": 2.55,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-06T03:00:00.000Z",
+            "metres": 2.6,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-07T03:00:00.000Z",
+            "metres": 2.7,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-08T03:00:00.000Z",
+            "metres": 2.76,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-09T03:00:00.000Z",
+            "metres": 2.76,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-10T03:00:00.000Z",
+            "metres": 2.96,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-11T03:00:00.000Z",
+            "metres": 3.01,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-12T03:00:00.000Z",
+            "metres": 3.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-13T03:00:00.000Z",
+            "metres": 3.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-14T03:00:00.000Z",
+            "metres": 3.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-15T03:00:00.000Z",
+            "metres": 3.15,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-16T03:00:00.000Z",
+            "metres": 3.17,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-17T03:00:00.000Z",
+            "metres": 3.2,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-18T03:00:00.000Z",
+            "metres": 3.17,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-19T03:00:00.000Z",
+            "metres": 3.11,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-20T03:00:00.000Z",
+            "metres": 3.11,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-21T03:00:00.000Z",
+            "metres": 3.1,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-22T03:00:00.000Z",
+            "metres": 3.08,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-23T03:00:00.000Z",
+            "metres": 3.06,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-24T03:00:00.000Z",
+            "metres": 3,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-25T03:00:00.000Z",
+            "metres": 3.01,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-26T03:00:00.000Z",
+            "metres": 3,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-27T03:00:00.000Z",
+            "metres": 2.99,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-28T03:00:00.000Z",
+            "metres": 2.99,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-29T03:00:00.000Z",
+            "metres": 2.99,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-30T03:00:00.000Z",
+            "metres": 2.99,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-07-31T03:00:00.000Z",
+            "metres": 3.03,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-08-01T03:00:00.000Z",
+            "metres": 3.06,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-08-02T03:00:00.000Z",
+            "metres": 3.06,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-08-03T03:00:00.000Z",
+            "metres": 3.28,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          },
+          {
+            "at": "2026-08-04T03:00:00.000Z",
+            "metres": 3.26,
+            "measured": true,
+            "quality": "PUBLISHED_OPERATIONAL"
+          }
+        ],
+        "forecastPoints": [],
+        "thresholds": [
+          {
+            "id": "NORMAL",
+            "label": "Referencia baja",
+            "metres": 2
+          },
+          {
+            "id": "ALERTA",
+            "label": "Alerta",
+            "metres": 5.3
+          },
+          {
+            "id": "EVACUACION",
+            "label": "Umbral de evacuación",
+            "metres": 5.7
+          }
+        ]
+      },
+      "rain": {
+        "available": false,
+        "dataStatus": "UNAVAILABLE",
+        "accumulated1hMm": 0,
+        "accumulated24hMm": 0,
+        "forecast": "Sin estimación suplementaria disponible.",
+        "observedAt": "2026-08-05T00:57:50.858Z",
+        "sourceId": "nasa-gpm-imerg-early",
+        "points": []
+      },
+      "sources": [
+        {
+          "id": "ina:30",
+          "name": "INA · Sistema de Información Hidrológica",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "FRESH",
+          "observedAt": "2026-08-04T03:00:00.000Z",
+          "validUntil": "2026-08-04T15:00:00.000Z",
+          "contribution": "Río Paraná, estación Santa Fe, serie 30; lectura publicada por la fuente.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=30&timestart=2026-02-06&timeend=2026-08-06",
+          "qualityNote": "Dato operativo en tiempo real sin garantía de control de calidad o validación definitiva por INA."
+        },
+        {
+          "id": "ina:3044",
+          "name": "INA · Sistema de Información Hidrológica",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "STALE",
+          "observedAt": "2026-07-08T12:38:00.000Z",
+          "validUntil": "2026-07-09T00:38:00.000Z",
+          "contribution": "Río Salado, estación Santo Tomé, serie 3044; lectura publicada por la fuente.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=3044&timestart=2026-02-06&timeend=2026-08-06",
+          "qualityNote": "Dato operativo en tiempo real sin garantía de control de calidad o validación definitiva por INA."
+        },
+        {
+          "id": "ina-waterml-parana",
+          "name": "INA WaterML 2.0 · Paraná",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "FRESH",
+          "observedAt": "2026-08-04T03:00:00.000Z",
+          "validUntil": "2026-08-04T15:00:00.000Z",
+          "contribution": "WaterML interpretado: 187 lecturas publicadas.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/obs/puntual/series/30?timestart=2026-02-06&timeend=2026-08-06&format=waterml2",
+          "qualityNote": "WaterML 2.0 interpretado; la calidad hidrológica depende de la marca explícita del proveedor."
+        },
+        {
+          "id": "ina-waterml-salado",
+          "name": "INA WaterML 2.0 · Salado",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "STALE",
+          "observedAt": "2026-07-08T12:38:00.000Z",
+          "validUntil": "2026-07-09T00:38:00.000Z",
+          "contribution": "WaterML interpretado: 143 lecturas publicadas.",
+          "official": true,
+          "connected": true,
+          "url": "https://alerta.ina.gob.ar/a5/obs/puntual/series/3044?timestart=2026-02-06&timeend=2026-08-06&format=waterml2",
+          "qualityNote": "WaterML 2.0 interpretado; la calidad hidrológica depende de la marca explícita del proveedor."
+        },
+        {
+          "id": "ports-hydrometers",
+          "name": "Agencia Nacional de Puertos y Navegación",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "UNAVAILABLE",
+          "observedAt": "1970-01-01T00:00:00.000Z",
+          "validUntil": "1970-01-01T00:00:00.000Z",
+          "contribution": "OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE: la página oficial sólo publica enlaces HTML/HTTP por estación y no un endpoint estable legible por máquina.",
+          "official": true,
+          "connected": false,
+          "url": "https://www.argentina.gob.ar/economia/agencia-nacional-de-puertos-y-navegacion/navegacion/navegable-troncal/hidrometros"
+        },
+        {
+          "id": "smn-observations",
+          "name": "Servicio Meteorológico Nacional · observaciones",
+          "kind": "OFFICIAL_OBSERVATION",
+          "status": "UNAVAILABLE",
+          "observedAt": "1970-01-01T00:00:00.000Z",
+          "validUntil": "1970-01-01T00:00:00.000Z",
+          "contribution": "CREDENTIAL_REQUIRED: la API oficial ws1 requiere JWT no provisto como endpoint público estable; no se extrae token desde HTML.",
+          "official": true,
+          "connected": false,
+          "url": "https://ws2.smn.gob.ar/observaciones"
+        },
+        {
+          "id": "smn-alerts",
+          "name": "Servicio Meteorológico Nacional · alertas",
+          "kind": "OFFICIAL_ALERT",
+          "status": "FRESH",
+          "observedAt": "2026-08-04T22:00:02.000Z",
+          "validUntil": "2026-08-05T04:00:02.000Z",
+          "contribution": "100 alertas con título y timestamp interpretados.",
+          "official": true,
+          "connected": true,
+          "url": "https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml"
+        },
+        {
+          "id": "nasa-gpm-imerg-early",
+          "name": "NASA GPM IMERG Early",
+          "kind": "SATELLITE_OBSERVATION",
+          "status": "UNAVAILABLE",
+          "observedAt": "2026-08-05T00:57:50.858Z",
+          "validUntil": "2026-08-05T06:57:50.858Z",
+          "contribution": "NASA GPM no entregó una muestra numérica acotada (PARSE).",
+          "official": true,
+          "connected": false,
+          "url": "https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer/query",
+          "resolution": "0,1° / 30 minutos",
+          "uncertainty": "Fuente suplementaria no utilizada para determinar el estado hídrico principal."
+        }
+      ],
+      "contradictions": [],
+      "shelters": [],
+      "actions": [
+        "Consultá alertas y recomendaciones oficiales.",
+        "Tené disponibles los teléfonos esenciales."
+      ],
+      "messages": []
+    }
+  }
+}

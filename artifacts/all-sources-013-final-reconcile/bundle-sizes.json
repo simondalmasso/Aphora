@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-05T00:57:46.530Z",
+  "budgets": {
+    "initialJsGzipBytes": 97280,
+    "initialCssGzipBytes": 30720,
+    "lazyVisualJsGzipBytes": 174080
+  },
+  "actual": {
+    "jsGzipBytes": 77636,
+    "initialJsGzipBytes": 77636,
+    "lazyVisualJsGzipBytes": 1436,
+    "totalJsGzipBytes": 79072,
+    "cssGzipBytes": 10976,
+    "totalDistBytes": 1311864
+  },
+  "loading": {
+    "threeJs": "DYNAMIC_IMPORT_ONLY_OR_UNUSED_DEPENDENCY",
+    "initialFiles": [
+      "assets/index-81C2XbIV.js"
+    ]
+  },
+  "files": [
+    {
+      "path": ".vite/manifest.json",
+      "bytes": 185,
+      "gzipBytes": 143
+    },
+    {
+      "path": "assets/index-81C2XbIV.js",
+      "bytes": 253399,
+      "gzipBytes": 77636
+    },
+    {
+      "path": "assets/index-81C2XbIV.js.map",
+      "bytes": 1002270,
+      "gzipBytes": 203862
+    },
+    {
+      "path": "assets/index-Cgu3ROMM.css",
+      "bytes": 46849,
+      "gzipBytes": 10579
+    },
+    {
+      "path": "essential-contacts.json",
+      "bytes": 541,
+      "gzipBytes": 300
+    },
+    {
+      "path": "icons/icon.svg",
+      "bytes": 492,
+      "gzipBytes": 358
+    },
+    {
+      "path": "index.html",
+      "bytes": 935,
+      "gzipBytes": 510
+    },
+    {
+      "path": "lite.css",
+      "bytes": 665,
+      "gzipBytes": 397
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 659,
+      "gzipBytes": 379
+    },
+    {
+      "path": "offline-guidance.json",
+      "bytes": 392,
+      "gzipBytes": 289
+    },
+    {
+      "path": "offline.html",
+      "bytes": 1539,
+      "gzipBytes": 830
+    },
+    {
+      "path": "service-worker.js",
+      "bytes": 3938,
+      "gzipBytes": 1436
+    }
+  ],
+  "externalFonts": false,
+  "thirdPartyTrackers": [],
+  "pass": true
+}

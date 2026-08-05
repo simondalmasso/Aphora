@@ -1,0 +1,12 @@
+{
+  "orderId": "ALL-SOURCES-013",
+  "acceptance": "NOT_DECLARED",
+  "audHold": "ACTIVE",
+  "deployedWorkerVersion": "44dd8390-9f73-40c6-b487-8070445e6b9e",
+  "deployRun": 30964449026,
+  "deployArtifact": 8914179956,
+  "deployArtifactDigest": "sha256:d972f5fe00512f3f72d20e10d1b00af8f20aabf7ce272f0191695ca72679bf36",
+  "reconciliationVerificationRun": 30964771686,
+  "reconciliationEvidenceArtifact": 8914304870,
+  "operation": "synchronize exact already-deployed implementation without another deploy"
+}

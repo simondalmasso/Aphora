@@ -2,63 +2,126 @@ import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core'
 
 export interface NasaGpmReading {
   readonly observedAt: string;
-  readonly value: number | null;
+  readonly value: number;
   readonly latencyMinutes: number;
   readonly resolution: string;
   readonly uncertainty: string;
+  readonly sourceUrl: string;
+  readonly objectId: number;
 }
 
-const POLICY: ProviderPolicy = Object.freeze({
+interface RasterReference {
+  readonly objectId: number;
+  readonly observedAt: string;
+}
+
+const HOST = 'gis.earthdata.nasa.gov';
+const QUERY_PATH = /^\/image\/rest\/services\/GESDISC\/GPM_3IMERGHHE\/ImageServer\/query$/;
+const SAMPLE_PATH = /^\/image\/rest\/services\/GESDISC\/GPM_3IMERGHHE\/ImageServer\/getSamples$/;
+const QUERY_POLICY: ProviderPolicy = Object.freeze({
   id: 'nasa-gpm-imerg-early',
-  hosts: Object.freeze(['maps.disasters.nasa.gov']),
-  paths: Object.freeze([/^\/ags03\/rest\/services\/NRT_Latest\/GPM_NRT_30min_Latest\/ImageServer\/identify$/]),
+  hosts: Object.freeze([HOST]),
+  paths: Object.freeze([QUERY_PATH]),
   contentTypes: Object.freeze(['application/json']),
+  timeoutMs: 16_000,
   maxBytes: 500_000,
-  freshMs: 30 * 60_000,
-  staleMs: 12 * 60 * 60_000,
+  freshMs: 15 * 60_000,
+  staleMs: 0,
+});
+const SAMPLE_POLICY: ProviderPolicy = Object.freeze({
+  id: 'nasa-gpm-imerg-early',
+  hosts: Object.freeze([HOST]),
+  paths: Object.freeze([SAMPLE_PATH]),
+  contentTypes: Object.freeze(['application/json']),
+  timeoutMs: 12_000,
+  maxBytes: 500_000,
+  freshMs: 15 * 60_000,
+  staleMs: 0,
 });
 
-function timestamp(value: unknown): string | null {
-  const visit = (node: unknown, depth: number): string | null => {
-    if (depth > 6) return null;
-    if (typeof node === 'string' && Number.isFinite(Date.parse(node))) return new Date(node).toISOString();
-    if (typeof node === 'number' && node > 1_000_000_000_000 && node < 9_999_999_999_999) return new Date(node).toISOString();
-    if (Array.isArray(node)) { for (const item of node) { const result = visit(item, depth + 1); if (result) return result; } }
-    if (typeof node === 'object' && node !== null) {
-      const record = node as Record<string, unknown>;
-      for (const key of ['observedAt', 'timestamp', 'time', 'acquisitionDate', 'date']) if (key in record) { const result = visit(record[key], depth + 1); if (result) return result; }
-      for (const item of Object.values(record)) { const result = visit(item, depth + 1); if (result) return result; }
-    }
-    return null;
-  };
-  return visit(value, 0);
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function numeric(value: unknown): number | null {
+function finite(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') { const parsed = Number(value.replace(',', '.')); return Number.isFinite(parsed) ? parsed : null; }
-  if (Array.isArray(value)) { for (const item of value) { const parsed = numeric(item); if (parsed !== null) return parsed; } }
-  if (typeof value === 'object' && value !== null) {
-    const record = value as Record<string, unknown>;
-    for (const key of ['value', 'pixelValue', 'precipitation', 'results']) if (key in record) { const parsed = numeric(record[key]); if (parsed !== null) return parsed; }
-  }
-  return null;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().replace(',', '.');
+  if (!normalized || /^(?:nodata|null|nan)$/i.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function fetchNasaGpm(url: string): Promise<ProviderResult<NasaGpmReading>> {
-  return fetchProvider(url, POLICY, (body) => {
+function unavailableFrom<T, U>(result: ProviderResult<T>): ProviderResult<U> {
+  return Object.freeze({
+    value: null,
+    status: result.status,
+    fetchedAt: result.fetchedAt,
+    observedAt: result.observedAt,
+    errorClass: result.errorClass,
+    fromCache: result.fromCache,
+  });
+}
+
+export async function fetchNasaGpm(baseUrl: string): Promise<ProviderResult<NasaGpmReading>> {
+  const queryUrl = new URL(`${baseUrl.replace(/\/$/, '')}/query`);
+  queryUrl.searchParams.set('where', '1=1');
+  queryUrl.searchParams.set('outFields', 'OBJECTID,StdTime');
+  queryUrl.searchParams.set('orderByFields', 'StdTime DESC');
+  queryUrl.searchParams.set('resultRecordCount', '1');
+  queryUrl.searchParams.set('returnGeometry', 'false');
+  queryUrl.searchParams.set('f', 'json');
+
+  const latest = await fetchProvider<RasterReference>(queryUrl.toString(), QUERY_POLICY, (body) => {
     const payload = JSON.parse(body) as unknown;
-    const observedAt = timestamp(payload);
-    if (!observedAt) throw new Error('NASA_OBSERVATION_TIME_MISSING');
+    if (!record(payload) || record(payload.error)) throw new Error('NASA_QUERY_ERROR');
+    const feature = Array.isArray(payload.features) ? payload.features[0] : null;
+    const attributes = record(feature) && record(feature.attributes) ? feature.attributes : null;
+    const objectId = finite(attributes?.objectid ?? attributes?.OBJECTID);
+    const stdTime = finite(attributes?.stdtime ?? attributes?.StdTime);
+    if (objectId === null || !Number.isInteger(objectId) || objectId <= 0 || stdTime === null || stdTime < 1_000_000_000_000) {
+      throw new Error('NASA_QUERY_SCHEMA');
+    }
+    const observedAt = new Date(stdTime).toISOString();
+    return { value: Object.freeze({ objectId, observedAt }), observedAt };
+  });
+  if (!latest.value) return unavailableFrom<RasterReference, NasaGpmReading>(latest);
+
+  const sampleUrl = new URL(`${baseUrl.replace(/\/$/, '')}/getSamples`);
+  sampleUrl.searchParams.set('geometry', JSON.stringify({ x: -60.7, y: -31.63, spatialReference: { wkid: 4326 } }));
+  sampleUrl.searchParams.set('geometryType', 'esriGeometryPoint');
+  sampleUrl.searchParams.set('returnFirstValueOnly', 'true');
+  sampleUrl.searchParams.set('outFields', 'OBJECTID,StdTime');
+  sampleUrl.searchParams.set('mosaicRule', JSON.stringify({
+    mosaicMethod: 'esriMosaicLockRaster',
+    lockRasterIds: [latest.value.objectId],
+  }));
+  sampleUrl.searchParams.set('f', 'json');
+
+  const raster = latest.value;
+  return fetchProvider<NasaGpmReading>(sampleUrl.toString(), SAMPLE_POLICY, (body) => {
+    const payload = JSON.parse(body) as unknown;
+    if (!record(payload) || record(payload.error) || !Array.isArray(payload.samples) || payload.samples.length === 0) {
+      throw new Error('NASA_SAMPLE_MISSING');
+    }
+    const sample = payload.samples.find(record);
+    if (!sample) throw new Error('NASA_SAMPLE_SCHEMA');
+    const rasterId = finite(sample.rasterId ?? sample.rasterID ?? (record(sample.attributes) ? sample.attributes.objectid ?? sample.attributes.OBJECTID : null));
+    if (rasterId !== null && rasterId !== raster.objectId) throw new Error('NASA_SAMPLE_RASTER_MISMATCH');
+    const value = finite(sample.value ?? sample.pixelValue ?? sample.values);
+    if (value === null) throw new Error('NASA_SAMPLE_VALUE_MISSING');
+    const latencyMinutes = Math.max(0, Math.round((Date.now() - Date.parse(raster.observedAt)) / 60_000));
     return {
       value: Object.freeze({
-        observedAt,
-        value: numeric(payload),
-        latencyMinutes: 240,
-        resolution: 'aprox. 0,1° / 30 minutos',
-        uncertainty: 'Estimación satelital temprana; no reemplaza pluviómetros ni se transforma en nivel local.',
+        observedAt: raster.observedAt,
+        value,
+        latencyMinutes,
+        resolution: '0,1° / 30 minutos',
+        uncertainty: 'IMERG Early V07 es una estimación satelital suplementaria; no reemplaza pluviómetros ni niveles hidrométricos locales.',
+        sourceUrl: sampleUrl.toString(),
+        objectId: raster.objectId,
       }),
-      observedAt,
+      observedAt: raster.observedAt,
     };
   });
 }

@@ -1,0 +1,9 @@
+{
+  "orderId": "ALL-SOURCES-013",
+  "accepted": false,
+  "workerVersion": "dde3e09c-4da0-4efe-ac93-d7ecf5b66364",
+  "failedWorkflowRun": 30961574907,
+  "branchHeadBeforeCorrection": "c6fbedb96b22b47131c8110f6a7b681a9974bd24",
+  "cloudflareGithubDrift": true,
+  "reason": "Worker runtime contained unsynchronized metadata-backed NASA code; metadata is not a rainfall observation."
+}

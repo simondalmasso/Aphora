@@ -1,5 +1,5 @@
 export type ProviderStatus = 'FRESH' | 'STALE' | 'UNAVAILABLE';
-export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'CIRCUIT_OPEN' | 'NETWORK' | null;
+export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'CIRCUIT_OPEN' | 'NETWORK' | 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE' | 'CREDENTIAL_REQUIRED' | null;
 
 export interface ParsedProvider<T> { readonly value: T; readonly observedAt: string }
 export interface ProviderPolicy {
@@ -54,6 +54,8 @@ function classify(error: unknown): ProviderErrorClass {
   if (message.includes('BODY_TOO_LARGE')) return 'BODY_TOO_LARGE';
   if (message.includes('PARSE')) return 'PARSE';
   if (message.includes('CIRCUIT_OPEN')) return 'CIRCUIT_OPEN';
+  if (message.includes('OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE')) return 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE';
+  if (message.includes('CREDENTIAL_REQUIRED')) return 'CREDENTIAL_REQUIRED';
   return 'NETWORK';
 }
 function allowedUrl(raw: string, policy: ProviderPolicy): URL {
@@ -106,6 +108,9 @@ export function restoreProviderHealth(entries: readonly ProviderHealth[]): void 
     health.set(entry.id, Object.freeze({ ...entry }));
   }
 }
+export function publishProviderBlock(id: string, errorClass: Extract<ProviderErrorClass, 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE' | 'CREDENTIAL_REQUIRED'>): void {
+  health.set(id, Object.freeze({ id, status: 'UNAVAILABLE', lastSuccessAt: null, lastObservedAt: null, errorClass, circuitOpenUntil: null }));
+}
 
 export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, parse: (body: string, contentType: string) => ParsedProvider<T>): Promise<ProviderResult<T>> {
   const now = new Date();
@@ -125,7 +130,8 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
   const freshMs = policy.freshMs ?? DEFAULT_FRESH_MS;
   const staleMs = policy.staleMs ?? DEFAULT_STALE_MS;
   if (cached && cachedAge <= freshMs) {
-    const result: ProviderResult<T> = { value: cached.value, status: 'FRESH', fetchedAt: cached.fetchedAt, observedAt: cached.observedAt, errorClass: null, fromCache: true };
+    const observationStatus: ProviderStatus = now.getTime() - Date.parse(cached.observedAt) <= freshMs ? 'FRESH' : 'STALE';
+    const result: ProviderResult<T> = { value: cached.value, status: observationStatus, fetchedAt: cached.fetchedAt, observedAt: cached.observedAt, errorClass: null, fromCache: true };
     publishHealth(policy, result, circuit);
     return result;
   }
@@ -152,7 +158,8 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
     await cacheWrite(payloadKey, stored, Math.ceil(staleMs / 1000));
     circuit = { failures: 0, lastSuccessAt: fetchedAt, lastObservedAt: stored.observedAt, errorClass: null, openUntil: null };
     await cacheWrite(circuitKey, circuit, Math.ceil(staleMs / 1000));
-    const result: ProviderResult<T> = { value: stored.value, status: 'FRESH', fetchedAt, observedAt: stored.observedAt, errorClass: null, fromCache: false };
+    const observationStatus: ProviderStatus = now.getTime() - Date.parse(stored.observedAt) <= freshMs ? 'FRESH' : 'STALE';
+    const result: ProviderResult<T> = { value: stored.value, status: observationStatus, fetchedAt, observedAt: stored.observedAt, errorClass: null, fromCache: false };
     publishHealth(policy, result, circuit);
     return result;
   } catch (error) {
