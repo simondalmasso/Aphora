@@ -70,14 +70,26 @@ jobs:
           if content != '155636e689a8d8edc4449e9340c568dec900ae0de16eb11508efa01f24d97c76':
               raise SystemExit(f'PATCH_CONTENT_HASH_MISMATCH:{content}')
           Path('/tmp/public-safety-015.patch').write_bytes(patch)
+          fix_encoded = Path('.github/public-safety-015-fix1.patch.gz.b64').read_text().strip()
+          fix_transport = hashlib.sha256(fix_encoded.encode()).hexdigest()
+          if fix_transport != 'f083063018ab2c42c55e03ac82866cb57361bae23f68e1cf194076963cbf6741':
+              raise SystemExit(f'FIX1_TRANSPORT_HASH_MISMATCH:{fix_transport}')
+          fix_patch = gzip.decompress(base64.b64decode(fix_encoded, validate=True))
+          fix_content = hashlib.sha256(fix_patch).hexdigest()
+          if fix_content != '137c23ea587fd1b81d5ae0bcab6793ff2e579c622a73e8f360969fc2653fd123':
+              raise SystemExit(f'FIX1_CONTENT_HASH_MISMATCH:{fix_content}')
+          Path('/tmp/public-safety-015-fix1.patch').write_bytes(fix_patch)
           report.extend([
               f'transport_sha256={transport}',
               f'content_sha256={content}',
               f'content_bytes={len(patch)}',
+              f'fix1_transport_sha256={fix_transport}',
+              f'fix1_content_sha256={fix_content}',
           ])
           Path('artifacts/public-safety-015-validation/patch-hashes.txt').write_text('\n'.join(report) + '\n')
           PY
           git apply --index /tmp/public-safety-015.patch
+          git apply --index /tmp/public-safety-015-fix1.patch
           git diff --cached --check
           git diff --cached --stat | tee "$EVIDENCE_DIR/patch-stat.txt"
 
