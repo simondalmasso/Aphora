@@ -73,21 +73,23 @@ jobs:
               'CLEANUP_BLOCK',
           )
 
+          if text.count("\n          npx wrangler deploy \\\n") != 1:
+              raise SystemExit('EXACT_DEPLOY_COMMAND_COUNT_MISMATCH')
+          for forbidden in (
+              'Configure and verify R2',
+              'r2 bucket',
+              'r2 object',
+              'Provision or verify D1 and R2',
+          ):
+              if forbidden in text:
+                  raise SystemExit(f'R2_DEPLOY_STEP_PRESENT:{forbidden}')
+
           output = Path('/tmp/deploy-workers-probe-fix/deploy-workers.yml')
           output.write_text(text)
           digest = hashlib.sha256(text.encode()).hexdigest()
           Path('/tmp/deploy-workers-probe-fix/sha256.txt').write_text(f'content_sha256={digest}\n')
           print(f'content_sha256={digest}')
           PY
-
-          grep -q 'KV_PROBE_FIX_TRANSPORT_HASH_MISMATCH' /tmp/deploy-workers-probe-fix/deploy-workers.yml
-          grep -q 'git apply --index /tmp/v3-full-014-kv-probe-fix.patch' /tmp/deploy-workers-probe-fix/deploy-workers.yml
-          grep -q '.github/v3-full-014-kv-probe-fix.patch.gz.b64' /tmp/deploy-workers-probe-fix/deploy-workers.yml
-          test "$(grep -c 'npx wrangler deploy' /tmp/deploy-workers-probe-fix/deploy-workers.yml)" = 1
-          if grep -nE 'Configure and verify R2|r2 bucket|r2 object|Provision or verify D1 and R2' /tmp/deploy-workers-probe-fix/deploy-workers.yml; then
-            echo 'R2_DEPLOY_STEP_PRESENT' >&2
-            exit 1
-          fi
 
       - name: Upload transformed canonical workflow
         uses: actions/upload-artifact@v4
