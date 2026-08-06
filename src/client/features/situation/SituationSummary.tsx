@@ -1,36 +1,33 @@
 import type { Snapshot } from '../../../domain/snapshot';
-import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety';
+import { formatHumanAge } from '../../../domain/public-safety';
 
-function freshnessLabel(value: Snapshot['freshness']): string {
-  if (value === 'ACTUALIZADO') return 'Información vigente';
-  if (value === 'ACTUALIZACION_DEMORADA') return 'Actualización demorada';
-  if (value === 'DESACTUALIZADO') return 'Información desactualizada';
-  return 'Vigencia no disponible';
-}
-
-function sentenceCase(value: string): string {
-  return value ? `${value[0]!.toUpperCase()}${value.slice(1)}` : value;
+function trendSymbol(trend: NonNullable<Snapshot['systems']>[number]['trend']): string {
+  if (trend === 'RISING' || trend === 'RISING_SLOWLY') return '↗';
+  if (trend === 'FALLING') return '↘';
+  if (trend === 'STABLE') return '→';
+  return '·';
 }
 
 export function SituationSummary({ snapshot }: { readonly snapshot: Snapshot }) {
   const systems = snapshot.systems ?? [];
-  const latest = systems
-    .map((system) => system.observedAt)
-    .filter((value): value is string => Boolean(value))
-    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
-  const primaryAction = snapshot.alertStatus === 'ALERTA_OFICIAL_ACTIVA'
-    ? 'Seguí la instrucción completa de la alerta oficial vigente.'
-    : snapshot.recommendedAction;
-  return <section className="situation-summary" aria-labelledby="situation-title">
-    <div className="section-heading situation-summary__heading">
-      <div><p className="section-kicker">Situación actual</p><h2 id="situation-title">Lo importante en Santa Fe</h2></div>
-      <span className={`freshness-badge freshness-badge--${(snapshot.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}>{freshnessLabel(snapshot.freshness)}</span>
-    </div>
-    <p className="situation-summary__lead">{snapshot.summary}</p>
-    <div className="situation-facts">
-      <div><span>Estado hídrico</span><strong>{snapshot.stateLabel}</strong></div>
-      <div><span>Última información</span><strong>{sentenceCase(formatHumanAge(latest, snapshot.generatedAt))}</strong><small>{formatLocalDateTime(latest)}</small></div>
-      <div className="situation-facts__action"><span>Acción principal</span><strong>{primaryAction}</strong></div>
+  return <section className="territory-section" aria-labelledby="territory-title">
+    <header className="compact-section-heading">
+      <div><p className="section-kicker">Contexto territorial</p><h2 id="territory-title">Dos sistemas, una lectura clara</h2></div>
+      <span>{snapshot.rain.available ? `${snapshot.rain.accumulated24hMm.toFixed(1).replace('.', ',')} mm / 24 h` : 'Lluvia local no disponible'}</span>
+    </header>
+    <div className="territory-schematic" role="img" aria-label="Esquema compacto de las estaciones Paraná y Salado">
+      <svg viewBox="0 0 520 116" aria-hidden="true">
+        <path d="M20 32 C110 8 172 55 264 30 S410 12 500 36"/>
+        <path d="M20 84 C118 108 176 61 270 86 S412 105 500 78"/>
+        <circle cx="250" cy="33" r="7"/><circle cx="292" cy="83" r="7"/>
+      </svg>
+      <div className="territory-stations">
+        {systems.slice(0, 2).map((system) => <article key={system.id}>
+          <span>{trendSymbol(system.trend)} {system.watercourse}</span>
+          <strong>{system.currentMetres === null ? 'Sin dato' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`}</strong>
+          <small>{system.stationName} · {formatHumanAge(system.observedAt, snapshot.generatedAt)}</small>
+        </article>)}
+      </div>
     </div>
   </section>;
 }
