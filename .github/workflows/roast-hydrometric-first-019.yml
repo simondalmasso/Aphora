@@ -41,13 +41,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Decode reviewed payload
+      - name: Extract reviewed payload
         shell: bash
         run: |
           set -euo pipefail
-          echo '9b49211c63a0d4be7ea59d8ff83e1c0f268b0c1807ef427b7ee4f08597cb0933  .github/roast-019-product.tar.gz.b64' | sha256sum -c -
-          base64 --decode .github/roast-019-product.tar.gz.b64 > /tmp/roast-019-product.tar.gz
-          echo 'f005a02d293ad077b27bcc2848034959bcc89dd188721a42c7b7c0b3ff3a87fc  /tmp/roast-019-product.tar.gz' | sha256sum -c -
+          echo 'f005a02d293ad077b27bcc2848034959bcc89dd188721a42c7b7c0b3ff3a87fc  .github/roast-019-product.tar.gz.b64' | sha256sum -c -
+          cp .github/roast-019-product.tar.gz.b64 /tmp/roast-019-product.tar.gz
           tar -xzf /tmp/roast-019-product.tar.gz
           chmod 700 .github/roast-019-run.sh
 
