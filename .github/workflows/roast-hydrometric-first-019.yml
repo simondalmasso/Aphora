@@ -41,13 +41,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Extract reviewed payload
+      - name: Assemble reviewed payload
         shell: bash
         run: |
           set -euo pipefail
-          echo 'f005a02d293ad077b27bcc2848034959bcc89dd188721a42c7b7c0b3ff3a87fc  .github/roast-019-product.tar.gz.b64' | sha256sum -c -
-          cp .github/roast-019-product.tar.gz.b64 /tmp/roast-019-product.tar.gz
+          echo 'e0214fe1e78a91f8a64e9206e882bc3c3394eb9a9ba6f34e295566168a0d690c  .github/roast-019-product-parts/part00' | sha256sum -c -
+          echo '0efb3a06a5a80ab78649ea1b870036ef3b157492924877be0299008131c183d0  .github/roast-019-product-parts/part01' | sha256sum -c -
+          echo 'e72f03eba0e6a10abb59161677c093d0241f63586ce341348690dfa81b6ccad1  .github/roast-019-product-parts/part02' | sha256sum -c -
+          echo '1f2f87ae6963a3dd3bb5f928e5253dd4840f52e3b83bbba091c75e6dac0bab50  .github/roast-019-product-parts/part03' | sha256sum -c -
+          echo '8bc26df382cd56dc75e4b2930097d9bdf89df34913504ed59582df9e497d772b  .github/roast-019-product-parts/part04' | sha256sum -c -
+          echo '5aef86ee00366e2840ce7cb9951e976b0f65ca06745cbc0e517a6b58f95df010  .github/roast-019-product-parts/part05' | sha256sum -c -
+          cat .github/roast-019-product-parts/part* > /tmp/roast-019-product.tar.gz.b64
+          echo '9fc0e6418896c54a78cd6ba6d1ba2d58be748b64917d988f8a7d9e343084cecc  /tmp/roast-019-product.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/roast-019-product.tar.gz.b64 > /tmp/roast-019-product.tar.gz
+          echo '373811dbc3af81707de39f5f168dd4abcbe9c05010270c9ebad6ece1e8671dab  /tmp/roast-019-product.tar.gz' | sha256sum -c -
           tar -xzf /tmp/roast-019-product.tar.gz
+          echo 'ffa669775d0919034c8eae1528df0aeb6bf10d1995ddef9d8093704ff969faeb  .github/roast-019-script-parts/part00' | sha256sum -c -
+          echo '4584006e139579ef17fb11186a9cbd953cf514c622f4b3a6b8a42dec0185a422  .github/roast-019-script-parts/part01' | sha256sum -c -
+          cat .github/roast-019-script-parts/part* > .github/roast-019-run.sh
+          echo '65e521c95e532e02ee2d9c65b10983ee3598a34b503e79ffad5fd1f89eb9e58d  .github/roast-019-run.sh' | sha256sum -c -
           chmod 700 .github/roast-019-run.sh
 
       - name: Apply product and record provenance
