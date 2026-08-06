@@ -1,0 +1,77 @@
+json"
+    curl -fsS "$DEPLOYMENT_URL/api/snapshot?verify=$GITHUB_RUN_ID" > "$EVIDENCE_DIR/production-snapshot.json"
+    curl -fsS "$DEPLOYMENT_URL/lite?verify=$GITHUB_RUN_ID" > "$EVIDENCE_DIR/production-lite.html"
+    curl -fsS "$DEPLOYMENT_URL/source-provenance.json?verify=$GITHUB_RUN_ID" > "$EVIDENCE_DIR/production-source-provenance.json"
+    node <<'NODE'
+const fs=require('node:fs');const h=JSON.parse(fs.readFileSync(process.env.EVIDENCE_DIR+'/production-health.json'));const p=JSON.parse(fs.readFileSync(process.env.EVIDENCE_DIR+'/production-source-provenance.json'));const l=JSON.parse(fs.readFileSync('public/source-provenance.json'));if(h.ok!==true)throw new Error('PRODUCTION_HEALTH_NOT_OK');if(p.orderId!==l.orderId||p.productTreeSha256!==l.productTreeSha256)throw new Error('CLOUDFLARE_GITHUB_DRIFT');
+NODE
+
+    DEPLOYMENT_URL="$DEPLOYMENT_URL" EVIDENCE_DIR="$EVIDENCE_DIR" node <<'NODE'
+const { chromium }=require('playwright');const fs=require('node:fs');const path=require('node:path');(async()=>{const b=await chromium.launch({headless:true});for(const v of [{w:390,h:844,n:'production-390x844'},{w:1440,h:900,n:'production-1440x900'}]){const p=await b.newPage({viewport:{width:v.w,height:v.h}});await p.goto(process.env.DEPLOYMENT_URL,{waitUntil:'networkidle'});await p.locator('[data-testid="hydrometric-situation"]').waitFor();const first=await p.locator('main > section').first().getAttribute('data-testid');if(first!=='hydrometric-situation')throw new Error('PRODUCTION_FIRST_BLOCK_NOT_HYDROMETRIC');await p.screenshot({path:path.join(process.env.EVIDENCE_DIR,'screenshots',v.n+'.png'),fullPage:true});await p.close();}await b.close();})();
+NODE
+
+    tar --exclude='playwright-report' --exclude='test-results' -czf /tmp/sos-sf-roast-019-evidence.tar.gz "$EVIDENCE_DIR" docs/ROAST_019_REFERENCE_MATRIX.md docs/ROAST_019_IMPLEMENTATION.md
+    archive_hash="$(sha256sum /tmp/sos-sf-roast-019-evidence.tar.gz | cut -d' ' -f1)"
+    {
+      echo "deployment_version_id=$version_id"
+      echo "archive_sha256=$archive_hash"
+    } >> "$GITHUB_OUTPUT"
+    ;;
+
+  cleanup)
+    test -n "${GH_TOKEN:-}"
+    workflow_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/roast-hydrometric-first-019.yml" --jq .id)"
+    gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id/disable"
+    git pull --ff-only origin "$BRANCH"
+    git rm -f .github/workflows/roast-hydrometric-first-019.yml .github/roast-019-trigger .github/roast-019-run.sh
+    git_config
+    git commit -m 'ci: self-disarm roast hydrometric-first 019'
+    git push origin HEAD:"$BRANCH"
+    final_head="$(git rev-parse HEAD)"
+    workflow_state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_id" --jq .state)"
+    test "$workflow_state" = 'disabled_manually'
+    main_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
+    test "$main_sha" = "$EXPECTED_MAIN"
+    first="$(cat "$EVIDENCE_DIR/first-viewport-metrics.json")"
+    density="$(cat "$EVIDENCE_DIR/density-metrics.json")"
+    words="$(node -e "const x=$first;process.stdout.write(String(x.wordsBeforeChart))")"
+    mobile="$(node -e "const x=$density;process.stdout.write(String(x.find(v=>v.width===390).ratio.toFixed(3)))")"
+    tablet="$(node -e "const x=$density;process.stdout.write(String(x.find(v=>v.width===768).ratio.toFixed(3)))")"
+    desktop="$(node -e "const x=$density;process.stdout.write(String(x.find(v=>v.width===1440).ratio.toFixed(3)))")"
+    cat > /tmp/checkpoint-019.md <<CHECKPOINT
+STATUS=VERIFIED_NOT_ACCEPTED
+ORDER=$ORDER
+REMOTE_HEAD_BEFORE=$EXPECTED_BASE
+REMOTE_HEAD_AFTER=$final_head
+PRODUCT_COMMIT_SHA=$PRODUCT_COMMIT_SHA
+DEPLOYMENT_VERSION_ID=$DEPLOYMENT_VERSION_ID
+DEPLOY_COMMAND_COUNT=1
+CLOUDFLARE_MUTATION_COUNT=1
+PRODUCT_TREE_SHA256=$PRODUCT_TREE_SHA256
+FIRST_BLOCK=HYDROMETRIC_SITUATION
+FIRST_VIEWPORT_RESULT=PASS
+WORDS_BEFORE_CHART=$words
+MOBILE_SCROLL_RATIO=$mobile
+TABLET_SCROLL_RATIO=$tablet
+DESKTOP_SCROLL_RATIO=$desktop
+PRIMARY_SECTION_COUNT=4
+SOURCE_FAMILIES_VERIFIED=INA_REST,INA_WATERML,SMN_ALERTS,PROTECCION_CIVIL,NASA_GPM_SUPPLEMENTARY
+SOURCE_HEALTH_RESULT=PASS_TRACEABLE
+ALERT_FAILURE_PLACEMENT=HEADER_BADGE_AND_DIALOG_ONLY
+SKIP_LINK_RESULT=PASS_HIDDEN_UNTIL_FOCUS
+OFFLINE_RESULT=PASS
+E2E_RESULT=PASS_RETRIES_0
+FLAKY_TEST_COUNT=0
+SCREENSHOT_ARTIFACT_ID=$SCREENSHOT_ARTIFACT_ID
+ARTIFACT_ID=$ARTIFACT_ID
+ARTIFACT_SHA256=$ARTIFACT_SHA256
+TEMP_WORKFLOW_ID=$workflow_id
+TEMP_WORKFLOW_STATE=$workflow_state
+CLOUDFLARE_GITHUB_DRIFT=false
+MAIN_SHA=$main_sha
+AUD_HOLD=ACTIVE
+CHECKPOINT
+    gh issue comment 13 --repo "$GITHUB_REPOSITORY" --body-file /tmp/checkpoint-019.md
+    ;;
+  *) echo 'usage: roast-019-run.sh apply|verify|cleanup' >&2; exit 2;;
+esac
