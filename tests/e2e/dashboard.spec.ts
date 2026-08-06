@@ -52,7 +52,7 @@ const systems = [
     validUntil: '2026-08-06T10:30:00.000Z',
     sourceId: 'ina-rest-30',
     sourceName: 'Instituto Nacional del Agua · INA REST',
-    points: points(2.99),
+    points: points(2.988),
     thresholds: [
       { id: 'NORMAL' as const, label: 'Referencia inferior', metres: 2 },
       { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 5.3 },
@@ -78,7 +78,7 @@ const systems = [
     validUntil: '2026-08-06T00:00:00.000Z',
     sourceId: 'ina-rest-3044',
     sourceName: 'Instituto Nacional del Agua · INA REST',
-    points: points(4.57, '2026-08-05T18:00:00.000Z'),
+    points: points(4.568, '2026-08-05T18:00:00.000Z'),
     thresholds: [
       { id: 'NORMAL' as const, label: 'Referencia inferior', metres: 0 },
       { id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: 4.7 },
@@ -363,14 +363,16 @@ test('skip link is hidden until keyboard focus', async ({ page }) => {
   await page.keyboard.press('Tab');
   await expect(skip).toBeFocused();
   const after = await skip.evaluate((element) => getComputedStyle(element).transform);
-  expect(after).toBe('none');
+  expect(after).not.toBe(before);
+  const focusedBox = await skip.boundingBox();
+  expect(focusedBox?.y).toBeGreaterThanOrEqual(0);
 });
 
 test('offline keeps the cached hydrometric surface and signals connection state', async ({ page }) => {
   await page.addInitScript(({ key, value }) => {
     localStorage.setItem(key, value);
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
-  }, { key: storageKey, value: JSON.stringify(baseSnapshot) });
+  }, { key: storageKey, value: JSON.stringify({ snapshot: baseSnapshot, savedAt: generatedAt }) });
   await page.route('**/api/**', (route) => route.abort());
   await page.goto('/');
   await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
@@ -396,7 +398,7 @@ test('captures required visual states and writes the comparison manifest', async
 
   const stale = snapshotWith({
     id: 'roast-019-stale',
-    systems: [{ ...systems[0], freshness: 'DESACTUALIZADO', dataStatus: 'STALE', observedAt: '2026-08-05T04:30:00.000Z' }, systems[1]],
+    systems: [{ ...systems[0], freshness: 'DESACTUALIZADO', dataStatus: 'STALE', observedAt: '2026-08-05T04:30:00.000Z', points: points(2.988, '2026-08-05T04:30:00.000Z') }, systems[1]],
   });
   await mockPublicApi(page, stale);
   await page.setViewportSize({ width: 390, height: 844 });
