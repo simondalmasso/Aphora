@@ -1,0 +1,179 @@
+name: Global Actions Disarm 018
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/global-actions-disarm-018-trigger]
+permissions:
+  actions: write
+  contents: write
+  issues: write
+concurrency:
+  group: sos-sf-global-actions-disarm-018
+  cancel-in-progress: false
+env:
+  ORDER_ID: SOS-SF-AUD-GLOBAL-ACTIONS-DISARM-AND-CLOSE-018
+  EXPECTED_TAKE_HEAD: bff5b83b102062a84afb9c47213fb3cf2f52309d
+  EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+  EXPECTED_PRODUCT_SHA: af295d2707ded620c2e19194bf7242270dfbc873
+  EXPECTED_PRODUCT_TREE: 274e51ce655ebf4c82c894843a8549b249191c436d3736e356748d16183cf940
+  EXPECTED_DEPLOYMENT_VERSION: 672106fb-575d-48d5-a9de-4a20e6d02f73
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  EVIDENCE_DIR: artifacts/global-actions-disarm-018
+  SELF_PATH: .github/workflows/global-actions-disarm-018.yml
+  SELF_TRIGGER: .github/global-actions-disarm-018-trigger
+  SELF_SCRIPT: .github/scripts/global_actions_disarm_018.py
+  TERMINAL_RECORD: .github/global-actions-disarm-018-terminal.json
+jobs:
+  global-disarm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Assert exact take point and temporary control-only delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          git fetch origin main arq/visual-dashboard-v3 --force
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git merge-base --is-ancestor "$EXPECTED_TAKE_HEAD" HEAD
+          git merge-base --is-ancestor "$EXPECTED_PRODUCT_SHA" HEAD
+          mapfile -t changed < <(git diff --name-only "$EXPECTED_TAKE_HEAD"...HEAD)
+          printf '%s\n' "${changed[@]}" > "$EVIDENCE_DIR/preflight-changed-paths.txt"
+          test "${#changed[@]}" -eq 3
+          for p in "$SELF_PATH" "$SELF_TRIGGER" "$SELF_SCRIPT"; do printf '%s\n' "${changed[@]}" | grep -Fx "$p"; done
+          printf 'REMOTE_HEAD_BEFORE=%s\nMAIN_SHA=%s\n' "$EXPECTED_TAKE_HEAD" "$EXPECTED_MAIN" > "$EVIDENCE_DIR/take-point.txt"
+      - name: Inventory globally and disable production mutation workflows
+        id: disarm
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python "$SELF_SCRIPT" | tee "$EVIDENCE_DIR/disarm-script-output.json"
+          SELF_ID="$(python -c 'import json; print(json.load(open("artifacts/global-actions-disarm-018/disarm-result-pre-self.json"))["self_workflow_id"])')"
+          echo "self_workflow_id=$SELF_ID" >> "$GITHUB_OUTPUT"
+      - name: Prove product identity and production GET-only health
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,subprocess
+          excluded=('.github/','artifacts/','dist/'); marker='public/source-provenance.json'
+          digest=hashlib.sha256(); included=0
+          for raw in sorted(p for p in subprocess.check_output(['git','ls-files','-z']).split(b'\0') if p):
+              path=raw.decode()
+              if path==marker or path.startswith(excluded): continue
+              data=Path(path).read_bytes(); digest.update(path.encode()); digest.update(b'\0'); digest.update(len(data).to_bytes(8,'big')); digest.update(data); included+=1
+          actual=digest.hexdigest(); assert actual==os.environ['EXPECTED_PRODUCT_TREE'], actual
+          local=json.loads(Path(marker).read_text()); assert local['productTreeSha256']==actual
+          Path(os.environ['EVIDENCE_DIR'],'product-tree.txt').write_text(f'PRODUCT_TREE_SHA256={actual}\nINCLUDED_FILE_COUNT={included}\n')
+          PY
+          curl -fsSL "$DEPLOYMENT_URL/api/health?audit018=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/health.json"
+          curl -fsSL "$DEPLOYMENT_URL/source-provenance.json?audit018=$GITHUB_RUN_ID" -o "$EVIDENCE_DIR/remote-source-provenance.json"
+          node <<'NODE'
+          const fs=require('node:fs'); const d=process.env.EVIDENCE_DIR;
+          const health=JSON.parse(fs.readFileSync(`${d}/health.json`)); const h=health.data||health;
+          if(!(h.healthy===true||h.status==='healthy'||h.status==='ok'||health.ok===true)) throw Error('HEALTH');
+          const l=JSON.parse(fs.readFileSync('public/source-provenance.json')); const r=JSON.parse(fs.readFileSync(`${d}/remote-source-provenance.json`));
+          for(const f of ['schemaVersion','orderId','productTreeSha256','includedFileCount','deploymentRunId']) if(String(l[f])!==String(r[f])) throw Error(`DRIFT:${f}`);
+          NODE
+          printf 'PRODUCTION_GET_RESULT=HEALTHY\nCLOUDFLARE_GITHUB_DRIFT=false\nDEPLOY_COMMAND_COUNT=0\nCLOUDFLARE_MUTATION_COUNT=0\n' > "$EVIDENCE_DIR/runtime-result.txt"
+      - name: Self-disable and push terminal control commit
+        id: terminal
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELF_WORKFLOW_ID: ${{ steps.disarm.outputs.self_workflow_id }}
+        run: |
+          set -euo pipefail
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$SELF_WORKFLOW_ID/disable"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$SELF_WORKFLOW_ID" --jq .state)" = disabled_manually
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          e=Path(os.environ['EVIDENCE_DIR']); p=json.loads((e/'disarm-result-pre-self.json').read_text())
+          t={'order':os.environ['ORDER_ID'],'status':'VERIFIED_NOT_ACCEPTED','expectedTakeHead':os.environ['EXPECTED_TAKE_HEAD'],'registeredWorkflowCount':p['registered_workflow_count'],'activeWorkflowCountBefore':p['active_workflow_count_before'],'disabledMutationWorkflowIds':p['disabled_mutation_workflow_ids'],'activeCloudflareMutationWorkflows':p['ACTIVE_CLOUDFLARE_MUTATION_WORKFLOWS'],'activeDeployWorkflows':p['ACTIVE_DEPLOY_WORKFLOWS'],'activeRemoteMigrationWorkflows':p['ACTIVE_REMOTE_MIGRATION_WORKFLOWS'],'activeProvisioningWorkflows':p['ACTIVE_PROVISIONING_WORKFLOWS'],'activeSecretWriteWorkflows':p['ACTIVE_SECRET_WRITE_WORKFLOWS'],'rerunnableProductionMutationPaths':p['RERUNNABLE_PRODUCTION_MUTATION_PATHS'],'selfDisarmWorkflowId':p['self_workflow_id'],'selfDisarmWorkflowState':'disabled_manually','deployCommandCount':0,'cloudflareMutationCount':0,'productSourceChanged':False,'productTreeSha256':os.environ['EXPECTED_PRODUCT_TREE'],'deploymentVersionId':os.environ['EXPECTED_DEPLOYMENT_VERSION'],'productionGetResult':'HEALTHY','cloudflareGithubDrift':False,'mainSha':os.environ['EXPECTED_MAIN']}
+          Path(os.environ['TERMINAL_RECORD']).write_text(json.dumps(t,indent=2,sort_keys=True)+'\n')
+          PY
+          git rm "$SELF_PATH" "$SELF_TRIGGER" "$SELF_SCRIPT"
+          git add "$TERMINAL_RECORD"
+          git diff --cached --check
+          mapfile -t staged < <(git diff --cached --name-only)
+          test "${#staged[@]}" -eq 4
+          for p in "${staged[@]}"; do [[ "$p" == .github/* ]]; done
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m "ci: globally disarm production mutation workflows"
+          git push origin HEAD:arq/visual-dashboard-v3
+          FINAL_SHA="$(git rev-parse HEAD)"
+          echo "final_sha=$FINAL_SHA" >> "$GITHUB_OUTPUT"
+          printf 'SELF_DISARM_WORKFLOW_ID=%s\nSELF_DISARM_WORKFLOW_STATE=disabled_manually\nREMOTE_HEAD_AFTER=%s\n' "$SELF_WORKFLOW_ID" "$FINAL_SHA" > "$EVIDENCE_DIR/self-disarm.txt"
+      - name: Final global GET verification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELF_WORKFLOW_ID: ${{ steps.disarm.outputs.self_workflow_id }}
+          FINAL_SHA: ${{ steps.terminal.outputs.final_sha }}
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/arq/visual-dashboard-v3" --jq .commit.sha)" = "$FINAL_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)" = "$EXPECTED_MAIN"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$SELF_WORKFLOW_ID" --jq .state)" = disabled_manually
+          for p in "$SELF_PATH" "$SELF_TRIGGER" "$SELF_SCRIPT"; do if gh api "repos/$GITHUB_REPOSITORY/contents/$p?ref=$FINAL_SHA" >/dev/null 2>&1; then exit 1; fi; done
+          git merge-base --is-ancestor "$EXPECTED_PRODUCT_SHA" HEAD
+          test "$(git diff --name-only "$EXPECTED_TAKE_HEAD"...HEAD | grep -Ev '^\.github/' | wc -l)" -eq 0
+          test "$(gh api "repos/$GITHUB_REPOSITORY/issues/8" --jq .state)" = open
+          cp "$TERMINAL_RECORD" "$EVIDENCE_DIR/terminal-record.json"
+      - name: Upload global disarm evidence
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-actions-disarm-018-${{ steps.terminal.outputs.final_sha }}-${{ github.run_id }}
+          path: artifacts/global-actions-disarm-018/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish single ARQ checkpoint
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          FINAL_SHA: ${{ steps.terminal.outputs.final_sha }}
+        run: |
+          set -euo pipefail
+          A="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
+          ASHA="$(jq -r '.digest|sub("^sha256:";"")' <<<"$A")"
+          R="$(cat "$EVIDENCE_DIR/disarm-result-pre-self.json")"
+          IDS="$(jq -r '.disabled_mutation_workflow_ids|map(tostring)|join(",")' <<<"$R")"
+          BODY="$(cat <<EOF
+          STATUS=VERIFIED_NOT_ACCEPTED
+          ORDER=$ORDER_ID
+          REMOTE_HEAD_BEFORE=$EXPECTED_TAKE_HEAD
+          REMOTE_HEAD_AFTER=$FINAL_SHA
+          CONTROL_COMMIT_SHA=$FINAL_SHA
+          REGISTERED_WORKFLOW_COUNT=$(jq -r .registered_workflow_count <<<"$R")
+          ACTIVE_WORKFLOW_COUNT_BEFORE=$(jq -r .active_workflow_count_before <<<"$R")
+          DISABLED_MUTATION_WORKFLOW_IDS=$IDS
+          ACTIVE_CLOUDFLARE_MUTATION_WORKFLOWS=$(jq -r .ACTIVE_CLOUDFLARE_MUTATION_WORKFLOWS <<<"$R")
+          ACTIVE_DEPLOY_WORKFLOWS=$(jq -r .ACTIVE_DEPLOY_WORKFLOWS <<<"$R")
+          ACTIVE_REMOTE_MIGRATION_WORKFLOWS=$(jq -r .ACTIVE_REMOTE_MIGRATION_WORKFLOWS <<<"$R")
+          ACTIVE_PROVISIONING_WORKFLOWS=$(jq -r .ACTIVE_PROVISIONING_WORKFLOWS <<<"$R")
+          ACTIVE_SECRET_WRITE_WORKFLOWS=$(jq -r .ACTIVE_SECRET_WRITE_WORKFLOWS <<<"$R")
+          RERUNNABLE_PRODUCTION_MUTATION_PATHS=$(jq -r .RERUNNABLE_PRODUCTION_MUTATION_PATHS <<<"$R")
+          SELF_DISARM_WORKFLOW_ID=$(jq -r .self_workflow_id <<<"$R")
+          SELF_DISARM_WORKFLOW_STATE=disabled_manually
+          DEPLOY_COMMAND_COUNT=0
+          CLOUDFLARE_MUTATION_COUNT=0
+          PRODUCT_SOURCE_CHANGED=false
+          PRODUCT_TREE_SHA256=$EXPECTED_PRODUCT_TREE
+          DEPLOYMENT_VERSION_ID=$EXPECTED_DEPLOYMENT_VERSION
+          PRODUCTION_GET_RESULT=HEALTHY
+          CLOUDFLARE_GITHUB_DRIFT=false
+          MAIN_SHA=$EXPECTED_MAIN
+          ARTIFACT_ID=$ARTIFACT_ID
+          ARTIFACT_SHA256=$ASHA
+          EOF
+          )"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/8/comments" -f body="$BODY" >/dev/null
