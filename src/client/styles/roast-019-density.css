@@ -1,0 +1,51 @@
+/* ROAST 019: measurable first-viewport and desktop density gates. */
+@media (max-width: 700px) {
+  .source-strip span:nth-of-type(2) { display: none; }
+}
+
+@media (min-width: 1100px) {
+  .dashboard {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    padding-top: 10px;
+    padding-bottom: 16px;
+  }
+
+  .verified-alert-banner,
+  .hydrometric-section { grid-column: 1 / -1; }
+  .territory-section { grid-column: 1; }
+  .safety-actions { grid-column: 2; }
+  .source-transparency { grid-column: 3; }
+
+  .hydrometric-section { padding: 14px 15px 13px; }
+  .primary-station { padding: 11px; }
+  .hydro-reading { margin: 6px 0; }
+  .hydro-level { min-height: 90px; }
+  .hydro-level strong { font-size: clamp(3.25rem, 5.7vw, 4.7rem); }
+  .source-strip { margin-bottom: 6px; }
+  .hydro-chart { padding: 6px; }
+  .hydro-chart svg { max-height: 235px; }
+  .data-table-disclosure summary { min-height: 30px; }
+
+  .territory-section,
+  .safety-actions,
+  .source-transparency { padding: 12px; }
+  .compact-section-heading { margin-bottom: 7px; }
+  .territory-schematic { min-height: 132px; }
+  .territory-schematic svg { height: 74px; }
+  .territory-stations { inset: auto 7px 7px; gap: 5px; }
+  .territory-stations article { padding: 6px 7px; }
+  .contact-grid { gap: 4px; }
+  .contact-grid a { min-height: 56px; }
+  .secondary-actions { margin-top: 5px; }
+  .secondary-actions summary { min-height: 31px; }
+  .secondary-actions > div { padding: 4px 0; }
+
+  .source-health-grid { grid-template-columns: 1fr; gap: 5px; }
+  .source-health-grid article { padding: 7px 8px; }
+  .source-health-grid p { margin: 2px 0 4px; }
+  .source-health-grid dl { grid-template-columns: .8fr 1.2fr; gap: 4px; }
+  .source-health-grid small { margin-top: 3px; }
+
+  .app-footer { padding-top: 8px; padding-bottom: 14px; }
+}

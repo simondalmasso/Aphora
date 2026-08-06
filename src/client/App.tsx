@@ -8,6 +8,7 @@ import { SecureMessagesPanel } from './features/messages/SecureMessagesPanel';
 import { ReportDialog } from './features/reports/ReportDialog';
 import { useSnapshot } from './pwa/useSnapshot';
 import './styles/app.css';
+import './styles/roast-019-density.css';
 
 export default function App() {
   const { snapshot, online, refresh, refreshing } = useSnapshot();
