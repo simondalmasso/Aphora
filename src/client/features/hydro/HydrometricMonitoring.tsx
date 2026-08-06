@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useMemo, useState, type RefObject } from 'react';
 import type { HydrologicalSystem, Snapshot, Source } from '../../../domain/snapshot';
 import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety';
 import { HydroSeriesChart } from '../../components/ui/HydroSeriesChart';
@@ -47,12 +47,10 @@ export function HydrometricMonitoring({
 }) {
   const systems = snapshot.systems ?? EMPTY_SYSTEMS;
   const [selectedId, setSelectedId] = useState(() => snapshot.river.systemId ?? systems[0]?.id ?? '');
-  const selected = systems.find((system) => system.id === selectedId) ?? systems[0];
-
-  useEffect(() => {
-    if (selectedId && systems.some((system) => system.id === selectedId)) return;
-    setSelectedId(snapshot.river.systemId ?? systems[0]?.id ?? '');
-  }, [selectedId, snapshot.river.systemId, systems]);
+  const validSelectedId = systems.some((system) => system.id === selectedId)
+    ? selectedId
+    : snapshot.river.systemId ?? systems[0]?.id ?? '';
+  const selected = systems.find((system) => system.id === validSelectedId) ?? systems[0];
 
   const selectedSource = useMemo(
     () => selected ? snapshot.sources.find((source) => source.id === selected.sourceId) : undefined,
