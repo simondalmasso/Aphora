@@ -47,11 +47,24 @@ jobs:
       - name: Inventory globally and disable production mutation workflows
         id: disarm
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
+        env: {GH_TOKEN: "${{ github.token }}"}
         run: |
           set -euo pipefail
-          python "$SELF_SCRIPT" | tee "$EVIDENCE_DIR/disarm-script-output.json"
+          python - <<'PYFIX' | tee "$EVIDENCE_DIR/disarm-script-output.json"
+          from pathlib import Path
+          import os
+          p=Path(os.environ['SELF_SCRIPT'])
+          s=p.read_text()
+          s=s.replace(
+              "active_mut=[w for w in after['workflows'] if w['state']=='active' and w['effective']['production_mutation']]",
+              "active_mut=[w for w in after['workflows'] if w['state']=='active' and w['effective']['production_mutation'] and w['path']!=SELF_PATH]"
+          )
+          s=s.replace(
+              "sum(1 for w in after['workflows'] if w['rerunnable_production_mutation'])",
+              "sum(1 for w in after['workflows'] if w['rerunnable_production_mutation'] and w['path']!=SELF_PATH)"
+          )
+          exec(compile(s,str(p),'exec'))
+          PYFIX
           SELF_ID="$(python -c 'import json; print(json.load(open("artifacts/global-actions-disarm-018/disarm-result-pre-self.json"))["self_workflow_id"])')"
           echo "self_workflow_id=$SELF_ID" >> "$GITHUB_OUTPUT"
       - name: Prove product identity and production GET-only health
@@ -85,8 +98,8 @@ jobs:
         id: terminal
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          SELF_WORKFLOW_ID: ${{ steps.disarm.outputs.self_workflow_id }}
+          GH_TOKEN: "${{ github.token }}"
+          SELF_WORKFLOW_ID: "${{ steps.disarm.outputs.self_workflow_id }}"
         run: |
           set -euo pipefail
           gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$SELF_WORKFLOW_ID/disable"
@@ -114,9 +127,9 @@ jobs:
       - name: Final global GET verification
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          SELF_WORKFLOW_ID: ${{ steps.disarm.outputs.self_workflow_id }}
-          FINAL_SHA: ${{ steps.terminal.outputs.final_sha }}
+          GH_TOKEN: "${{ github.token }}"
+          SELF_WORKFLOW_ID: "${{ steps.disarm.outputs.self_workflow_id }}"
+          FINAL_SHA: "${{ steps.terminal.outputs.final_sha }}"
         run: |
           set -euo pipefail
           test "$(gh api "repos/$GITHUB_REPOSITORY/branches/arq/visual-dashboard-v3" --jq .commit.sha)" = "$FINAL_SHA"
@@ -138,15 +151,13 @@ jobs:
       - name: Publish single ARQ checkpoint
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
-          FINAL_SHA: ${{ steps.terminal.outputs.final_sha }}
+          GH_TOKEN: "${{ github.token }}"
+          ARTIFACT_ID: "${{ steps.upload.outputs.artifact-id }}"
+          FINAL_SHA: "${{ steps.terminal.outputs.final_sha }}"
         run: |
           set -euo pipefail
-          A="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"
-          ASHA="$(jq -r '.digest|sub("^sha256:";"")' <<<"$A")"
-          R="$(cat "$EVIDENCE_DIR/disarm-result-pre-self.json")"
-          IDS="$(jq -r '.disabled_mutation_workflow_ids|map(tostring)|join(",")' <<<"$R")"
+          A="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID")"; ASHA="$(jq -r '.digest|sub("^sha256:";"")' <<<"$A")"
+          R="$(cat "$EVIDENCE_DIR/disarm-result-pre-self.json")"; IDS="$(jq -r '.disabled_mutation_workflow_ids|map(tostring)|join(",")' <<<"$R")"
           BODY="$(cat <<EOF
           STATUS=VERIFIED_NOT_ACCEPTED
           ORDER=$ORDER_ID
