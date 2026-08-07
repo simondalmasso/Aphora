@@ -115,7 +115,7 @@ export function HydrometricMonitoring({
           </div>
           <dl className="hydro-metrics">
             <div><dt>Tendencia</dt><dd>{trendLabel(selected)}</dd></div>
-            <div><dt>Cambio 24h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
+            <div><dt aria-label="Cambio en 24 horas">Δ24h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
           </dl>
         </div>
 
