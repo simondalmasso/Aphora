@@ -78,11 +78,6 @@ async function fetchEnvelope(path: string): Promise<unknown> {
   return payload?.data;
 }
 
-function objectValue(value: unknown): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Respuesta API inválida');
-  return value as Record<string, unknown>;
-}
-
 export function useSnapshot() {
   const [initialStored] = useState<StoredSnapshot | null>(loadStored);
   const [snapshot, setSnapshot] = useState<Snapshot>(() => navigator.onLine ? unavailableSnapshot : initialStored ? offlineSnapshot(initialStored) : noStoredOfflineSnapshot());
@@ -116,12 +111,14 @@ export function useSnapshot() {
       }
       if (mounted.current) { setOnline(true); setRefreshing(true); setRefreshError(null); }
       try {
-        const [snapshotData, sourcesData, messagesData] = await Promise.all([fetchEnvelope('/api/snapshot'), fetchEnvelope('/api/sources'), fetchEnvelope('/api/messages')]);
-        const sources = objectValue(sourcesData).sources;
-        const systems = objectValue(sourcesData).systems;
-        const messages = objectValue(messagesData).messages;
-        const base = objectValue(snapshotData);
-        const validated = validateSnapshot({ ...base, sources, systems, messages });
+        // /api/snapshot is the authoritative atomic public payload. Fetching
+        // /api/snapshot, /api/sources and /api/messages concurrently used to
+        // build three independent upstream snapshots and could merge mutually
+        // inconsistent generations, leaving the UI unavailable while INA data
+        // was already usable. One snapshot keeps measurement, sources, systems
+        // and public messages on the same generation and reduces upstream load.
+        const snapshotData = await fetchEnvelope('/api/snapshot');
+        const validated = validateSnapshot(snapshotData);
         const now = new Date().toISOString();
         if (validated.mode !== 'DEMO' && validated.dataStatus !== 'UNAVAILABLE') localStorage.setItem(STORAGE_KEY, JSON.stringify({ snapshot: validated, savedAt: now } satisfies StoredSnapshot));
         if (mounted.current) {
