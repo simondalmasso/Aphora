@@ -14,7 +14,7 @@ interface AppShellProps {
   readonly alertsButtonRef: RefObject<HTMLButtonElement | null>;
   readonly onRefresh: () => void;
   readonly onAlerts: (opener?: HTMLButtonElement | null) => void;
-  readonly onMessages: () => void;
+  readonly onMessages: (opener?: HTMLButtonElement | null) => void;
   readonly disclaimer: string;
   readonly children: ReactNode;
 }
@@ -54,12 +54,12 @@ export function AppShell({
       <span aria-hidden="true">{alert.tone === 'active' ? '!' : '◉'}</span>{alert.label}
     </button>
     <IconButton className="header-refresh-button" label="Actualizar información" loading={refreshing} onClick={onRefresh} icon={<svg viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M6.1 9A7 7 0 0 1 18.4 6.6L20 9M4 15l1.6 2.4A7 7 0 0 0 17.9 15"/></svg>}/>
-    <IconButton className="header-messages-button" ref={messagesButtonRef} label="Abrir comunicaciones" badge={unread} onClick={onMessages} aria-haspopup="dialog" icon={<svg viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3V5Z"/><path d="M8 9h8M8 12h5"/></svg>}/>
+    <IconButton className="header-messages-button" ref={messagesButtonRef} label="Abrir comunicaciones" badge={unread} onClick={(event) => onMessages(event.currentTarget)} aria-haspopup="dialog" icon={<svg viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3V5Z"/><path d="M8 9h8M8 12h5"/></svg>}/>
   </>;
 
   return <div className="site-shell hovs-r2">
     <a className="skip-link" href="#main">Saltar al contenido principal</a>
-    <MuniCivicHeader currentPath={currentPath} actions={actions}/>
+    <MuniCivicHeader currentPath={currentPath} actions={actions} communications={{ unread, onOpen: onMessages }}/>
     {children}
     <CivicFooter disclaimer={disclaimer}/>
   </div>;
