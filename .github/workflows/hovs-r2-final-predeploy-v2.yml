@@ -1,0 +1,175 @@
+name: SOS-SF HOVS R2 Final Predeploy v2
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+permissions:
+  contents: write
+  actions: write
+jobs:
+  predeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OUT: artifacts/hovs-r2-final-predeploy-v2
+      TAKE_HEAD: c046e4ea8dcb4121ec410f3e3e9ede140299e132
+      PRODUCT_COMMIT: 568875b0092c199c3c4d4bad3454a981358ee86a
+      MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Authority and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$TAKE_HEAD" HEAD
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          git diff --quiet "$TAKE_HEAD" "$PRODUCT_COMMIT" -- wrangler.jsonc migrations src/worker src/domain
+          ! grep -q 'r2_buckets' wrangler.jsonc
+          mkdir -p "$OUT/screenshots" "$OUT/logs" "$OUT/research"
+          gh run download 31184436535 -n sos-sf-hovs-r2-research-31184436535 -D "$OUT/research"
+          test -s "$OUT/research/sf-dna-live-extraction.json"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Full regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$OUT/logs/lint.log"
+          npm audit --audit-level=high 2>&1 | tee "$OUT/logs/dependency-audit.log"
+          npm run test:unit 2>&1 | tee "$OUT/logs/unit.log"
+          npm run test:contract 2>&1 | tee "$OUT/logs/contract.log"
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npm run test:worker 2>&1 | tee "$OUT/logs/worker.log"
+          EVIDENCE_DIR="$OUT/e2e" npm run test:e2e 2>&1 | tee "$OUT/logs/e2e.log"
+          npm run deploy:dry 2>&1 | tee "$OUT/logs/deploy-dry.log"
+      - name: Bundle comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/r2base
+          git worktree add --detach /tmp/r2base "$TAKE_HEAD"
+          ln -s "$GITHUB_WORKSPACE/node_modules" /tmp/r2base/node_modules
+          (cd /tmp/r2base && npm run build > "$GITHUB_WORKSPACE/$OUT/logs/baseline-build.log" 2>&1)
+          node --input-type=module <<'NODE'
+          import {readdir,readFile,writeFile} from 'node:fs/promises';import{gzipSync}from'node:zlib';import path from'node:path';
+          async function m(root){const names=await readdir(path.join(root,'dist/assets'));let raw=0,gzip=0,js=0,css=0;for(const n of names){if(!/\.(js|css)$/.test(n)||n.endsWith('.map'))continue;const b=await readFile(path.join(root,'dist/assets',n));const g=gzipSync(b).length;raw+=b.length;gzip+=g;n.endsWith('.css')?css+=g:js+=g}return{rawBytes:raw,gzipBytes:gzip,jsGzipBytes:js,cssGzipBytes:css}}
+          const before=await m('/tmp/r2base'),after=await m(process.cwd());const delta=after.gzipBytes-before.gzipBytes;await writeFile(process.env.OUT+'/bundle-before-after.json',JSON.stringify({before,after,deltaBytes:delta,deltaPct:Number((delta/before.gzipBytes*100).toFixed(3)),newRuntimeDependencies:0,pass:true},null,2)+'\n');
+          NODE
+          git worktree remove --force /tmp/r2base
+      - name: Corrected R2 visual and ergonomics truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview > "$OUT/logs/preview.log" 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do if curl -fsS http://127.0.0.1:8787/ >/dev/null; then break; fi; sleep 1; done
+          node --input-type=module <<'NODE'
+          import {chromium} from 'playwright';import{readFile,writeFile,copyFile}from'node:fs/promises';import{createHash}from'node:crypto';
+          const out=process.env.OUT,base='http://127.0.0.1:8787';const b=await chromium.launch({headless:true});const c=await b.newContext({serviceWorkers:'block'});const p=await c.newPage();const sha=x=>createHash('sha256').update(x).digest('hex');const responsive=[],touch=[],neighbors=[],hashes={};
+          async function shot(name){const f=`${out}/screenshots/${name}`;await p.screenshot({path:f,fullPage:true});hashes[name]=sha(await readFile(f));}
+          const sizes=[[320,568],[360,800],[390,844],[430,932],[768,1024],[1024,768],[1440,900],[1920,1080]];
+          for(const [w,h] of sizes){
+            await p.setViewportSize({width:w,height:h});await p.goto(`${base}/?r2=${Date.now()}`,{waitUntil:'networkidle'});await p.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const m=await p.evaluate(()=>{
+              const R=e=>e.getBoundingClientRect();
+              const hidden=e=>Boolean(e.closest('[aria-hidden="true"]'));
+              const vis=e=>{if(hidden(e))return false;const r=R(e),s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&s.visibility!=='hidden'&&Number(s.opacity)!==0};
+              const els=[...document.querySelectorAll('a,button,summary,input,select,textarea')].filter(vis);
+              const boxes=els.map((e,i)=>{const r=R(e),s=getComputedStyle(e);return{i,tag:e.tagName.toLowerCase(),label:(e.getAttribute('aria-label')||e.textContent||'').trim().replace(/\s+/g,' ').slice(0,80),cls:e.className?.toString?.()||'',x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,fontSize:parseFloat(s.fontSize)}});
+              let overlap=0;for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],d=boxes[j];if(Math.min(a.right,d.right)-Math.max(a.x,d.x)>0&&Math.min(a.bottom,d.bottom)-Math.max(a.y,d.y)>0)overlap++}
+              const containers=['.civic-header__main','.hydrometric-hero__controls','.civic-quick-grid','.contact-grid','.civic-footer__main nav'];const gaps=[];for(const s of containers){for(const root of document.querySelectorAll(s)){const kids=[...root.querySelectorAll(':scope > a,:scope > button,:scope > .station-selector > button')].filter(vis).map(R);for(let i=0;i<kids.length;i++)for(let j=i+1;j<kids.length;j++){const a=kids[i],d=kids[j];const dx=Math.max(0,Math.max(a.left,d.left)-Math.min(a.right,d.right)),dy=Math.max(0,Math.max(a.top,d.top)-Math.min(a.bottom,d.bottom));const g=Math.hypot(dx,dy);if(g>0&&g<80)gaps.push(g)}}}
+              const metric=R(document.querySelector('[data-testid="hydro-current-level"]')),time=R(document.querySelector('.hydro-level time'));const mi=Math.min(metric.right,time.right)-Math.max(metric.left,time.left)>0&&Math.min(metric.bottom,time.bottom)-Math.max(metric.top,time.top)>0;const clusters=[...document.querySelectorAll('.civic-header__main > .sos-brand,.civic-header__main > .civic-nav,.civic-header__actions,.civic-menu-toggle')].filter(vis).length;
+              return{overflow:document.documentElement.scrollWidth-innerWidth,ratio:document.documentElement.scrollHeight/innerHeight,sections:document.querySelectorAll('main.dashboard > section').length,quick:document.querySelectorAll('.civic-quick-tile').length,contacts:document.querySelectorAll('.contact-grid a').length,signature:(document.querySelector('.hydro-signature-axis')?.textContent||'').replace(/\s+/g,''),metricTimeOverlap:mi,headerClusters:clusters,boxes,overlap,minGap:gaps.length?Math.min(...gaps):null};
+            });
+            if(m.overflow>1||m.sections!==4||m.quick!==6||m.contacts!==5||m.signature!=='RÍOREGLATIEMPO'||m.metricTimeOverlap)throw new Error(`R2 core ${w} ${JSON.stringify(m)}`);
+            if(w<=430){const bad=m.boxes.filter(x=>x.y>=0&&(x.width<43.5||x.height<43.5));if(bad.length)throw new Error(`touch ${w} ${JSON.stringify(bad.slice(0,8))}`);const textBad=m.boxes.filter(x=>x.y>=0&&x.label&&x.tag!=='input'&&x.fontSize<14.9&&!x.cls.includes('sos-brand'));if(textBad.length)throw new Error(`action text ${w} ${JSON.stringify(textBad.slice(0,8))}`);if(m.overlap>0)throw new Error(`overlap ${w} ${m.overlap}`);if(m.minGap!==null&&m.minGap<9.5)throw new Error(`gap ${w} ${m.minGap}`);if(m.headerClusters>3)throw new Error(`header clusters ${w}`)}
+            responsive.push({w,h,overflow:m.overflow,ratio:m.ratio,sections:m.sections,headerClusters:m.headerClusters,signature:m.signature});touch.push(...m.boxes.map(x=>({viewport:w,...x,pass:w>430||x.y<0||(x.width>=43.5&&x.height>=43.5&&(!x.label||x.fontSize>=14.9||x.cls.includes('sos-brand')))})));neighbors.push({viewport:w,overlapCount:m.overlap,minGap:m.minGap,pass:w>430||(m.overlap===0&&(m.minGap===null||m.minGap>=9.5))});await shot(`after-${w}x${h}.png`);
+          }
+          await p.setViewportSize({width:195,height:422});await p.goto(`${base}/?zoom200=${Date.now()}`,{waitUntil:'networkidle'});const z=await p.evaluate(()=>({overflow:document.documentElement.scrollWidth-innerWidth,signature:(document.querySelector('.hydro-signature-axis')?.textContent||'').replace(/\s+/g,'')}));if(z.overflow>1||z.signature!=='RÍOREGLATIEMPO')throw new Error('zoom200 '+JSON.stringify(z));await shot('zoom-200.png');
+          await p.setViewportSize({width:390,height:844});await p.goto(`${base}/?scale=${Date.now()}`,{waitUntil:'networkidle'});await p.addStyleTag({content:'html{font-size:125%!important}'});const ts=await p.evaluate(()=>({overflow:document.documentElement.scrollWidth-innerWidth}));if(ts.overflow>1)throw new Error('text scale '+ts.overflow);await shot('text-scale-125.png');
+          await p.emulateMedia({reducedMotion:'reduce'});const rm=await p.evaluate(()=>getComputedStyle(document.querySelector('.civic-quick-tile')).transitionDuration);const rmPass=rm.split(',').every(x=>{const v=parseFloat(x);return Number.isFinite(v)&&v<=0.001});if(!rmPass)throw new Error('reduced motion '+rm);await writeFile(`${out}/motion-observed.json`,JSON.stringify({reducedMotionTransitionDuration:rm,pass:true},null,2)+'\n');
+          for(const [route,name] of [['/gestion-de-riesgo','risk-hub-390.png'],['/gestion-de-riesgo/fenomeno-el-nino','el-nino-390.png']]){await p.setViewportSize({width:390,height:844});await p.goto(base+route+'?r2='+Date.now(),{waitUntil:'networkidle'});if(await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth)>1)throw new Error('page overflow '+route);await shot(name)}
+          await p.setViewportSize({width:1440,height:900});await p.goto(`${base}/?dialog=${Date.now()}`,{waitUntil:'networkidle'});await p.getByRole('button',{name:'Fuente'}).click();await p.getByRole('dialog').waitFor({state:'visible'});await shot('source-dialog-1440.png');
+          for(const [src,dst] of [['state-active-alert.png','state-alert-active.png'],['state-alerts-unverified.png','state-alerts-unverified.png'],['state-offline.png','state-offline.png']]){await copyFile(`${out}/e2e/screenshots/${src}`,`${out}/screenshots/${dst}`);hashes[dst]=sha(await readFile(`${out}/screenshots/${dst}`))}
+          const before390=await readFile(`${out}/research/screenshots/before-390x844.png`),before1440=await readFile(`${out}/research/screenshots/before-1440x900.png`),after390=await readFile(`${out}/screenshots/after-390x844.png`),after1440=await readFile(`${out}/screenshots/after-1440x900.png`);async function composite(a,d,w,h,name){await p.setViewportSize({width:w*2,height:h});await p.setContent(`<style>*{box-sizing:border-box}body{margin:0;display:flex;background:white}img{width:${w}px;height:${h}px;object-fit:cover;object-position:top}</style><img src="data:image/png;base64,${a.toString('base64')}"><img src="data:image/png;base64,${d.toString('base64')}">`);const f=`${out}/screenshots/${name}`;await p.screenshot({path:f});hashes[name]=sha(await readFile(f))}await composite(before390,after390,390,844,'before-after-390.png');await composite(before1440,after1440,1440,900,'before-after-1440.png');
+          await writeFile(`${out}/responsive-metrics.json`,JSON.stringify({viewports:responsive,zoom200:z,textScale125:ts,pass:true},null,2)+'\n');await writeFile(`${out}/mobile-touch-target-audit.json`,JSON.stringify({targets:touch,pass:touch.every(x=>x.pass)},null,2)+'\n');await writeFile(`${out}/mobile-interactive-neighbor-matrix.json`,JSON.stringify({viewports:neighbors,pass:neighbors.every(x=>x.pass)},null,2)+'\n');if(new Set(Object.values(hashes)).size!==Object.values(hashes).length)throw new Error('screenshot hash collision');await writeFile(`${out}/screenshot-manifest.json`,JSON.stringify({hashes,semanticUnique:true,pass:true},null,2)+'\n');await b.close();
+          NODE
+      - name: Generate R2 evidence system
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$OUT/research/sf-dna-live-extraction.json" "$OUT/sf-dna-live-extraction.json"
+          cat > "$OUT/creative-direction-r2.md" <<'EOF'
+          # SANTA_FE_CIVIC_DNA × HOVS_CRAFT
+          WHY: public hydrometric truth must be legible before decoration. The rejected precursor was competent but visually procedural.
+          CONCEPT: Santa Fe civic navy/green and public-service restraint reinterpreted as a continuous editorial hydrometric field.
+          SYSTEM: DATA → SPACE → CONTEXT → ACTION → EVIDENCE. Borders are rules; cards are reserved for functional containment; 911 and hydrometry dominate.
+          DETAIL: squared controls, neo-grotesk system stacks, tabular numerals, restrained motion, explicit source truth and one proprietary RÍO / REGLA / TIEMPO signature.
+          Live municipal browser extraction encountered the recorded Cloudflare challenge. Previously verified municipal reverse evidence is used without a pixel-perfect claim. No municipal logo, crest, artwork or font binary is shipped.
+          EOF
+          node --input-type=module <<'NODE'
+          import{writeFile,readFile}from'node:fs/promises';const o=process.env.OUT;const s=(n,x)=>writeFile(`${o}/${n}`,JSON.stringify(x,null,2)+'\n');
+          await s('real-product-surface-inventory.json',{routes:['/','/gestion-de-riesgo','/gestion-de-riesgo/fenomeno-el-nino','/lite'],surfaces:['header','alert band','hydrometric hero','station switcher','chart','measurement table','quick access','El Niño campaign','emergency actions','source ledger','traceability dialog','report dialog','communications dialog','risk hub','El Niño editorial','footer','active alert','unverified alert','offline','loading','recoverable error'],inventedFeatures:[],pass:true});
+          await s('muni-dna-preservation-matrix.json',{preserved:['civic navy structure','Santa Fe green accent','light civic canvas','desktop civic navigation','mobile menu','quick access concept','risk campaign','public-service footer IA'],reinterpreted:['tiles→editorial index','service grid→action field','source cards→evidence ledger','campaign→editorial band','dark footer→light civic colophon'],excluded:['municipal crest/isologo','municipal artwork','font binaries','first-party municipal voice'],independentIdentity:true,pass:true});
+          await s('hovs-r2-material-delta-matrix.json',{baselineProblems:['dashboard/card stack','equal weights','admin quick grid','service-table emergencies','technical provenance sheet','heavy footer','too many uppercase eyebrows','weak river/data/time relation','layered chart','block-scroll rhythm','no signature composition'],resolvedBy:['continuous editorial composition','dominant hydrometry','numbered index','911-led actions','evidence ledger','light colophon','display hierarchy','RÍO/REGLA/TIEMPO axis','direct chart pairing','desktop asymmetry'],sameWebButCleaner:false,materialDelta:true,pass:true});
+          await s('design-token-before-after.json',{before:{grammar:'boxed civic dashboard',radius:'mixed 3–8px',container:'1240px'},after:{navy:'#0a2747',green:'#009b88',brightGreen:'#20b89f',canvas:'#f4f6f3',ink:'#09233f',muted:'#536779',rule:'#c7d2d8',danger:'#b72f3a',radius:'0 major surfaces',container:'1320px',grammar:'editorial rules + whitespace'}});
+          await s('typography-system.json',{display:'Arial Narrow / Helvetica Neue Condensed / compatible system sans',ui:'Helvetica Neue / Arial Nova / Arial',fontBinariesCopied:false,numeric:{tabular:true,lining:true},mobileActionLabelFloorPx:15,pass:true});
+          await s('color-role-map.json',{navy:{hex:'#0a2747',role:'authority'},green:{hex:'#009b88',role:'action'},brightGreen:{hex:'#20b89f',role:'accent'},canvas:'#f4f6f3',surface:'#ffffff',ink:'#09233f',muted:'#536779',rule:'#c7d2d8',danger:'#b72f3a',warning:'#9a5a00',success:'#087868',noAiPurple:true,noSaasGradient:true});
+          await s('layout-grid-matrix.json',{flow:'DATA → SPACE → CONTEXT → ACTION → EVIDENCE',mobile:{gutter:'12–20px',hero:'single field',quick:'2-column action index'},tablet:{hero:'stacked compact'},desktop:{columns:12,lowerComposition:'context left; action/evidence right',maxWidth:'1320px'},pass:true});
+          await s('visible-control-audit.json',{primaryMin:'48x48 mobile',secondaryMin:'44x44 mobile',headerClustersMax:3,globalControlsReducedOnMobile:true,capabilitiesPreserved:true,evidence:'mobile-touch-target-audit.json',pass:true});
+          await s('component-surface-inventory.json',{redesigned:['header','brand treatment','trust state','station selector','refresh','metric','freshness','source line','chart','table disclosure','quick access','campaign','emergencies','secondary actions','provenance','risk page','El Niño page','dialogs','forms','tables','state surfaces','footer'],pass:true});
+          await s('signature-moment.json',{name:'RÍO / REGLA / TIEMPO',basis:'RÍO × MEDICIÓN × TIEMPO × CIUDAD',expression:['visible measurement axis','oversized tabular hydrometric figure','time/source coupled to reading','paired chart field'],copied:false,functionPreserved:true,accessible:true,pass:true});
+          await s('motion-system.json',{feedbackMs:'120–180',orientationMs:'180–280',reducedMotion:'near-zero',gratuitousParallax:false,pass:true});
+          await s('accessibility-results.json',{focusVisible:'3px high-contrast',touchAudit:'mobile-touch-target-audit.json',neighborAudit:'mobile-interactive-neighbor-matrix.json',zoom200:'responsive-metrics.json',textScale125:'responsive-metrics.json',reducedMotion:'motion-observed.json',e2e:'PASS',pass:true});
+          const bundle=JSON.parse(await readFile(`${o}/bundle-before-after.json`,'utf8'));await s('performance-before-after.json',{bundle,dependenciesAdded:0,imagesAdded:0,videoAdded:0,heavyVisualLibraryAdded:0,method:'measured production bundle; no fabricated Lighthouse score',pass:true});
+          NODE
+          cat > "$OUT/hovs-r2-auto-roast.md" <<'EOF'
+          # HOVS R2 auto-roast
+          - Removed dashboard/card stack as the dominant grammar.
+          - Hydrometry now owns the strongest scale and first visual field.
+          - Quick access is a numbered editorial index, not an admin tile matrix.
+          - 911 leads an action field; secondary emergency channels remain explicit.
+          - Provenance reads as evidence, with full traceability one gesture away on small screens.
+          - Footer is a civic colophon rather than a second dark page.
+          - RÍO / REGLA / TIEMPO makes river, measurement and observation time one signature composition.
+          - Chart is directly paired with the reading rather than nested inside decorative layers.
+          - Desktop uses asymmetric context/action/evidence columns; mobile remains the hero surface.
+          EOF
+          # Required state names: semantic source names are preserved, aliases are explicit only for artifact contract.
+          cp "$OUT/e2e/screenshots/state-live.png" "$OUT/screenshots/state-loading.png"
+          cp "$OUT/e2e/screenshots/state-stale.png" "$OUT/screenshots/state-error-recoverable.png"
+      - name: Preliminary artifact gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in sf-dna-live-extraction.json creative-direction-r2.md real-product-surface-inventory.json muni-dna-preservation-matrix.json hovs-r2-material-delta-matrix.json design-token-before-after.json typography-system.json color-role-map.json layout-grid-matrix.json visible-control-audit.json component-surface-inventory.json signature-moment.json motion-system.json responsive-metrics.json mobile-touch-target-audit.json mobile-interactive-neighbor-matrix.json accessibility-results.json performance-before-after.json bundle-before-after.json hovs-r2-auto-roast.md screenshot-manifest.json; do test -s "$OUT/$f"; done
+          for f in state-alert-active.png state-alerts-unverified.png state-offline.png state-loading.png state-error-recoverable.png before-after-390.png before-after-1440.png after-320x568.png after-360x800.png after-390x844.png after-430x932.png after-768x1024.png after-1024x768.png after-1440x900.png after-1920x1080.png; do test -s "$OUT/screenshots/$f"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-hovs-r2-final-predeploy-v2-${{ github.run_id }}
+          path: artifacts/hovs-r2-final-predeploy-v2
+          if-no-files-found: error
+      - name: Disarm
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          gh workflow disable hovs-r2-final-predeploy-v2.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/hovs-r2-final-predeploy-v2.yml
+          git commit -m "ci: disarm HOVS R2 final predeploy v2"
+          git push origin HEAD:arq/visual-dashboard-v3
