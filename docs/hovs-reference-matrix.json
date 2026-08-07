@@ -1,0 +1,78 @@
+{
+  "order": "SOS-SF-AUD-MUNI-HOVS-CREATIVE-DIRECTION-021-HOVS",
+  "method": "principles only; no copied assets, layouts, code, fonts or identity",
+  "references": [
+    {
+      "REFERENCE": "HOVS / House of van Schneider",
+      "URL": "https://vanschneider.com/",
+      "OBSERVED_PRINCIPLE": "Brand and product work is presented as one coherent system with a clear point of view.",
+      "WHY_IT_WORKS": "A recognizable idea survives across identity, interface and communication.",
+      "APPLY_TO_SOS_SF": "Treat hydrometry, civic navigation, data-viz and risk content as one visual system.",
+      "DO_NOT_COPY": "Portfolio composition, project imagery, typography, assets or code.",
+      "IMPLEMENTATION_DECISION": "Use the existing MUNI palette and type family, then create one editorial hierarchy around river measurement."
+    },
+    {
+      "REFERENCE": "The WHY always comes first",
+      "URL": "https://vanschneider.com/blog/the-why-always-comes-first/",
+      "OBSERVED_PRINCIPLE": "Design decisions derive from a product-level WHY before visual tactics.",
+      "WHY_IT_WORKS": "It prevents decoration from becoming the concept.",
+      "APPLY_TO_SOS_SF": "Every spacing, type and control decision must improve immediate comprehension, trust or action.",
+      "DO_NOT_COPY": "Essay wording or examples.",
+      "IMPLEMENTATION_DECISION": "Adopt Río / regla / tiempo as the single creative direction."
+    },
+    {
+      "REFERENCE": "Make it invisible",
+      "URL": "https://vanschneider.com/blog/make-it-invisible/",
+      "OBSERVED_PRINCIPLE": "Good product mechanics recede so the user's objective dominates.",
+      "WHY_IT_WORKS": "Reduced interface friction increases focus on content and action.",
+      "APPLY_TO_SOS_SF": "Collapse mobile header controls and move refresh into the hydrometric context.",
+      "DO_NOT_COPY": "Article language or visual treatment.",
+      "IMPLEMENTATION_DECISION": "Mobile header becomes brand + trust state + menu; secondary controls move to contextual surfaces."
+    },
+    {
+      "REFERENCE": "NASA / JPL work",
+      "URL": "https://vanschneider.com/",
+      "OBSERVED_PRINCIPLE": "A strong conceptual identifier is carried consistently across mission applications.",
+      "WHY_IT_WORKS": "Complex technical information gains a memorable organizing idea.",
+      "APPLY_TO_SOS_SF": "Use measurement scale, lines and numeric hierarchy as a recurring signature.",
+      "DO_NOT_COPY": "NASA/JPL marks, mission patches, illustrations or layouts.",
+      "IMPLEMENTATION_DECISION": "The river number and chart become the signature moment without new decorative branding."
+    },
+    {
+      "REFERENCE": "mymind",
+      "URL": "https://mymind.com/",
+      "OBSERVED_PRINCIPLE": "Content is prioritized while interface chrome stays deliberately quiet.",
+      "WHY_IT_WORKS": "The product feels calm despite dense underlying capability.",
+      "APPLY_TO_SOS_SF": "Reduce card borders and simultaneous controls around primary data.",
+      "DO_NOT_COPY": "mymind UI, iconography, colors or interactions.",
+      "IMPLEMENTATION_DECISION": "Use whitespace and rules before boxes; preserve controls behind clear contextual actions."
+    },
+    {
+      "REFERENCE": "Semplice",
+      "URL": "https://www.semplice.com/",
+      "OBSERVED_PRINCIPLE": "Large-scale typography and deliberate composition create character without excessive decoration.",
+      "WHY_IT_WORKS": "Hierarchy becomes the visual identity.",
+      "APPLY_TO_SOS_SF": "Treat the measured level as editorial content rather than a dashboard KPI.",
+      "DO_NOT_COPY": "Templates, UI patterns, type choices or layouts.",
+      "IMPLEMENTATION_DECISION": "Use a larger tabular metric, controlled baseline and quieter metadata."
+    },
+    {
+      "REFERENCE": "Carbonmade",
+      "URL": "https://carbonmade.com/",
+      "OBSERVED_PRINCIPLE": "A product can be expressive while keeping the work itself central.",
+      "WHY_IT_WORKS": "Character and usability reinforce rather than compete.",
+      "APPLY_TO_SOS_SF": "Keep civic trust language while giving hydrometry a distinctive visual rhythm.",
+      "DO_NOT_COPY": "Brand, illustrations, interface or motion.",
+      "IMPLEMENTATION_DECISION": "Use MUNI colors and original SOS geometry only; character comes from scale and composition."
+    },
+    {
+      "REFERENCE": "Spotify brand/product work",
+      "URL": "https://vanschneider.com/",
+      "OBSERVED_PRINCIPLE": "Brand decisions scale because rules are systematic rather than one-off screens.",
+      "WHY_IT_WORKS": "Consistency survives across many surfaces and states.",
+      "APPLY_TO_SOS_SF": "Define one touch, type, spacing, color-role and motion system across home, risk and El Niño.",
+      "DO_NOT_COPY": "Spotify brand assets, color system or product components.",
+      "IMPLEMENTATION_DECISION": "Create a final HOVS stylesheet that overrides earlier density patches with explicit system rules."
+    }
+  ]
+}
