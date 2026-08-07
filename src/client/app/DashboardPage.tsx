@@ -1,9 +1,9 @@
 import type { RefObject } from 'react';
 import type { Snapshot } from '../../domain/snapshot.ts';
+import { CivicDiscovery } from '../components/civic/CivicSystem.tsx';
 import { SafetyActions } from '../features/actions/SafetyActions.tsx';
 import { VerifiedAlertBanner } from '../features/alerts/OfficialAlertPanel.tsx';
 import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';
-import { SituationSummary } from '../features/situation/SituationSummary.tsx';
 import { SourceTransparency } from '../features/sources/SourceTransparency.tsx';
 
 interface Props {
@@ -23,7 +23,7 @@ export function DashboardPage(props: Props) {
       sourcesButtonRef={props.sourcesButtonRef}
       onSources={props.onSources}
     />
-    <SituationSummary snapshot={props.snapshot}/>
+    <CivicDiscovery snapshot={props.snapshot}/>
     <SafetyActions
       snapshot={props.snapshot}
       reportButtonRef={props.reportButtonRef}
