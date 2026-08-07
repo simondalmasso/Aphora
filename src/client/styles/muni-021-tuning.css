@@ -44,13 +44,21 @@
 @media (max-width: 520px) {
   .civic-header .connection-chip {
     display: inline-flex;
+    width: auto;
+    min-width: 62px;
+    height: auto;
     min-height: 34px;
     max-width: 74px;
-    padding-inline: 6px;
+    padding: 5px 6px;
+    border: 1px solid var(--muni-neutral-300);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--text-secondary);
     overflow: hidden;
     white-space: nowrap;
     font-size: .58rem;
   }
+  .civic-header .connection-chip i { flex: none; }
   .civic-header .alert-chip { width: 86px; }
   .civic-header__actions { gap: 3px !important; }
 }
@@ -62,5 +70,14 @@
 @media (max-width: 340px) {
   .civic-header .ui-icon-button { display: none; }
   .civic-header .alert-chip { width: 78px; }
-  .civic-header .connection-chip { max-width: 68px; }
+  .civic-header .connection-chip {
+    width: 10px;
+    min-width: 10px;
+    max-width: 10px;
+    height: 10px;
+    min-height: 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
 }
