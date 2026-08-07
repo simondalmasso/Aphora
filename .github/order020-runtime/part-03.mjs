@@ -44,6 +44,7 @@ async function cleanup() {
     try { gh('api','-X','DELETE',`repos/${REPO}/actions/runs/${item.id}`); deletedRuns += 1; } catch {}
   }
   await rm('.github/workflows', { recursive: true, force: true });
+  await rm('.github/order020-runtime', { recursive: true, force: true });
   const githubEntries = await readdir('.github', { withFileTypes: true }).catch(() => []);
   for (const entry of githubEntries) {
     if (entry.isFile() && (entry.name.includes('trigger') || entry.name.startsWith('order-020') || entry.name.includes('terminal'))) {
