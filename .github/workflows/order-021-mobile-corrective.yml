@@ -1,0 +1,303 @@
+name: SOS-SF 021 Mobile Corrective
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-021-mobile-corrective
+  cancel-in-progress: false
+
+jobs:
+  corrective:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EVIDENCE_DIR: artifacts/order-021-mobile-corrective
+      BASE_URL: https://sos-sf.simondalmasso44.workers.dev
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout authorized corrective head
+        uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Verify authority and baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor b3e402cdfce0ecfbe199b263394d726d01e4b8de HEAD
+          git merge-base --is-ancestor 2d58485d2df1b39cac0c6672fa210b8a46042f0e HEAD
+          mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/screenshots" "$EVIDENCE_DIR/before"
+          printf '{"order":"SOS-SF-AUD-DESIGN-REBUILD-021","amendment":"021-MOBILE-GRID-CORRECTIVE","expectedTakeHead":"b3e402cdfce0ecfbe199b263394d726d01e4b8de","correctiveProductCommit":"2d58485d2df1b39cac0c6672fa210b8a46042f0e","authorizedAdditionalDeploys":1,"mainSha":"%s"}\n' "$(git rev-parse origin/main)" > "$EVIDENCE_DIR/authority.json"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Full predeploy gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$EVIDENCE_DIR/logs/lint.log"
+          npm audit --audit-level=high 2>&1 | tee "$EVIDENCE_DIR/logs/dependency-audit.log"
+          npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/logs/unit.log"
+          npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/logs/contract.log"
+          npm run build 2>&1 | tee "$EVIDENCE_DIR/logs/build.log"
+          npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/logs/worker.log"
+          npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/logs/e2e.log"
+
+      - name: Local mobile geometry gate catches prior failure mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview > "$EVIDENCE_DIR/logs/preview.log" 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8787/ >/dev/null && break; sleep 1; done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { writeFile } from 'node:fs/promises';
+          const cases=[
+            {w:320,h:568},{w:360,h:800},{w:390,h:844,max:2.2},{w:430,h:932},
+            {w:768,h:1024,max:1.75},{w:1440,h:900,max:1.25}
+          ];
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage();
+          const out=[];
+          for(const c of cases){
+            await page.setViewportSize({width:c.w,height:c.h});
+            await page.goto('http://127.0.0.1:8787/',{waitUntil:'networkidle'});
+            const hydro=page.getByTestId('hydrometric-situation'); await hydro.waitFor({state:'visible'});
+            const m=await page.evaluate(()=>{
+              const h=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect();
+              const d=document.querySelector('.dashboard')?.getBoundingClientRect();
+              const sections=[...document.querySelectorAll('.dashboard > section')].map(el=>{const r=el.getBoundingClientRect();return {width:r.width,left:r.left,right:r.right}});
+              const chart=document.querySelector('[data-testid="main-hydro-chart"]')?.getBoundingClientRect();
+              return {ratio:document.documentElement.scrollHeight/innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,hydro:{width:h?.width??0,y:h?.y??9999},dashboardWidth:d?.width??0,sections,chart:chart?{y:chart.y,height:chart.height}:null};
+            });
+            if(m.overflow>1) throw new Error(`overflow ${c.w}: ${m.overflow}`);
+            if(c.w<=430){
+              if(m.hydro.width/c.w<.94) throw new Error(`hydro width collapse ${c.w}: ${m.hydro.width}/${c.w}`);
+              if(m.dashboardWidth/c.w<.94) throw new Error(`dashboard width collapse ${c.w}: ${m.dashboardWidth}/${c.w}`);
+              if(m.sections.some(s=>s.width/c.w<.94)) throw new Error(`section width collapse ${c.w}: ${JSON.stringify(m.sections)}`);
+            }
+            if(c.w===390&&m.hydro.y>100) throw new Error(`hydro y ${m.hydro.y}`);
+            if(c.max&&m.ratio>c.max) throw new Error(`scroll ${c.w}: ${m.ratio}>${c.max}`);
+            if(c.w===390&&m.chart){const visible=Math.max(0,Math.min(c.h,m.chart.y+m.chart.height)-Math.max(0,m.chart.y));if(visible/m.chart.height<.45)throw new Error(`chart visibility ${visible/m.chart.height}`)}
+            out.push({...c,...m});
+          }
+          await writeFile(process.env.EVIDENCE_DIR+'/local-geometry.json',JSON.stringify(out,null,2)+'\n');
+          await browser.close();
+          NODE
+
+      - name: Save broken-before screenshots from rejected artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/8988074945/zip" > "$EVIDENCE_DIR/before.zip"
+          unzip -q "$EVIDENCE_DIR/before.zip" -d "$EVIDENCE_DIR/before"
+          test -s "$EVIDENCE_DIR/before/production-live-320x568.png"
+          test -s "$EVIDENCE_DIR/before/production-live-390x844.png"
+
+      - name: Exactly one authorized corrective deploy
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'CORRECTIVE_DEPLOY_COMMAND_COUNT=1\nTOTAL_021_DEPLOY_COMMAND_COUNT=2\n' > "$EVIDENCE_DIR/deploy-count.txt"
+          npx wrangler deploy 2>&1 | tee "$EVIDENCE_DIR/logs/wrangler-deploy.log"
+          deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' "$EVIDENCE_DIR/logs/wrangler-deploy.log" | tail -n1)
+          test -n "$deployment_url"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          version_id=$(grep -Eo '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$EVIDENCE_DIR/logs/wrangler-deploy.log" | tail -n1 || true)
+          if [ -z "$version_id" ]; then
+            version_id=$(npx wrangler deployments list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s),a=Array.isArray(j)?j:(j.deployments||[]);console.log(a[0]?.id||a[0]?.version_id||"")})')
+          fi
+          test -n "$version_id"
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+
+      - name: Production GET and visual truth after corrective deploy
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          DEPLOYMENT_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { createHash } from 'node:crypto';
+          import { readFile, writeFile } from 'node:fs/promises';
+          const base=process.env.DEPLOYMENT_URL.replace(/\/$/,'');
+          const get=async path=>{const r=await fetch(base+path+'?audit021c='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});const text=await r.text();let json=null;try{json=JSON.parse(text)}catch{};return{path,status:r.status,text,json,cache:r.headers.get('cache-control')||''}};
+          const api=[];for(const p of ['/api/health','/api/snapshot','/api/sources','/source-provenance.json'])api.push(await get(p));
+          const unwrap=x=>x?.json&&typeof x.json==='object'&&'data'in x.json?x.json.data:x?.json,by=p=>api.find(x=>x.path===p);
+          const health=unwrap(by('/api/health')),snapshot=unwrap(by('/api/snapshot')),sources=unwrap(by('/api/sources'));
+          const usable=(snapshot?.systems||[]).filter(s=>s.available===true&&Number.isFinite(s.currentMetres)&&Number.isFinite(Date.parse(s.observedAt)));
+          const src=sources?.sources||[];
+          const apiGates={health:by('/api/health').status===200&&health?.status==='healthy',hydrometry:usable.some(s=>['parana-santa-fe','salado-santo-tome'].includes(s.id)),ina:src.find(s=>s.id==='ina-rest-30')?.connected===true&&src.find(s=>s.id==='ina-rest-3044')?.connected===true,optionalUrls:[...(snapshot?.sources||[]),...(snapshot?.timeline||[])].every(x=>x.url===undefined||(typeof x.url==='string'&&x.url.trim().startsWith('https://')))};
+          if(Object.values(apiGates).some(v=>v!==true))throw new Error('api gates '+JSON.stringify(apiGates));
+          const cases=[{w:320,h:568},{w:360,h:800},{w:390,h:844,max:2.2},{w:430,h:932},{w:768,h:1024,max:1.75},{w:1440,h:900,max:1.25}];
+          const browser=await chromium.launch({headless:true});const page=await browser.newPage();const out=[];
+          for(const c of cases){
+            await page.setViewportSize({width:c.w,height:c.h});
+            await page.goto(base+'/?audit021c='+Date.now(),{waitUntil:'networkidle'});
+            await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const level=(await page.getByTestId('hydro-current-level').innerText()).trim();
+            const source=(await page.getByTestId('hydro-source-strip').innerText()).trim();
+            const m=await page.evaluate(()=>{const h=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect();const d=document.querySelector('.dashboard')?.getBoundingClientRect();const sections=[...document.querySelectorAll('.dashboard > section')].map(el=>{const r=el.getBoundingClientRect();return{width:r.width,left:r.left,right:r.right}});const chart=document.querySelector('[data-testid="main-hydro-chart"]')?.getBoundingClientRect();return{ratio:document.documentElement.scrollHeight/innerHeight,overflow:document.documentElement.scrollWidth-innerWidth,hydro:{width:h?.width??0,y:h?.y??9999},dashboardWidth:d?.width??0,sections,chart:chart?{y:chart.y,height:chart.height}:null}});
+            if(!level||!source.includes('Instituto Nacional del Agua'))throw new Error(`semantic ${c.w}`);
+            if(m.overflow>1)throw new Error(`overflow ${c.w}`);
+            if(c.w<=430&&(m.hydro.width/c.w<.94||m.dashboardWidth/c.w<.94||m.sections.some(s=>s.width/c.w<.94)))throw new Error(`mobile width ${c.w}: ${JSON.stringify(m)}`);
+            if(c.w===390&&m.hydro.y>100)throw new Error(`hydro y ${m.hydro.y}`);
+            if(c.max&&m.ratio>c.max)throw new Error(`scroll ${c.w}: ${m.ratio}`);
+            if(c.w===390&&m.chart){const visible=Math.max(0,Math.min(c.h,m.chart.y+m.chart.height)-Math.max(0,m.chart.y));if(visible/m.chart.height<.45)throw new Error(`chart visibility ${visible/m.chart.height}`)}
+            const file=`${process.env.EVIDENCE_DIR}/screenshots/production-live-${c.w}x${c.h}.png`;await page.screenshot({path:file,fullPage:true});out.push({...c,...m,level,source,sha256:createHash('sha256').update(await readFile(file)).digest('hex')});
+          }
+          if(new Set(out.map(x=>x.sha256)).size!==out.length)throw new Error('production screenshot collision');
+          await writeFile(process.env.EVIDENCE_DIR+'/production-blackbox.json',JSON.stringify({deploymentVersionId:process.env.DEPLOYMENT_VERSION_ID,apiGates,usable:usable.map(s=>({id:s.id,currentMetres:s.currentMetres,observedAt:s.observedAt,freshness:s.freshness})),viewports:out},null,2)+'\n');
+          await browser.close();
+          NODE
+
+      - name: Build broken-vs-corrected comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright'; import { readFile } from 'node:fs/promises';
+          const browser=await chromium.launch({headless:true});
+          for(const [kind,w,h] of [['mobile-320',320,568],['mobile-390',390,844]]){
+            const a=await readFile(`${process.env.EVIDENCE_DIR}/before/production-live-${w}x${h}.png`),b=await readFile(`${process.env.EVIDENCE_DIR}/screenshots/production-live-${w}x${h}.png`);
+            const page=await browser.newPage({viewport:{width:w*2+12,height:h}});await page.setContent(`<style>html,body{margin:0;background:#111}main{display:flex;gap:12px;align-items:flex-start}img{width:${w}px;height:auto}</style><main><img src="data:image/png;base64,${a.toString('base64')}"><img src="data:image/png;base64,${b.toString('base64')}"></main>`);await page.screenshot({path:`${process.env.EVIDENCE_DIR}/screenshots/before-after-${kind}.png`,fullPage:true});await page.close();
+          }
+          await browser.close();
+          NODE
+
+      - name: Evidence manifest
+        env:
+          DEPLOYMENT_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp docs/DESIGN_021.md "$EVIDENCE_DIR/design-reference-and-roast.md"
+          node --input-type=module <<'NODE'
+          import{createHash}from'node:crypto';import{readdir,readFile,writeFile}from'node:fs/promises';import{join}from'node:path';const root=process.env.EVIDENCE_DIR,files=[];async function walk(d){for(const e of await readdir(d,{withFileTypes:true})){const p=join(d,e.name);e.isDirectory()?await walk(p):files.push(p)}}await walk(root);const entries=[];for(const p of files){const b=await readFile(p);entries.push({path:p.slice(root.length+1),sha256:createHash('sha256').update(b).digest('hex'),bytes:b.length})}await writeFile(root+'/evidence-manifest.json',JSON.stringify({order:'SOS-SF-AUD-DESIGN-REBUILD-021',amendment:'021-MOBILE-GRID-CORRECTIVE',correctiveProductCommit:'2d58485d2df1b39cac0c6672fa210b8a46042f0e',originalDeployRunId:31161050305,total021DeployCommands:2,correctiveDeployCommands:1,correctiveDeploymentVersionId:process.env.DEPLOYMENT_VERSION_ID,entries},null,2)+'\n');
+          NODE
+
+      - name: Upload corrected screenshots
+        id: screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-021-mobile-corrective-screenshots-${{ github.run_id }}
+          path: artifacts/order-021-mobile-corrective/screenshots/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload corrective evidence
+        id: evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-021-mobile-corrective-evidence-${{ github.run_id }}
+          path: artifacts/order-021-mobile-corrective/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Terminally disarm corrective executor
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[]|select(.path==".github/workflows/order-021-mobile-corrective.yml")|.id'|head -n1)
+          test -n "$workflow_id"
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/disable"
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm .github/workflows/order-021-mobile-corrective.yml
+          git commit -m 'ci: terminally disarm 021 mobile corrective executor'
+          git push origin HEAD:arq/visual-dashboard-v3
+          state=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}" --jq '.state')
+          test "$state" = disabled_manually
+          echo "workflow_id=$workflow_id" >> "$GITHUB_OUTPUT"
+          echo "terminal_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify registry and publish corrected ARQ checkpoint
+        env:
+          TERMINAL_SHA: ${{ steps.cleanup.outputs.terminal_sha }}
+          WORKFLOW_ID: ${{ steps.cleanup.outputs.workflow_id }}
+          DEPLOYMENT_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" > "$EVIDENCE_DIR/workflow-registry-final.json"
+          test "$(jq '[.workflows[]|select(.state=="active")]|length' "$EVIDENCE_DIR/workflow-registry-final.json")" -eq 0
+          body="STATUS=VERIFIED_NOT_ACCEPTED
+          ORDER=SOS-SF-AUD-DESIGN-REBUILD-021
+          AMENDMENT=021-MOBILE-GRID-CORRECTIVE
+          SUPERSEDES_CHECKPOINT_COMMENT_ID=5214971575
+          REMOTE_HEAD_BEFORE=b3e402cdfce0ecfbe199b263394d726d01e4b8de
+          REMOTE_HEAD_AFTER=${TERMINAL_SHA}
+          CORRECTIVE_PRODUCT_COMMIT_SHA=2d58485d2df1b39cac0c6672fa210b8a46042f0e
+          TOTAL_021_DEPLOY_COMMAND_COUNT=2
+          CORRECTIVE_DEPLOY_COMMAND_COUNT=1
+          CORRECTIVE_DEPLOY_RUN_ID=${GITHUB_RUN_ID}
+          CORRECTIVE_DEPLOYMENT_VERSION_ID=${DEPLOYMENT_VERSION_ID}
+          TOTAL_021_CLOUDFLARE_MUTATION_COUNT=2
+          MATERIAL_FINDINGS_OPEN=0
+          MOBILE_GRID_COLLAPSE=FIXED
+          MOBILE_SECTION_WIDTH_GATE=PASS
+          PRIMARY_HYDROMETRIC_SOURCE_E2E=PASS
+          PRODUCTION_API_UI_CONSISTENCY=PASS
+          FIRST_VIEWPORT_DESIGN_GATE=PASS
+          RESPONSIVE_GATE=PASS
+          SCROLL_BUDGET_GATE=PASS
+          SCREENSHOT_HASH_GATE=PASS
+          SCREENSHOT_SEMANTIC_GATE=PASS
+          TYPECHECK=PASS
+          LINT=PASS_ZERO_PROJECT_WARNINGS
+          DEPENDENCY_AUDIT=PASS
+          UNIT=PASS
+          CONTRACT=PASS
+          BUILD=PASS
+          WORKER=PASS
+          E2E=PASS
+          FLAKY_TEST_COUNT=0
+          ACCESSIBILITY=PASS
+          OFFLINE=PASS
+          HORIZONTAL_OVERFLOW=0
+          SCREENSHOT_ARTIFACT_ID=${SCREENSHOT_ARTIFACT_ID}
+          EVIDENCE_ARTIFACT_ID=${EVIDENCE_ARTIFACT_ID}
+          EVIDENCE_ARTIFACT_SHA256=${EVIDENCE_ARTIFACT_SHA256}
+          TEMP_WORKFLOW_ID=${WORKFLOW_ID}
+          TEMP_WORKFLOW_STATE=disabled_manually
+          ACTIVE_MUTATION_WORKFLOWS=0
+          RERUNNABLE_HISTORICAL_PRODUCTION_MUTATION_PATHS=0
+          CLOUDFLARE_GITHUB_DRIFT=false
+          D1_FREE=PRESERVED
+          KV_FREE=PRESERVED
+          R2=ABSENT
+          USD_BUDGET=0
+          MAIN_SHA=45047d1c1e16941ea37967d67307d0ab17e85fad
+          OWNER_ACCEPTANCE=PENDING
+          AUD_HOLD=ACTIVE"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/16/comments" -f body="$body"
