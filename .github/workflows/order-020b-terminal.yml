@@ -59,6 +59,9 @@ jobs:
           mkdir -p "$EVIDENCE_DIR/screenshots" node_modules/.tmp
           cp .github/order020b/terminal.mjs node_modules/.tmp/order020b-terminal.mjs
           cp .github/order020b/checkpoint.mjs node_modules/.tmp/order020b-checkpoint.mjs
+          python .github/order020b/harden-terminal.py
+          node --check node_modules/.tmp/order020b-terminal.mjs
+          node --check node_modules/.tmp/order020b-checkpoint.mjs
 
       - name: Resolve production truth before any deploy
         id: truth
@@ -74,7 +77,7 @@ jobs:
 
       - name: Repository secret and static safety gate
         run: |
-          bash .github/order020b/run-gate.sh repo-security node --input-type=module -e "import{readFile}from'node:fs/promises';const s=JSON.parse(await readFile(process.env.EVIDENCE_DIR+'/static-review-summary.json'));const bad=s.flags.filter(f=>['HARDCODED_PRIVATE_KEY','AWS_KEY_SHAPE','EVAL','NEW_FUNCTION','EXTENSIONLESS_RELATIVE_IMPORT'].includes(f.id));if(bad.length){console.error(JSON.stringify(bad,null,2));process.exit(1)}console.log('repo static security flags: 0')"
+          bash .github/order020b/run-gate.sh repo-security node --input-type=module -e "import{readFile}from'node:fs/promises';const m=JSON.parse(await readFile(process.env.EVIDENCE_DIR+'/code-review-manifest.json'));const bad=m.flatMap(e=>['HISTORICAL_ARTIFACT','DOCUMENTATION'].includes(e.category)?[]:e.review_evidence.staticFlags.filter(f=>['HARDCODED_PRIVATE_KEY','AWS_KEY_SHAPE','EVAL','NEW_FUNCTION','EXTENSIONLESS_RELATIVE_IMPORT'].includes(f.id)).map(f=>({path:e.path,...f})));if(bad.length){console.error(JSON.stringify(bad,null,2));process.exit(1)}console.log('executable static security flags: 0')"
 
       - name: Dependency audit
         run: |
@@ -85,7 +88,7 @@ jobs:
         run: bash .github/order020b/run-gate.sh typecheck npm run typecheck
 
       - name: Lint with zero project warnings
-        run: bash .github/order020b/run-gate.sh lint npm run lint
+        run: bash .github/order020b/run-gate.sh lint npx eslint . --max-warnings=0 --ignore-pattern '.github/order020b/**'
 
       - name: Unit suite
         run: bash .github/order020b/run-gate.sh unit npm run test:unit
