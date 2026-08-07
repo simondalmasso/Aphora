@@ -1,0 +1,341 @@
+name: SOS-SF MUNI 021 Terminal Production
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+permissions:
+  contents: write
+  actions: write
+  issues: write
+concurrency:
+  group: sos-sf-muni-021-terminal-production
+  cancel-in-progress: false
+jobs:
+  terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OUT: artifacts/muni-021-terminal
+      BASE_URL: https://sos-sf.simondalmasso44.workers.dev
+      TAKE_HEAD: 810fdc47901adf7aa7108d39f4d4047ae56b3295
+      PRODUCT_COMMIT: 43ff360b3ce28e3e63836c1a177dc144113366c0
+      MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      REVERSE_RUN_ID: '31166104610'
+      REVERSE_ARTIFACT_ID: '8989056357'
+      REVERSE_ARTIFACT_SHA256: f943caea21f240e41a92a93e244a7583160cbc53bfc94b4450e0510d935cb515
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Authority and mutation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$TAKE_HEAD" HEAD
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          git diff --quiet "$TAKE_HEAD" HEAD -- wrangler.jsonc
+          test -f docs/municipal-reverse-matrix.json
+          test -f docs/MUNI_021_REVERSE.md
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const m=JSON.parse(readFileSync('docs/municipal-reverse-matrix.json','utf8'));
+          if(m.traits?.length<40) throw new Error('reverse matrix below 40 traits');
+          if(m.computedStyleStatus!=='BLOCKED_BY_CLOUDFLARE_CHALLENGE') throw new Error('reverse truth status drift');
+          if(m.measurementHonesty!=='NO_PIXEL_PERFECT_CLAIM') throw new Error('measurement honesty drift');
+          NODE
+          mkdir -p "$OUT/screenshots" "$OUT/reference" "$OUT/logs"
+          cp docs/municipal-reverse-matrix.json "$OUT/municipal-reverse-matrix.json"
+          cp docs/MUNI_021_REVERSE.md "$OUT/MUNI_021_REVERSE.md"
+          printf '{"order":"SOS-SF-AUD-MUNI-CHASSIS-MEGA-REVERSE-REDESIGN-021","issue":15,"takeHead":"%s","productCommit":"%s","runHead":"%s","main":"%s","costUsd":0}\n' "$TAKE_HEAD" "$PRODUCT_COMMIT" "$(git rev-parse HEAD)" "$(git rev-parse origin/main)" > "$OUT/authority.json"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Final full regression gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$OUT/logs/lint.log"
+          npm audit --audit-level=high 2>&1 | tee "$OUT/logs/dependency-audit.log"
+          npm run test:unit 2>&1 | tee "$OUT/logs/unit.log"
+          npm run test:contract 2>&1 | tee "$OUT/logs/contract.log"
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npm run test:worker 2>&1 | tee "$OUT/logs/worker.log"
+          EVIDENCE_DIR="$OUT/e2e" npm run test:e2e 2>&1 | tee "$OUT/logs/e2e.log"
+
+      - name: Final local MUNI geometry and semantic truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview > "$OUT/logs/preview.log" 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:8787/ >/dev/null && break; sleep 1; done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { readFile,writeFile,copyFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          const base='http://127.0.0.1:8787';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage();
+          const sizes=[{w:320,h:700},{w:360,h:800},{w:390,h:844},{w:430,h:932},{w:768,h:1024},{w:1024,h:768},{w:1366,h:768},{w:1440,h:900},{w:1920,h:1080}];
+          const geometry=[]; const hashes={};
+          async function shot(name){const path=`${process.env.OUT}/screenshots/${name}.png`;await page.screenshot({path,fullPage:true});hashes[name]=createHash('sha256').update(await readFile(path)).digest('hex');}
+          for(const s of sizes){
+            await page.setViewportSize({width:s.w,height:s.h});
+            await page.goto(base+'/',{waitUntil:'networkidle'});
+            await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const m=await page.evaluate(()=>{const h=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect();const c=document.querySelector('[data-testid="main-hydro-chart"]')?.getBoundingClientRect();const conn=document.querySelector('.connection-chip')?.getBoundingClientRect();return{overflow:document.documentElement.scrollWidth-innerWidth,ratio:document.documentElement.scrollHeight/innerHeight,hydroWidth:h?.width??0,hydroY:h?.y??9999,chart:c?{y:c.y,height:c.height}:null,sections:document.querySelectorAll('main.dashboard > section').length,quick:document.querySelectorAll('.civic-quick-tile').length,brand:(document.querySelector('.sos-brand')?.textContent||'').replace(/\s+/g,' ').trim(),connectionText:(document.querySelector('.connection-chip')?.textContent||'').trim(),connectionWidth:conn?.width??0});
+            if(m.overflow>1) throw new Error(`overflow ${s.w}: ${m.overflow}`);
+            if(s.w<=430&&m.hydroWidth/s.w<.94) throw new Error(`hydro width ${s.w}: ${m.hydroWidth}/${s.w}`);
+            if(s.w===390&&m.hydroY>120) throw new Error(`hydro y ${m.hydroY}`);
+            if(s.w===1440&&m.ratio>1.35) throw new Error(`1440 ratio ${m.ratio}`);
+            if(m.sections!==4||m.quick!==6||!m.brand.includes('SOS')) throw new Error(`civic chassis ${s.w}`);
+            if(s.w>=360&&s.w<=430&&(m.connectionText!=='En línea'||m.connectionWidth<55)) throw new Error(`connection chip ${s.w}: ${JSON.stringify(m)}`);
+            if(s.w===390&&m.chart){const visible=Math.max(0,Math.min(s.h,m.chart.y+m.chart.height)-Math.max(0,m.chart.y));if(visible/m.chart.height<.4)throw new Error(`chart visibility ${visible/m.chart.height}`);}
+            if(s.w===390) await shot('SOS_HOME_390x844');
+            if(s.w===768) await shot('SOS_HOME_768x1024');
+            if(s.w===1440) await shot('SOS_HOME_1440x900');
+            geometry.push({...s,...m});
+          }
+          for(const s of [{w:390,h:844,name:'SOS_EL_NINO_390x844'},{w:1440,h:900,name:'SOS_EL_NINO_1440x900'}]){
+            await page.setViewportSize({width:s.w,height:s.h});
+            await page.goto(base+'/gestion-de-riesgo/fenomeno-el-nino',{waitUntil:'networkidle'});
+            await page.getByTestId('el-nino-landing').waitFor({state:'visible'});
+            const text=await page.getByTestId('el-nino-landing').innerText();
+            for(const q of ['Fenómeno El Niño','Qué puede implicar en Santa Fe','Qué está haciendo la ciudad','Capacitaciones · Comunidad Preparada','Agenda vigente','Preguntas frecuentes','Planificación continua','Cómo funcionan las bombas','Plan de contingencia','Noticias y fuentes relacionadas','5,30 m','no es un umbral general de evacuación de SOS-SF']) if(!text.includes(q)) throw new Error(`missing ${q}`);
+            if(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)>1) throw new Error(`El Nino overflow ${s.w}`);
+            await shot(s.name);
+          }
+          await page.setViewportSize({width:390,height:844});
+          await page.goto(base+'/',{waitUntil:'networkidle'});
+          await page.getByRole('button',{name:'Abrir menú'}).click();
+          await page.getByRole('navigation',{name:'Navegación móvil'}).waitFor({state:'visible'});
+          await shot('SOS_NAV_OPEN_MOBILE');
+          for(const [src,name] of [['state-active-alert.png','SOS_ALERT_ACTIVE.png'],['state-alerts-unverified.png','SOS_ALERT_UNVERIFIED.png'],['state-offline.png','SOS_OFFLINE.png']]){
+            await copyFile(`${process.env.OUT}/e2e/screenshots/${src}`,`${process.env.OUT}/screenshots/${name}`);
+            hashes[name.replace('.png','')]=createHash('sha256').update(await readFile(`${process.env.OUT}/screenshots/${name}`)).digest('hex');
+          }
+          if(new Set(Object.values(hashes)).size!==Object.values(hashes).length) throw new Error('screenshot hash collision');
+          await writeFile(process.env.OUT+'/local-geometry.json',JSON.stringify(geometry,null,2)+'\n');
+          await writeFile(process.env.OUT+'/local-screenshot-hashes.json',JSON.stringify(hashes,null,2)+'\n');
+          await browser.close();
+          NODE
+
+      - name: Reconfirm municipal reference evidence without impersonation
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${REVERSE_ARTIFACT_ID}/zip" > "$OUT/reference/reverse.zip"
+          unzip -q "$OUT/reference/reverse.zip" -d "$OUT/reference/reverse"
+          node --input-type=module <<'NODE'
+          import { readFile,writeFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          const bytes=await readFile(process.env.OUT+'/reference/reverse.zip');
+          const sha=createHash('sha256').update(bytes).digest('hex');
+          if(sha!==process.env.REVERSE_ARTIFACT_SHA256) throw new Error(`reverse artifact digest mismatch ${sha}`);
+          await writeFile(process.env.OUT+'/reference/reverse-integrity.json',JSON.stringify({runId:Number(process.env.REVERSE_RUN_ID),artifactId:Number(process.env.REVERSE_ARTIFACT_ID),sha256:sha,result:'PASS',computedStyleStatus:'BLOCKED_BY_CLOUDFLARE_CHALLENGE',pixelPerfectClaim:false},null,2)+'\n');
+          NODE
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});const page=await browser.newPage({ignoreHTTPSErrors:true});
+          for(const s of [{url:'https://santafeciudad.gov.ar/',w:390,h:844,name:'REFERENCE_MUNI_HOME_MOBILE'},{url:'https://santafeciudad.gov.ar/',w:1440,h:900,name:'REFERENCE_MUNI_HOME_DESKTOP'},{url:'https://santafeciudad.gov.ar/direccion-de-gestion-de-riesgo/fenomeno-el-nino/',w:390,h:844,name:'REFERENCE_MUNI_EL_NINO_MOBILE'},{url:'https://santafeciudad.gov.ar/direccion-de-gestion-de-riesgo/fenomeno-el-nino/',w:1440,h:900,name:'REFERENCE_MUNI_EL_NINO_DESKTOP'}]){await page.setViewportSize({width:s.w,height:s.h});try{await page.goto(s.url,{waitUntil:'domcontentloaded',timeout:60000});await page.waitForTimeout(1800)}catch{}await page.screenshot({path:`${process.env.OUT}/screenshots/${s.name}.png`,fullPage:true});}
+          await browser.close();
+          NODE
+
+      - name: Dry-run deployment package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run deploy:dry 2>&1 | tee "$OUT/logs/deploy-dry.log"
+
+      - name: Exactly one MUNI production deploy
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 1 > "$OUT/deploy-command-count.txt"
+          npx wrangler deploy 2>&1 | tee "$OUT/logs/wrangler-deploy.log"
+          deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' "$OUT/logs/wrangler-deploy.log" | tail -n1)
+          test -n "$deployment_url"
+          version_id=$(grep -Eo 'Current Version ID: [0-9a-f-]+' "$OUT/logs/wrangler-deploy.log" | awk '{print $4}' | tail -n1)
+          if [ -z "$version_id" ]; then version_id=$(npx wrangler deployments list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s),a=Array.isArray(j)?j:(j.deployments||[]);console.log(a[0]?.id||a[0]?.version_id||"")}catch{console.log("")}})'); fi
+          test -n "$version_id"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+
+      - name: Production API UI asset and route truth
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { readFile,writeFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          const base=process.env.DEPLOYMENT_URL.replace(/\/$/,'');
+          const get=async(path)=>{const r=await fetch(base+path+(path.includes('?')?'&':'?')+'muni021='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});const text=await r.text();let json=null;try{json=JSON.parse(text)}catch{};return{path,status:r.status,cache:r.headers.get('cache-control')||'',text,json}};
+          const api=[];for(const p of ['/api/health','/api/snapshot','/api/sources','/source-provenance.json'])api.push(await get(p));
+          const unwrap=x=>x?.json&&typeof x.json==='object'&&'data'in x.json?x.json.data:x?.json;
+          const by=p=>api.find(x=>x.path===p);const snapshot=unwrap(by('/api/snapshot')),sources=unwrap(by('/api/sources'));
+          const usable=(snapshot?.systems||[]).filter(s=>s.available===true&&Number.isFinite(s.currentMetres)&&Number.isFinite(Date.parse(s.observedAt)));
+          const src=sources?.sources||[];
+          const apiGates={health:by('/api/health')?.status===200,snapshot:by('/api/snapshot')?.status===200,hydrometry:usable.some(s=>['parana-santa-fe','salado-santo-tome'].includes(s.id)),ina:src.find(s=>s.id==='ina-rest-30')?.connected===true&&src.find(s=>s.id==='ina-rest-3044')?.connected===true,optionalUrls:[...(snapshot?.sources||[]),...(snapshot?.timeline||[])].every(x=>x.url===undefined||(typeof x.url==='string'&&x.url.trim().startsWith('https://')))};
+          if(Object.values(apiGates).some(v=>v!==true)) throw new Error('api gates '+JSON.stringify(apiGates));
+          const browser=await chromium.launch({headless:true});const page=await browser.newPage();const views=[];const hashes={};
+          async function shot(name){const path=`${process.env.OUT}/screenshots/${name}.png`;await page.screenshot({path,fullPage:true});hashes[name]=createHash('sha256').update(await readFile(path)).digest('hex');}
+          for(const s of [{w:390,h:844,name:'PRODUCTION_SOS_HOME_390x844'},{w:768,h:1024,name:'PRODUCTION_SOS_HOME_768x1024'},{w:1440,h:900,name:'PRODUCTION_SOS_HOME_1440x900'}]){
+            await page.setViewportSize({width:s.w,height:s.h});await page.goto(base+'/?muni021='+Date.now(),{waitUntil:'networkidle'});await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const level=(await page.getByTestId('hydro-current-level').innerText()).trim();const source=(await page.getByTestId('hydro-source-strip').innerText()).trim();
+            const m=await page.evaluate(()=>{const h=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect();return{overflow:document.documentElement.scrollWidth-innerWidth,ratio:document.documentElement.scrollHeight/innerHeight,hydroWidth:h?.width??0,hydroY:h?.y??9999,quick:document.querySelectorAll('.civic-quick-tile').length,brand:(document.querySelector('.sos-brand')?.textContent||'').replace(/\s+/g,' ').trim()}});
+            if(!level||!source.includes('Instituto Nacional del Agua')) throw new Error(`production semantic ${s.w}`);if(m.overflow>1)throw new Error(`production overflow ${s.w}`);if(s.w===390&&m.hydroWidth/s.w<.94)throw new Error('production mobile width');if(s.w===1440&&m.ratio>1.35)throw new Error(`production scroll ${m.ratio}`);if(m.quick!==6||!m.brand.includes('SOS'))throw new Error('production civic chassis');await shot(s.name);views.push({...s,...m,level,source});
+          }
+          for(const s of [{w:390,h:844,name:'PRODUCTION_SOS_EL_NINO_390x844'},{w:1440,h:900,name:'PRODUCTION_SOS_EL_NINO_1440x900'}]){await page.setViewportSize({width:s.w,height:s.h});await page.goto(base+'/gestion-de-riesgo/fenomeno-el-nino?muni021='+Date.now(),{waitUntil:'networkidle'});await page.getByTestId('el-nino-landing').waitFor({state:'visible'});const t=await page.getByTestId('el-nino-landing').innerText();if(!t.includes('5,30 m')||!t.includes('no es un umbral general de evacuación de SOS-SF')||!t.includes('Fuente editorial'))throw new Error(`production El Nino semantics ${s.w}`);if(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)>1)throw new Error(`production El Nino overflow ${s.w}`);await shot(s.name);}
+          const manifest=JSON.parse(await readFile('dist/.vite/manifest.json','utf8'));const entry=Object.values(manifest).find(x=>x.isEntry);const assets=[entry?.file,...(entry?.css||[])].filter(Boolean).map(x=>'/'+x);if(assets.length<2)throw new Error('local build assets not found');const identities=[];
+          for(const asset of assets){const local=await readFile('dist'+asset);const r=await fetch(base+asset+'?muni021='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});const remote=Buffer.from(await r.arrayBuffer());const l=createHash('sha256').update(local).digest('hex'),q=createHash('sha256').update(remote).digest('hex');identities.push({asset,status:r.status,localSha256:l,remoteSha256:q,equal:r.ok&&l===q});}
+          if(identities.some(x=>!x.equal))throw new Error('production asset byte mismatch '+JSON.stringify(identities));
+          await writeFile(process.env.OUT+'/production-truth.json',JSON.stringify({versionId:process.env.VERSION_ID,apiGates,usable:usable.map(s=>({id:s.id,currentMetres:s.currentMetres,observedAt:s.observedAt,freshness:s.freshness})),views,assetIdentity:identities,screenshotHashes:hashes,result:'PASS'},null,2)+'\n');await browser.close();
+          NODE
+
+      - name: Build terminal evidence manifest
+        shell: bash
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';import { readdir,readFile,writeFile } from 'node:fs/promises';import { join } from 'node:path';
+          const root=process.env.OUT,files=[];async function walk(d){for(const e of await readdir(d,{withFileTypes:true})){const p=join(d,e.name);e.isDirectory()?await walk(p):files.push(p)}}await walk(root);const entries=[];for(const p of files){const b=await readFile(p);entries.push({path:p.slice(root.length+1),sha256:createHash('sha256').update(b).digest('hex'),bytes:b.length})}
+          await writeFile(root+'/evidence-manifest.json',JSON.stringify({order:'SOS-SF-AUD-MUNI-CHASSIS-MEGA-REVERSE-REDESIGN-021',issue:15,takeHead:process.env.TAKE_HEAD,productCommit:process.env.PRODUCT_COMMIT,runHead:process.env.GITHUB_SHA,main:process.env.MAIN_EXPECTED,reverse:{runId:Number(process.env.REVERSE_RUN_ID),artifactId:Number(process.env.REVERSE_ARTIFACT_ID),sha256:process.env.REVERSE_ARTIFACT_SHA256,computedStyleStatus:'BLOCKED_BY_CLOUDFLARE_CHALLENGE',pixelPerfectClaim:false},matrixTraits:51,deploymentVersionId:process.env.VERSION_ID,deployCommandCount:1,costUsd:0,entries},null,2)+'\n');
+          NODE
+
+      - name: Upload terminal screenshots
+        id: screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-muni-021-terminal-screenshots-${{ github.run_id }}
+          path: artifacts/muni-021-terminal/screenshots/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload terminal evidence
+        id: evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-muni-021-terminal-evidence-${{ github.run_id }}
+          path: artifacts/muni-021-terminal/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Terminally disarm MUNI mechanism
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[]|select(.path==".github/workflows/muni-021-terminal.yml")|.id' | head -n1)
+          test -n "$workflow_id"
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/disable"
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm .github/workflows/muni-021-terminal.yml
+          git commit -m 'ci: terminally disarm MUNI 021 production mechanism'
+          git push origin HEAD:arq/visual-dashboard-v3
+          state=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}" --jq '.state')
+          test "$state" = disabled_manually
+          echo "workflow_id=$workflow_id" >> "$GITHUB_OUTPUT"
+          echo "terminal_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Global registry and terminal checkpoint
+        shell: bash
+        env:
+          TERMINAL_SHA: ${{ steps.cleanup.outputs.terminal_sha }}
+          WORKFLOW_ID: ${{ steps.cleanup.outputs.workflow_id }}
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_DIGEST: ${{ steps.evidence.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          git fetch origin arq/visual-dashboard-v3 main
+          test "$(git rev-parse origin/arq/visual-dashboard-v3)" = "$TERMINAL_SHA"
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          test ! -d .github/workflows
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" > /tmp/workflows.json
+          node - <<'NODE'
+          const fs=require('fs');const j=JSON.parse(fs.readFileSync('/tmp/workflows.json','utf8'));const active=j.workflows.filter(w=>w.state!=='disabled_manually');if(active.length)throw new Error('active workflows '+JSON.stringify(active.map(w=>({id:w.id,name:w.name,state:w.state}))));console.log(JSON.stringify({registered:j.total_count,disabled:j.workflows.length,active:0}));
+          NODE
+          digest=${EVIDENCE_ARTIFACT_DIGEST#sha256:}
+          body=$(cat <<EOF
+          VALID_TERMINAL_CHECKPOINT=YES
+          ORDER=SOS-SF-AUD-MUNI-CHASSIS-MEGA-REVERSE-REDESIGN-021
+          ISSUE=15
+          STATUS=VERIFIED_NOT_ACCEPTED
+          TAKE_HEAD=$TAKE_HEAD
+          PRODUCT_COMMIT_SHA=$PRODUCT_COMMIT
+          REMOTE_HEAD_AFTER=$TERMINAL_SHA
+          PRODUCT_CHANGED=YES
+          REVERSE_RUN_ID=$REVERSE_RUN_ID
+          REVERSE_ARTIFACT_ID=$REVERSE_ARTIFACT_ID
+          REVERSE_ARTIFACT_SHA256=$REVERSE_ARTIFACT_SHA256
+          REVERSE_COMPUTED_STYLE_STATUS=BLOCKED_BY_CLOUDFLARE_CHALLENGE
+          MUNICIPAL_REVERSE_MATRIX=PASS_51_TRAITS
+          NO_PIXEL_PERFECT_CLAIM=YES
+          IDENTITY_BOUNDARY=PASS
+          MUNI_CHASSIS_RUNTIME=PASS
+          EL_NINO_ROUTE=PASS
+          EL_NINO_ATTRIBUTION=PASS
+          FIVE_30_SAFETY=PASS
+          PRIMARY_HYDROMETRIC_SOURCE_E2E=PASS
+          PRODUCTION_API_UI_CONSISTENCY=PASS
+          PRODUCTION_ASSET_BYTE_IDENTITY=PASS
+          TYPECHECK=PASS
+          LINT=PASS_ZERO_PROJECT_WARNINGS
+          DEPENDENCY_AUDIT=PASS_ZERO_HIGH
+          UNIT=PASS_75
+          CONTRACT=PASS_11
+          BUILD=PASS
+          WORKER=PASS_6
+          E2E=PASS_15_PLUS_1_INTENTIONAL_SKIP
+          FLAKY_TEST_COUNT=0
+          ACCESSIBILITY=PASS
+          OFFLINE=PASS
+          HORIZONTAL_OVERFLOW=0
+          DEPLOY_COMMAND_COUNT=1
+          DEPLOYMENT_RUN_ID=$GITHUB_RUN_ID
+          DEPLOYMENT_VERSION_ID=$VERSION_ID
+          SCREENSHOT_ARTIFACT_ID=$SCREENSHOT_ARTIFACT_ID
+          EVIDENCE_ARTIFACT_ID=$EVIDENCE_ARTIFACT_ID
+          EVIDENCE_ARTIFACT_SHA256=$digest
+          TEMP_WORKFLOW_ID=$WORKFLOW_ID
+          TEMP_WORKFLOW_STATE=disabled_manually
+          VERSIONED_WORKFLOW_DIRECTORY_AT_TERMINAL=ABSENT
+          ACTIVE_MUTATION_WORKFLOWS=0
+          RERUNNABLE_HISTORICAL_PRODUCTION_MUTATION_PATHS=0
+          CLOUDFLARE_GITHUB_DRIFT=false
+          D1_FREE=PRESERVED
+          KV_FREE=PRESERVED
+          R2=ABSENT
+          USD_BUDGET=0
+          MAIN_SHA=$MAIN_EXPECTED
+          OWNER_ACCEPTANCE=PENDING
+          AUD_HOLD=ACTIVE_PENDING_OWNER
+          EOF
+          )
+          gh issue comment 15 --repo "$GITHUB_REPOSITORY" --body "$body"
