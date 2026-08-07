@@ -42,7 +42,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Apply review remediations
+      - name: Apply final maintainability remediation
         shell: bash
         run: |
           set -euo pipefail
@@ -50,6 +50,8 @@ jobs:
           npm install --package-lock-only --ignore-scripts --save-dev --save-exact wrangler@4.119.0 @cloudflare/workers-types@5.20260801.1
           python - <<'PY'
           from pathlib import Path
+          import json
+          import re
 
           auth = Path('src/worker/auth.ts')
           auth_text = auth.read_text()
@@ -70,13 +72,62 @@ jobs:
           elif test_new not in test_text:
               raise SystemExit('Google JWKS timeout test remediation target is absent')
           test.write_text(test_text)
+
+          files = []
+          for root in [Path('src'), Path('tests')]:
+              files.extend(path for path in root.rglob('*') if path.suffix in {'.ts', '.tsx'})
+          files.extend([Path('vite.config.ts'), Path('playwright.config.ts')])
+          pattern = re.compile(r"(?P<prefix>\b(?:from|import)\s*\(?\s*['\"])(?P<spec>\.{1,2}/[^'\"]+)(?P<suffix>['\"]\s*\)?)")
+          unresolved = []
+          changed = []
+          known_extensions = {'.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.svg', '.png'}
+          for path in files:
+              if not path.exists():
+                  continue
+              text = path.read_text()
+              def replace(match):
+                  spec = match.group('spec')
+                  if Path(spec).suffix in known_extensions:
+                      return match.group(0)
+                  base = path.parent / spec
+                  candidates = [
+                      (Path(str(base) + '.ts'), '.ts'),
+                      (Path(str(base) + '.tsx'), '.tsx'),
+                      (Path(str(base) + '.js'), '.js'),
+                      (Path(str(base) + '.jsx'), '.jsx'),
+                      (base / 'index.ts', '/index.ts'),
+                      (base / 'index.tsx', '/index.tsx'),
+                  ]
+                  hits = [suffix for candidate, suffix in candidates if candidate.exists()]
+                  if len(hits) != 1:
+                      unresolved.append({'file': str(path), 'specifier': spec, 'hits': hits})
+                      return match.group(0)
+                  return match.group('prefix') + spec + hits[0] + match.group('suffix')
+              updated = pattern.sub(replace, text)
+              if updated != text:
+                  path.write_text(updated)
+                  changed.append(str(path))
+          if unresolved:
+              raise SystemExit(f'Unresolved relative imports: {unresolved}')
+          for config_path in [Path('tsconfig.app.json'), Path('tsconfig.node.json')]:
+              config = json.loads(config_path.read_text())
+              config.setdefault('compilerOptions', {})['allowImportingTsExtensions'] = True
+              config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n')
+          Path('artifacts/order-020-preliminary/import-extension-remediation.json').write_text(
+              json.dumps({'changedFileCount': len(changed), 'changedFiles': changed}, indent=2) + '\n'
+          )
           PY
-          git add package.json package-lock.json src/worker/auth.ts tests/unit/auth.test.ts
+          if grep -RInE "(from|import)[[:space:]]*\\(?[[:space:]]*['\"]\\.{1,2}/[^'\"]+['\"]" src tests vite.config.ts playwright.config.ts > "$EVIDENCE_DIR/extensionless-imports.txt"; then
+            echo 'Extensionless relative imports remain.' >&2
+            exit 1
+          fi
+          git add package.json package-lock.json src tests vite.config.ts playwright.config.ts tsconfig.app.json tsconfig.node.json "$EVIDENCE_DIR/import-extension-remediation.json"
+          git reset "$EVIDENCE_DIR/import-extension-remediation.json"
           git diff --cached --check
           git config user.name sos-sf-automation
           git config user.email sos-sf-automation@users.noreply.github.com
           if ! git diff --cached --quiet; then
-            git commit -m 'test: observe JWKS timeout rejection before advancing timers'
+            git commit -m 'refactor: make relative TypeScript imports loader-explicit'
             git push origin HEAD:arq/visual-dashboard-v3
           fi
           git rev-parse HEAD > "$EVIDENCE_DIR/review-commit.txt"
