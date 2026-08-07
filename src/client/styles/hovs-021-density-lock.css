@@ -1,6 +1,7 @@
 /* Final density lock. Interactive neighbors keep >=10px where adjacent; targets retain owner minimums. */
 @media (max-width: 820px) {
   .dashboard { gap: 6px; }
+  .sos-brand { min-height: 48px; }
   .hydro-chart svg { max-height: 145px; }
   .station-selector button { font-size: .94rem; }
 
