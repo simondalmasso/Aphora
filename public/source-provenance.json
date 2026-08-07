@@ -1,9 +1,10 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "orderId": "SOS-SF-AUD-FULL-CODEBASE-REVIEW-AND-END-TO-END-CLOSE-020",
   "suborder": "020-B-MASTER-TERMINAL-EXECUTION",
-  "productTreeSha256": "2bd95999b1804f15991bec1a35d29e397907ec25c93f025888bef9ab7b1d333b",
+  "amendment": "020-B-FINAL-CORRECTIVE-DEPLOY-AUTHORITY",
+  "productTreeSha256": "5b2d4ab8509d96ff3ef9476156efc084fa2c0c70bf61cd23444f1f2cbe001471",
   "includedFileCount": 127,
-  "sourceHeadSha": "0d214c590bb99d02017188ae51513a58ba293749",
-  "preparedAt": "2026-08-07T04:55:54.354Z"
+  "sourceHeadSha": "3e81cf71b237be237673dd5fe686f63ff39dced5",
+  "preparedAt": "2026-08-07T06:23:06.822Z"
 }
