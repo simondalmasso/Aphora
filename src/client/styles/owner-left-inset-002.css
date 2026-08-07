@@ -114,6 +114,12 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .hovs-r2 .station-selector button {
+    min-width: 0;
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+
   .hovs-r2 .hydro-refresh-button {
     justify-self: start;
   }
@@ -124,6 +130,11 @@
   .hovs-r2 .contact-grid,
   .hovs-r2 .civic-footer__main {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hovs-r2 .hydro-level strong {
+    min-height: 54px;
+    font-size: clamp(3rem, 28vw, 4rem);
   }
 
   .hovs-r2 .hydro-metrics > div + div {
