@@ -100,6 +100,10 @@ export function HydrometricMonitoring({
           />
         </div>
 
+        <div className="hydro-signature-axis" aria-label="Lectura organizada por río, regla y tiempo">
+          <span>RÍO</span><i aria-hidden="true"/><span>REGLA</span><i aria-hidden="true"/><span>TIEMPO</span>
+        </div>
+
         <div className="hydro-reading">
           <div className="hydro-level">
             <span>Nivel</span>
