@@ -34,8 +34,11 @@ jobs:
           test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
           git merge-base --is-ancestor 234bc1ce853c7c1acad93fc6c0bc1202f8cd11c8 HEAD
           test "$(git rev-parse origin/main)" = 45047d1c1e16941ea37967d67307d0ab17e85fad
-          git log -1 --pretty=%B | sed -n '/ORDER020_PATCH_XZ_B64_BEGIN/,/ORDER020_PATCH_XZ_B64_END/p' | sed '1d;$d' | tr -d '\n' > /tmp/order020.patch.xz.b64
-          test -s /tmp/order020.patch.xz.b64
+          : > /tmp/order020.patch.xz.b64
+          for part in 00 01 02 03 04 05; do
+            git log -8 --format=%B | sed -n "/ORDER020_PATCH_PART_BEGIN=$part/,/ORDER020_PATCH_PART_END=$part/p" | sed '1d;$d' | tr -d '\n' >> /tmp/order020.patch.xz.b64
+          done
+          test "$(wc -c < /tmp/order020.patch.xz.b64)" = 60144
           base64 -d /tmp/order020.patch.xz.b64 > /tmp/order020.patch.xz
           echo '607a7896c279a88be9d8482161f8ce1a71b835c1212182f5683913197de3ffe4  /tmp/order020.patch.xz' | sha256sum -c -
           xz -dc /tmp/order020.patch.xz > /tmp/order020.patch
