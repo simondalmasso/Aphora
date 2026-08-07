@@ -63,13 +63,8 @@ jobs:
 
           test = Path('tests/unit/auth.test.ts')
           test_text = test.read_text()
-          test_old = """    const verification = verifyGoogleIdToken(token, clientId, now);
-    await vi.advanceTimersByTimeAsync(5_001);
-    await expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');"""
-          test_new = """    const verification = verifyGoogleIdToken(token, clientId, now);
-    const expectedRejection = expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');
-    await vi.advanceTimersByTimeAsync(5_001);
-    await expectedRejection;"""
+          test_old = "    const verification = verifyGoogleIdToken(token, clientId, now);\n    await vi.advanceTimersByTimeAsync(5_001);\n    await expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');"
+          test_new = "    const verification = verifyGoogleIdToken(token, clientId, now);\n    const expectedRejection = expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');\n    await vi.advanceTimersByTimeAsync(5_001);\n    await expectedRejection;"
           if test_old in test_text:
               test_text = test_text.replace(test_old, test_new)
           elif test_new not in test_text:
