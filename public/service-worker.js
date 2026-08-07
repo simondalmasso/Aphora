@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'sos-sf-public-safety-015-20260805a';
+const CACHE_VERSION = 'sos-sf-public-safety-020-20260806a';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PUBLIC_DATA_CACHE = `${CACHE_VERSION}-public-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css', '/essential-contacts.json', '/offline-guidance.json'];

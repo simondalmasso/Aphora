@@ -46,4 +46,10 @@ describe('snapshot validation', () => {
     expect(() => validateSnapshot(live({ sources: [] }))).toThrow('fuente inexistente');
     expect(() => validateSnapshot(live({ river: { ...live().river, currentMetres: Number.NaN } }))).toThrow('finito');
   });
+
+  it('rejects unsafe public URLs and fabricated available rain totals', () => {
+    expect(() => validateSnapshot(live({ sources: [{ ...source, url: 'javascript:alert(1)' }] }))).toThrow('debe usar HTTPS');
+    expect(() => validateSnapshot(live({ rain: { ...live().rain, available: true, accumulated1hMm: null, accumulated24hMm: null } }))).toThrow('disponible sin acumulados');
+  });
+
 });

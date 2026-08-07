@@ -74,8 +74,8 @@ export const unavailableSnapshot: Snapshot = Object.freeze({
   rain: Object.freeze({
     available: false,
     dataStatus: 'UNAVAILABLE',
-    accumulated1hMm: 0,
-    accumulated24hMm: 0,
+    accumulated1hMm: null,
+    accumulated24hMm: null,
     forecast: 'Sin estimación suplementaria utilizable.',
     observedAt: REFERENCE_AT,
     fetchedAt: REFERENCE_AT,

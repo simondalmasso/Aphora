@@ -9,6 +9,9 @@ export interface ProviderPolicy {
   readonly contentTypes: readonly string[];
   readonly timeoutMs?: number;
   readonly maxBytes?: number;
+  /** Maximum age of a cached transport response before the provider is queried again. */
+  readonly refreshMs?: number;
+  /** Maximum age of the provider observation before it is classified as stale. */
   readonly freshMs?: number;
   readonly staleMs?: number;
 }
@@ -128,8 +131,9 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
   let circuit = await cacheRead<CircuitState>(circuitKey) ?? defaultCircuit();
   const cachedAge = cached ? now.getTime() - Date.parse(cached.fetchedAt) : Number.POSITIVE_INFINITY;
   const freshMs = policy.freshMs ?? DEFAULT_FRESH_MS;
+  const refreshMs = policy.refreshMs ?? freshMs;
   const staleMs = policy.staleMs ?? DEFAULT_STALE_MS;
-  if (cached && cachedAge <= freshMs) {
+  if (cached && cachedAge <= refreshMs) {
     const observationStatus: ProviderStatus = now.getTime() - Date.parse(cached.observedAt) <= freshMs ? 'FRESH' : 'STALE';
     const result: ProviderResult<T> = { value: cached.value, status: observationStatus, fetchedAt: cached.fetchedAt, observedAt: cached.observedAt, errorClass: null, fromCache: true };
     publishHealth(policy, result, circuit);

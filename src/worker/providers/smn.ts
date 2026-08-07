@@ -36,6 +36,7 @@ const CAP: ProviderPolicy = Object.freeze({
   paths: Object.freeze([/^\/feeds\/CAP\/rss_alertaCAP_nuevo_\d{4}\.xml$/]),
   contentTypes: Object.freeze(['application/xml', 'text/xml', 'application/rss+xml']),
   maxBytes: 1_500_000,
+  refreshMs: 5 * 60_000,
   freshMs: 30 * 60_000,
   staleMs: 12 * 60 * 60_000,
 });
@@ -65,9 +66,10 @@ function firstDate(...values: (string | null)[]): string | null {
   return null;
 }
 
-function lifecycle(title: string, messageType: string, expires: string | null, now: Date): SmnAlertSummary['lifecycle'] {
+function lifecycle(title: string, messageType: string, expires: string | null, sent: string, now: Date): SmnAlertSummary['lifecycle'] {
   if (/cancel|cancelad|cesad|sin efecto|finaliz/i.test(`${title} ${messageType}`)) return 'CANCELLED';
   if (expires && Date.parse(expires) <= now.getTime()) return 'EXPIRED';
+  if (!expires && now.getTime() - Date.parse(sent) > 12 * 60 * 60_000) return 'EXPIRED';
   if (/update|actualiz/i.test(messageType)) return 'UPDATED';
   if (expires || /alerta|advertencia|aviso/i.test(title)) return 'ACTIVE';
   return 'UNKNOWN';
@@ -92,10 +94,11 @@ export function fetchSmnAlerts(url: string): Promise<ProviderResult<readonly Smn
       const identifier = tag(xml, 'identifier') ?? tag(xml, 'guid') ?? `smn:${sent}:${headline.slice(0, 80)}`;
       const description = tag(xml, 'description') ?? tag(xml, 'summary') ?? '';
       const area = tag(xml, 'areaDesc') ?? tag(xml, 'area') ?? headline;
-      const sourceUrl = tag(xml, 'link') ?? url;
+      const candidateUrl = tag(xml, 'link');
+      const sourceUrl = candidateUrl && (() => { try { return new URL(candidateUrl).protocol === 'https:'; } catch { return false; } })() ? candidateUrl : url;
       const messageType = tag(xml, 'msgType') ?? tag(xml, 'messageType') ?? 'Alert';
       const expires = firstDate(tag(xml, 'expires'));
-      const alertLifecycle = lifecycle(headline, messageType, expires, now);
+      const alertLifecycle = lifecycle(headline, messageType, expires, sent, now);
       output.push(Object.freeze({
         identifier: identifier.slice(0, 240),
         sender: (tag(xml, 'senderName') ?? tag(xml, 'sender') ?? 'Servicio Meteorológico Nacional').slice(0, 180),
@@ -121,7 +124,8 @@ export function fetchSmnAlerts(url: string): Promise<ProviderResult<readonly Smn
       }));
     }
     const channel = firstDate(tag(body, 'lastBuildDate'), tag(body, 'updated'));
-    const observedAt = output.map((alert) => alert.sent).sort().at(-1) ?? channel ?? now.toISOString();
+    const observedAt = output.map((alert) => alert.sent).sort().at(-1) ?? channel;
+    if (!observedAt) throw new Error('SMN_CAP_TIMESTAMP_MISSING');
     return { value: Object.freeze(output.slice(0, 100)), observedAt };
   });
 }

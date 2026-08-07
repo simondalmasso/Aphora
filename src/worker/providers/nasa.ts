@@ -25,6 +25,7 @@ const QUERY_POLICY: ProviderPolicy = Object.freeze({
   contentTypes: Object.freeze(['application/json']),
   timeoutMs: 16_000,
   maxBytes: 500_000,
+  refreshMs: 5 * 60_000,
   freshMs: 15 * 60_000,
   staleMs: 0,
 });
@@ -35,6 +36,7 @@ const SAMPLE_POLICY: ProviderPolicy = Object.freeze({
   contentTypes: Object.freeze(['application/json']),
   timeoutMs: 12_000,
   maxBytes: 500_000,
+  refreshMs: 5 * 60_000,
   freshMs: 15 * 60_000,
   staleMs: 0,
 });

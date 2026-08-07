@@ -18,15 +18,15 @@ export async function prepareReportPhoto(file: File): Promise<File> {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    const context = canvas.getContext('2d', { alpha: true });
+    const context = canvas.getContext('2d', { alpha: false });
     if (!context) throw new Error('IMAGE_CANVAS_UNAVAILABLE');
     context.drawImage(bitmap, 0, 0, width, height);
-    const outputType = file.type === 'image/png' && file.size <= MAX_BYTES && scale === 1 ? 'image/png' : 'image/webp';
+    const outputType = 'image/jpeg';
     let blob = await canvasBlob(canvas, outputType, .82);
-    if (blob.size > MAX_BYTES && outputType !== 'image/png') blob = await canvasBlob(canvas, outputType, .68);
-    if (blob.size > MAX_BYTES && outputType !== 'image/png') blob = await canvasBlob(canvas, outputType, .54);
+    if (blob.size > MAX_BYTES) blob = await canvasBlob(canvas, outputType, .68);
+    if (blob.size > MAX_BYTES) blob = await canvasBlob(canvas, outputType, .54);
     if (blob.size > MAX_BYTES) throw new Error('La foto no pudo reducirse por debajo de 4 MiB.');
-    const extension = outputType === 'image/webp' ? '.webp' : '.png';
+    const extension = '.jpg';
     const base = file.name.replace(/\.[^.]+$/, '').slice(0, 80) || 'foto';
     return new File([blob], `${base}${extension}`, { type: outputType, lastModified: Date.now() });
   } finally { bitmap.close(); }

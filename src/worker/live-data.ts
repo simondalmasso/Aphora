@@ -37,7 +37,7 @@ export interface LiveDataEnv {
 
 const INA_BASE = 'https://alerta.ina.gob.ar/a5/getObservaciones';
 const LIVE_DATA_CACHE_VERSION = 'public-safety-015-v1';
-const SMN_CAP_URL = 'https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml';
+function defaultSmnCapUrl(now: Date): string { return `https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_${now.getUTCFullYear()}.xml`; }
 const NASA_GPM_URL = 'https://gis.earthdata.nasa.gov/image/rest/services/GESDISC/GPM_3IMERGHHE/ImageServer';
 const PROVINCE_WARNING_URL = 'https://www.santafe.gov.ar/proteccioncivil/alertatemprana';
 const COBEM_URL = 'https://santafeciudad.gov.ar/direccion-de-gestion-de-riesgo/cobem/';
@@ -196,6 +196,7 @@ function sourceBase(input: {
   latencyMinutes?: number;
   resolution?: string;
   uncertainty?: string;
+  official?: boolean;
 }): Source {
   const preliminary: Source = {
     id: input.id,
@@ -207,7 +208,7 @@ function sourceBase(input: {
     lastCheckedAt: input.fetchedAt,
     validUntil: input.validUntil,
     contribution: input.contribution,
-    official: true,
+    official: input.official ?? true,
     url: input.url,
     connected: input.connected,
     organizationId: input.organizationId,
@@ -483,6 +484,7 @@ async function nasaSource(now: Date): Promise<Source> {
     latencyMinutes: connected ? result.value!.latencyMinutes : undefined,
     resolution: connected ? result.value!.resolution : '0,1° / 30 minutos',
     uncertainty: connected ? result.value!.uncertainty : 'Sin muestra válida; no aporta un dato local.',
+    official: false,
   });
 }
 
@@ -516,8 +518,12 @@ function humanVerificationSources(now: Date): readonly Source[] {
 }
 
 function highestState(systems: readonly HydrologicalSystem[]): PublicState {
-  const order: PublicState[] = ['UNKNOWN', 'NORMAL', 'VIGILANCIA', 'ALERTA', 'UMBRAL_EVACUACION_ALCANZADO', 'EVACUACION_OFICIAL'];
-  return systems.map(systemState).reduce((current, next) => order.indexOf(next) > order.indexOf(current) ? next : current, 'UNKNOWN');
+  const states = systems.map(systemState);
+  for (const confirmed of ['EVACUACION_OFICIAL', 'UMBRAL_EVACUACION_ALCANZADO', 'ALERTA', 'VIGILANCIA'] as const) {
+    if (states.includes(confirmed)) return confirmed;
+  }
+  if (states.includes('UNKNOWN')) return 'UNKNOWN';
+  return states.includes('NORMAL') ? 'NORMAL' : 'UNKNOWN';
 }
 
 function alertAction(status: Snapshot['alertStatus'], alerts: readonly OfficialAlert[]): string {
@@ -538,7 +544,7 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
   const defaultWaterMl = (series: string) => `https://alerta.ina.gob.ar/a5/obs/puntual/series/${series}?timestart=${from}&timeend=${to}&format=waterml2`;
 
   const stationPromise = Promise.all(STATIONS.map((station) => stationSystem(station, now)));
-  const smnAlertPromise = smnAlertFeed(env.SMN_ALERTS_JSON_URL ?? SMN_CAP_URL, now);
+  const smnAlertPromise = smnAlertFeed(env.SMN_ALERTS_JSON_URL ?? defaultSmnCapUrl(now), now);
   const optionalPromise = Promise.all([
     waterMlSource(env.INA_WATERML_PARANA_URL ?? defaultWaterMl('30'), 'ina-waterml-parana', 'INA WaterML · Río Paraná, Santa Fe', now),
     waterMlSource(env.INA_WATERML_SALADO_URL ?? defaultWaterMl('3044'), 'ina-waterml-salado', 'INA WaterML · Río Salado, Santo Tomé', now),
@@ -636,14 +642,14 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
       thresholds: primary.thresholds,
     }),
     rain: Object.freeze({
-      available: nasa?.connected === true,
+      available: false,
       dataStatus: nasa?.freshness ? dataStatusForFreshness(nasa.freshness) : 'UNAVAILABLE',
-      accumulated1hMm: 0,
-      accumulated24hMm: 0,
+      accumulated1hMm: null,
+      accumulated24hMm: null,
       forecast: nasa?.connected ? 'Estimación satelital suplementaria disponible; no se presenta como acumulado local ni pronóstico.' : 'No hay una muestra satelital local válida disponible.',
-      observedAt: nasa?.observedAt ?? now.toISOString(),
-      fetchedAt: nasa?.fetchedAt ?? now.toISOString(),
-      validUntil: nasa?.validUntil ?? now.toISOString(),
+      observedAt: nasa?.connected ? nasa.observedAt : unavailableSnapshot.rain.observedAt,
+      fetchedAt: nasa?.connected ? nasa.fetchedAt ?? nasa.lastCheckedAt ?? now.toISOString() : unavailableSnapshot.rain.fetchedAt,
+      validUntil: nasa?.connected ? nasa.validUntil : unavailableSnapshot.rain.validUntil,
       sourceId: 'nasa-gpm-imerg-early',
       points: Object.freeze([]),
     }),

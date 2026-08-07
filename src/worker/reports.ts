@@ -115,7 +115,8 @@ async function preparePhoto(file: File): Promise<{ bytes: Uint8Array; mime: stri
   const input = new Uint8Array(await file.arrayBuffer());
   const mime = signatureMime(input);
   if (!mime || mime !== file.type) throw new Error('INVALID_PHOTO_TYPE');
-  const sanitized = mime === 'image/jpeg' ? stripJpegMetadata(input) : input;
+  if (mime !== 'image/jpeg') throw new Error('PHOTO_REENCODING_REQUIRED');
+  const sanitized = stripJpegMetadata(input);
   if (sanitized.length > MAX_PHOTO_BYTES) throw new Error('INVALID_PHOTO_SIZE');
   return { bytes: sanitized, mime };
 }

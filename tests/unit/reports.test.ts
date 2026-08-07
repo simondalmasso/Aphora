@@ -128,6 +128,7 @@ const user: SessionPrincipal = { sessionId: 'session:user-one', sub: 'user:one',
 const other: SessionPrincipal = { ...user, sessionId: 'session:user-two', sub: 'user:two', email: 'two@example.org' };
 const operator: SessionPrincipal = { sessionId: 'session:operator-one', sub: 'operator:one', email: 'operator@example.org', role: 'VERIFIED_OPERATOR', expiresAt: user.expiresAt };
 const jpegBytes = () => Uint8Array.from([0xff, 0xd8, 0xff, 0xda, 0xff, 0xd9]).buffer;
+const pngBytes = () => Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]).buffer;
 const invalidBytes = () => Uint8Array.from([1, 2, 3]).buffer;
 
 function request(idempotencyKey = 'report:key-1', files: File[] = [], extra?: Record<string, unknown>) {
@@ -207,6 +208,7 @@ describe('report workflow', () => {
   it('rejects too many photos, MIME mismatches and oversized multipart bodies', async () => {
     const db = new FakeDb(); const kv = new FakeKV();
     await expect(createReport(request('report:bad', [new File([invalidBytes()], 'fake.jpg', { type: 'image/jpeg' })]), { MESSAGES_DB: db, REPORTS_KV: kv }, user, 'network:one')).rejects.toThrow('INVALID_PHOTO_TYPE');
+    await expect(createReport(request('report:png', [new File([pngBytes()], 'raw.png', { type: 'image/png' })]), { MESSAGES_DB: db, REPORTS_KV: kv }, user, 'network:one')).rejects.toThrow('PHOTO_REENCODING_REQUIRED');
     const jpeg = new File([jpegBytes()], 'ok.jpg', { type: 'image/jpeg' });
     await expect(createReport(request('report:many', [jpeg, jpeg, jpeg]), { MESSAGES_DB: db, REPORTS_KV: kv }, user, 'network:one')).rejects.toThrow('TOO_MANY_PHOTOS');
     const huge = new Request('https://sos-sf.test/api/private/reports', { method: 'POST', headers: { 'Content-Type': 'multipart/form-data; boundary=x', 'Content-Length': String(10 * 1024 * 1024) }, body: '--x--' });

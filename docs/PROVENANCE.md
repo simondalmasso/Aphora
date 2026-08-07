@@ -1,9 +1,9 @@
 # Provenance
 
-Orden activa: `SOS-SF-OWNER-GLOBAL-PUBLIC-SAFETY-REFOUNDATION-015`.
+Orden de cierre técnico vigente: `SOS-SF-AUD-FULL-CODEBASE-REVIEW-AND-END-TO-END-CLOSE-020`.
 
-La fuente canónica es la rama `arq/visual-dashboard-v3`. El producto conserva un archivo `public/source-provenance.json` que identifica orden, hash determinista del árbol de producto, cantidad de archivos y run de deployment. La verificación posterior compara el mismo hash entre GitHub y Cloudflare.
+La fuente canónica es `arq/visual-dashboard-v3`. `public/source-provenance.json` identifica la orden, el hash determinista del árbol operativo, cantidad de archivos y run de deployment. La verificación remota recalcula ese hash y lo compara con el asset servido por Cloudflare.
 
-La matriz de fuentes publica organismo, feed, última consulta, última observación, vigencia, clasificación, función, limitaciones y enlace oficial. Las páginas humanas se registran como canales de verificación, no como feeds automáticos.
+La matriz de fuentes registra organismo, feed, endpoint o familia, consulta, observación, antigüedad, clasificación, función, limitaciones y prueba de esquema. Dos transportes del mismo organismo no son corroboración independiente.
 
-Los artefactos de CI contienen screenshots, matrices, resultados de accesibilidad, performance, pruebas, deployment y terminal. No deben contener secretos, cookies, account IDs completos ni datos personales.
+Los artifacts de CI contienen inventarios, hallazgos, tests, fuentes reales, screenshots con aserciones semánticas y hashes, estado Cloudflare, workflows y drift. Nunca contienen secrets, cookies, tokens, valores privados, datos personales ni exports D1/KV.

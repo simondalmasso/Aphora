@@ -13,7 +13,7 @@ export function SituationSummary({ snapshot }: { readonly snapshot: Snapshot }) 
   return <section className="territory-section" aria-labelledby="territory-title">
     <header className="compact-section-heading">
       <div><p className="section-kicker">Contexto territorial</p><h2 id="territory-title">Dos sistemas, una lectura clara</h2></div>
-      <span>{snapshot.rain.available ? `${snapshot.rain.accumulated24hMm.toFixed(1).replace('.', ',')} mm / 24 h` : 'Lluvia local no disponible'}</span>
+      <span>{snapshot.rain.available && snapshot.rain.accumulated24hMm !== null ? `${snapshot.rain.accumulated24hMm.toFixed(1).replace('.', ',')} mm / 24 h` : 'Lluvia local no disponible'}</span>
     </header>
     <div className="territory-schematic" role="img" aria-label="Esquema compacto de las estaciones Paraná y Salado">
       <svg viewBox="0 0 520 116" aria-hidden="true">

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookie, readSession, securityTokenHash, validateGoogleClaims, verifyGoogleIdToken, type GoogleClaims } from '../../src/worker/auth';
+import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookie, readSession, resetGoogleJwksCacheForTests, securityTokenHash, validateGoogleClaims, verifyGoogleIdToken, type GoogleClaims } from '../../src/worker/auth';
 
 const clientId = 'client.apps.googleusercontent.com';
 const now = Date.parse('2026-08-02T15:00:00.000Z');
@@ -24,7 +24,7 @@ beforeAll(async () => {
   publicJwk = await crypto.subtle.exportKey('jwk', pair.publicKey);
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { resetGoogleJwksCacheForTests(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('direct Google identity and own sessions', () => {
   it('rejects invalid issuer, audience, authorized party, expiry and unverified email', () => {
@@ -40,9 +40,23 @@ describe('direct Google identity and own sessions', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ keys: [{ ...publicJwk, kid: 'test-key', use: 'sig' }] }), { status: 200 })));
     const token = await tokenFor(claims);
     await expect(verifyGoogleIdToken(token, clientId, now)).resolves.toMatchObject({ sub: claims.sub, email_verified: true });
+    await expect(verifyGoogleIdToken(token, clientId, now + 1)).resolves.toMatchObject({ sub: claims.sub });
     const parts = token.split('.');
     const tampered = `${parts[0]}.${base64Url(Buffer.from(JSON.stringify({ ...claims, sub: '9999999999' })))}.${parts[2]}`;
     await expect(verifyGoogleIdToken(tampered, clientId, now)).rejects.toThrow('GOOGLE_SIGNATURE_INVALID');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+
+  it('times out a stalled Google JWK request', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason ?? new Error('aborted')), { once: true });
+    })));
+    const token = await tokenFor(claims);
+    const verification = verifyGoogleIdToken(token, clientId, now);
+    await vi.advanceTimersByTimeAsync(5_001);
+    await expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');
   });
 
   it('creates signed finite HttpOnly sessions with unique identity and server-side role', async () => {

@@ -4,6 +4,11 @@ const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.
 const SESSION_COOKIE = '__Host-sos_sf_session';
 const CSRF_COOKIE = '__Host-sos_sf_csrf';
 const SESSION_MS = 8 * 60 * 60 * 1000;
+const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
+const GOOGLE_JWKS_TIMEOUT_MS = 5_000;
+const GOOGLE_JWKS_CACHE_MS = 5 * 60_000;
+let googleJwksCache: { readonly expiresAt: number; readonly keys: readonly GoogleJwk[] } | null = null;
+let googleJwksInFlight: Promise<readonly GoogleJwk[]> | null = null;
 
 export interface GoogleClaims { readonly iss: string; readonly aud: string | readonly string[]; readonly azp?: string; readonly sub: string; readonly exp: number; readonly iat?: number; readonly email: string; readonly email_verified: boolean; readonly name?: string }
 interface GoogleJwk extends JsonWebKey { readonly kid?: string; readonly use?: string }
@@ -32,15 +37,45 @@ export function validateGoogleClaims(value: unknown, clientId: string, nowMs: nu
   return claims as unknown as GoogleClaims;
 }
 
+
+async function googleSigningKeys(nowMs: number): Promise<readonly GoogleJwk[]> {
+  if (googleJwksCache && googleJwksCache.expiresAt > nowMs) return googleJwksCache.keys;
+  if (googleJwksInFlight) return googleJwksInFlight;
+  const operation = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error('GOOGLE_JWKS_TIMEOUT')), GOOGLE_JWKS_TIMEOUT_MS);
+    try {
+      const response = await fetch(GOOGLE_JWKS_URL, { signal: controller.signal, headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('GOOGLE_JWKS_UNAVAILABLE');
+      const payload = await response.json() as { keys?: unknown };
+      if (!Array.isArray(payload.keys)) throw new Error('GOOGLE_JWKS_INVALID');
+      const keys = Object.freeze(payload.keys.filter((key): key is GoogleJwk => typeof key === 'object' && key !== null));
+      if (!keys.length) throw new Error('GOOGLE_JWKS_INVALID');
+      googleJwksCache = Object.freeze({ expiresAt: nowMs + GOOGLE_JWKS_CACHE_MS, keys });
+      return keys;
+    } catch (error) {
+      if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  })().finally(() => { googleJwksInFlight = null; });
+  googleJwksInFlight = operation;
+  return operation;
+}
+
+export function resetGoogleJwksCacheForTests(): void {
+  googleJwksCache = null;
+  googleJwksInFlight = null;
+}
+
 export async function verifyGoogleIdToken(token: string, clientId: string, nowMs = Date.now()): Promise<GoogleClaims> {
   if (token.length > 16_000) throw new Error('GOOGLE_TOKEN_TOO_LARGE');
   const parts = token.split('.'); if (parts.length !== 3) throw new Error('GOOGLE_TOKEN_INVALID');
   const header = parsePart<{ alg?: unknown; kid?: unknown }>(parts[0]!);
   if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new Error('GOOGLE_TOKEN_ALGORITHM_INVALID');
-  const jwksResponse = await fetch('https://www.googleapis.com/oauth2/v3/certs', { headers: { Accept: 'application/json' } });
-  if (!jwksResponse.ok) throw new Error('GOOGLE_JWKS_UNAVAILABLE');
-  const jwks = await jwksResponse.json() as { keys?: GoogleJwk[] };
-  const jwk = jwks.keys?.find((key) => key.kid === header.kid && key.kty === 'RSA' && key.use === 'sig');
+  const jwks = await googleSigningKeys(nowMs);
+  const jwk = jwks.find((key) => key.kid === header.kid && key.kty === 'RSA' && key.use === 'sig');
   if (!jwk) throw new Error('GOOGLE_SIGNING_KEY_UNKNOWN');
   const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
   const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, base64UrlToBytes(parts[2]!), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));

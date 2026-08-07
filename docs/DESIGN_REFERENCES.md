@@ -1,6 +1,6 @@
-# SOS-SF 019 — research and design matrix
+# Referencias de diseño hidrométrico
 
-Order: `SOS-SF-AUD-ROAST-HYDROMETRIC-FIRST-019`
+Origen: orden 019; revalidado durante el cierre 020.
 
 This matrix records the product patterns reviewed before implementation. It does not claim that third-party models are official local measurements.
 

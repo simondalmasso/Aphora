@@ -165,8 +165,8 @@ export interface Snapshot {
   readonly rain: {
     readonly available?: boolean;
     readonly dataStatus?: DataStatus;
-    readonly accumulated1hMm: number;
-    readonly accumulated24hMm: number;
+    readonly accumulated1hMm: number | null;
+    readonly accumulated24hMm: number | null;
     readonly forecast: string;
     readonly observedAt: string;
     readonly fetchedAt: string;

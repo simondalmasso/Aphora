@@ -4,6 +4,7 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = Object.freeze({
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'accelerometer=(), ambient-light-sensor=(), autoplay=(), camera=(), display-capture=(), geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()',
   'Referrer-Policy': 'no-referrer',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
 });

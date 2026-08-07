@@ -44,6 +44,24 @@ describe('live hydrological aggregation', () => {
     expect(snapshot.sources.filter((source) => source.organizationId === 'ina')).toHaveLength(4);
     expect(snapshot.sources.find((source) => source.id === 'smn-observations')).toMatchObject({ classification: 'BLOCKED_CREDENTIAL', connected: false });
     expect(snapshot.sources.find((source) => source.id === 'ports-hydrometers')).toMatchObject({ classification: 'BLOCKED_NO_MACHINE_ENDPOINT', connected: false });
+    expect(snapshot.sources.find((source) => source.id === 'nasa-gpm-imerg-early')).toMatchObject({ official: false, classification: 'SUPPLEMENTARY', determinesPrimaryState: false });
+    expect(snapshot.rain).toMatchObject({ available: false, accumulated1hMm: null, accumulated24hMm: null });
+  });
+
+
+  it('returns UNKNOWN when a normal current system is mixed with an obsolete system', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const id = seriesId(input);
+      if (id === '30') return json(points(Number(id), [['2026-08-03T12:00:00.000Z', 3.1], ['2026-08-03T18:00:00.000Z', 3.2]]));
+      if (id === '3044') return json(points(Number(id), [['2026-08-01T12:00:00.000Z', 4.7], ['2026-08-01T18:00:00.000Z', 4.8]]));
+      if (String(input).includes('/identify')) return json({ observedAt: '2026-08-03T17:30:00.000Z', value: 0 });
+      throw new Error(`unexpected URL ${String(input)}`);
+    }) as typeof fetch;
+    const snapshot = await buildLiveSnapshot({}, new Date('2026-08-03T18:00:00.000Z'));
+    expect(snapshot.systems?.[0]?.freshness).toBe('ACTUALIZADO');
+    expect(snapshot.systems?.[1]?.freshness).toBe('DESACTUALIZADO');
+    expect(snapshot.state).toBe('UNKNOWN');
+    expect(snapshot.stateLabel).toContain('medición vigente suficiente');
   });
 
   it('does not convert an evacuation threshold into an official evacuation order', async () => {

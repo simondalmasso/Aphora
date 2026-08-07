@@ -18,7 +18,7 @@ class MemoryCache {
 }
 
 const originalFetch = globalThis.fetch;
-afterEach(() => { globalThis.fetch = originalFetch; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { globalThis.fetch = originalFetch; vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('bounded provider transport', () => {
   it('rejects non-allowlisted host or path before network access', async () => {
@@ -36,6 +36,31 @@ describe('bounded provider transport', () => {
     const result = await fetchProvider('https://provider.example.org/api/values', policy, () => ({ value: {}, observedAt: new Date().toISOString() }));
     expect(result.status).toBe('UNAVAILABLE');
     expect(result.errorClass).toBe('BODY_TOO_LARGE');
+  });
+
+
+  it('refetches after refreshMs even while the cached observation remains fresh', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-03T18:00:00.000Z'));
+    const cache = new MemoryCache();
+    vi.stubGlobal('caches', { default: cache });
+    const observedAt = '2026-08-03T17:00:00.000Z';
+    const fetchMock = vi.fn(async () => new Response('{"value":1}', { headers: { 'Content-Type': 'application/json' } }));
+    globalThis.fetch = fetchMock as typeof fetch;
+    const refreshPolicy: ProviderPolicy = { ...policy, refreshMs: 5 * 60_000, freshMs: 36 * 60 * 60_000 };
+    const parse = () => ({ value: { ok: true }, observedAt });
+
+    const first = await fetchProvider('https://provider.example.org/api/values', refreshPolicy, parse);
+    vi.advanceTimersByTime(4 * 60_000);
+    const second = await fetchProvider('https://provider.example.org/api/values', refreshPolicy, parse);
+    vi.advanceTimersByTime(2 * 60_000);
+    const third = await fetchProvider('https://provider.example.org/api/values', refreshPolicy, parse);
+
+    expect(first.fromCache).toBe(false);
+    expect(second.fromCache).toBe(true);
+    expect(second.status).toBe('FRESH');
+    expect(third.fromCache).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('opens the circuit after repeated provider failures', async () => {

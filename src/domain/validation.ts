@@ -20,6 +20,17 @@ function finite(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) throw new TypeError(`${label} debe ser finito`);
   return value;
 }
+function finiteOrNull(value: unknown, label: string): number | null {
+  if (value === null) return null;
+  return finite(value, label);
+}
+function httpsUrl(value: unknown, label: string): string {
+  const result = text(value, label, 1000);
+  let parsed: URL;
+  try { parsed = new URL(result); } catch { throw new TypeError(`${label} debe ser una URL HTTPS válida`); }
+  if (parsed.protocol !== 'https:') throw new TypeError(`${label} debe usar HTTPS`);
+  return result;
+}
 function points(value: unknown, label: string): readonly RiverPoint[] {
   if (!Array.isArray(value)) throw new TypeError(`${label} debe ser un arreglo`);
   let previous = -Infinity;
@@ -72,6 +83,7 @@ function source(value: unknown, index: number): Source {
   if (!['OFFICIAL_OBSERVATION', 'OFFICIAL_ALERT', 'FORECAST_MODEL', 'SATELLITE_OBSERVATION', 'COMMUNITY_REPORT', 'INTERNAL_DERIVATION', 'DEMO_FIXTURE'].includes(String(row.kind))) throw new TypeError(`snapshot.sources[${index}].kind inválido`);
   if (!['FRESH', 'STALE', 'UNAVAILABLE', 'UNKNOWN'].includes(String(row.status))) throw new TypeError(`snapshot.sources[${index}].status inválido`);
   iso(row.observedAt, `snapshot.sources[${index}].observedAt`); iso(row.validUntil, `snapshot.sources[${index}].validUntil`); text(row.contribution, `snapshot.sources[${index}].contribution`, 1000);
+  if (row.url !== undefined) httpsUrl(row.url, `snapshot.timeline[${index}].url`);
   if (typeof row.official !== 'boolean') throw new TypeError(`snapshot.sources[${index}].official inválido`);
   if (row.connected !== undefined && typeof row.connected !== 'boolean') throw new TypeError(`snapshot.sources[${index}].connected inválido`);
   if (row.organizationId !== undefined) text(row.organizationId, `snapshot.sources[${index}].organizationId`, 160);
@@ -91,14 +103,15 @@ function organization(value: unknown, index: number): SourceOrganization {
   const row = plain(value, `snapshot.sourceOrganizations[${index}]`);
   text(row.id, `snapshot.sourceOrganizations[${index}].id`, 160);
   text(row.name, `snapshot.sourceOrganizations[${index}].name`, 240);
-  text(row.url, `snapshot.sourceOrganizations[${index}].url`, 1000);
+  httpsUrl(row.url, `snapshot.sourceOrganizations[${index}].url`);
   if (row.official !== true) throw new TypeError(`snapshot.sourceOrganizations[${index}].official inválido`);
   return value as SourceOrganization;
 }
 
 function officialAlert(value: unknown, index: number): OfficialAlert {
   const row = plain(value, `snapshot.alerts[${index}]`);
-  for (const field of ['identifier','sender','status','messageType','scope','category','event','urgency','severity','certainty','headline','description','instruction','area','sourceUrl'] as const) text(row[field], `snapshot.alerts[${index}].${field}`, field === 'description' || field === 'instruction' ? 2000 : 1000);
+  for (const field of ['identifier','sender','status','messageType','scope','category','event','urgency','severity','certainty','headline','description','instruction','area'] as const) text(row[field], `snapshot.alerts[${index}].${field}`, field === 'description' || field === 'instruction' ? 2000 : 1000);
+  httpsUrl(row.sourceUrl, `snapshot.alerts[${index}].sourceUrl`);
   iso(row.sent, `snapshot.alerts[${index}].sent`);
   for (const field of ['effective','onset','expires'] as const) if (row[field] !== null) iso(row[field], `snapshot.alerts[${index}].${field}`);
   if (!['ACTIVE','UPDATED','CANCELLED','EXPIRED','UNKNOWN'].includes(String(row.lifecycle))) throw new TypeError(`snapshot.alerts[${index}].lifecycle inválido`);
@@ -114,6 +127,7 @@ function timelineEvent(value: unknown, index: number): TimelineEvent {
   text(row.title, `snapshot.timeline[${index}].title`, 500);
   text(row.detail, `snapshot.timeline[${index}].detail`, 2000);
   text(row.sourceId, `snapshot.timeline[${index}].sourceId`, 160);
+  if (row.url !== undefined) httpsUrl(row.url, `snapshot.timeline[${index}].url`);
   if (typeof row.official !== 'boolean') throw new TypeError(`snapshot.timeline[${index}].official inválido`);
   return value as TimelineEvent;
 }
@@ -193,7 +207,8 @@ export function validateSnapshot(value: unknown): Snapshot {
   if (river.available === true && !sourceIds.has(String(river.sourceId))) throw new TypeError('snapshot.river.sourceId no corresponde a una fuente');
 
   const rain = plain(record.rain, 'snapshot.rain');
-  finite(rain.accumulated1hMm, 'snapshot.rain.accumulated1hMm'); finite(rain.accumulated24hMm, 'snapshot.rain.accumulated24hMm'); text(rain.forecast, 'snapshot.rain.forecast', 1000); iso(rain.observedAt, 'snapshot.rain.observedAt'); iso(rain.fetchedAt, 'snapshot.rain.fetchedAt'); iso(rain.validUntil, 'snapshot.rain.validUntil'); text(rain.sourceId, 'snapshot.rain.sourceId', 160);
+  finiteOrNull(rain.accumulated1hMm, 'snapshot.rain.accumulated1hMm'); finiteOrNull(rain.accumulated24hMm, 'snapshot.rain.accumulated24hMm'); text(rain.forecast, 'snapshot.rain.forecast', 1000); iso(rain.observedAt, 'snapshot.rain.observedAt'); iso(rain.fetchedAt, 'snapshot.rain.fetchedAt'); iso(rain.validUntil, 'snapshot.rain.validUntil'); text(rain.sourceId, 'snapshot.rain.sourceId', 160);
+  if (rain.available === true && (rain.accumulated1hMm === null || rain.accumulated24hMm === null)) throw new TypeError('snapshot.rain disponible sin acumulados');
   if (!Array.isArray(rain.points)) throw new TypeError('snapshot.rain.points debe ser un arreglo');
   for (const field of ['changes', 'contradictions', 'shelters', 'actions', 'messages'] as const) if (!Array.isArray(record[field])) throw new TypeError(`snapshot.${field} debe ser un arreglo`);
   (record.messages as unknown[]).forEach(validateCriticalMessage);

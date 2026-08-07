@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function DashboardPage(props: Props) {
-  return <main id="main" className="dashboard">
+  return <main id="main" className="dashboard" data-snapshot-id={props.snapshot.id}>
     <VerifiedAlertBanner snapshot={props.snapshot} onOpen={props.onAlerts}/>
     <HydrometricMonitoring
       snapshot={props.snapshot}

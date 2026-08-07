@@ -8,15 +8,14 @@ describe('hydrometric-first progressive rendering', () => {
   it('renders hydrometric status first, four primary sections, emergency channels and no decorative canvas', () => {
     const html = renderToStaticMarkup(<DashboardPage
       snapshot={unavailableSnapshot}
-      refreshing={false}
-      refreshError={null}
       sourcesButtonRef={createRef<HTMLButtonElement>()}
       reportButtonRef={createRef<HTMLButtonElement>()}
       onSources={() => undefined}
+      onAlerts={() => undefined}
       onReport={() => undefined}
     />);
 
-    expect(html).toMatch(/^<main id="main" class="dashboard"><section class="hydrometric-section"/);
+    expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section"/);
     expect(html).toContain('data-testid="hydrometric-situation"');
     expect(html).toContain('Situación hidrométrica');
     expect(html).toContain('Ríos de Santa Fe');

@@ -8,6 +8,6 @@
 - La ausencia de alertas sólo se comunica con el feed relevante vigente.
 - El modo offline no afirma actualización ni ausencia de alertas.
 
-La lectura pública no requiere cuenta. Las funciones privadas usan CSP, CSRF, cookies seguras, autorización por sesión y rol, respuestas `private, no-store`, rate limits e idempotencia. Las fotos de reportes se guardan como binario privado en Workers KV Free con metadata y TTL; D1 conserva la metadata y auditoría. El agotamiento de cuota falla cerrado y nunca sugiere un upgrade.
+La lectura pública no requiere cuenta. Las funciones privadas usan CSP, CSRF, cookies seguras, autorización por sesión y rol, respuestas `private, no-store`, rate limits e idempotencia. Las fotos se recodifican a JPEG, se les elimina metadata y se guardan como binario privado en Workers KV Free con metadata de control y TTL; D1 conserva la metadata y auditoría. El agotamiento de cuota falla cerrado y nunca sugiere un upgrade.
 
 La ubicación exacta sólo se incluye con consentimiento explícito en un reporte. Un reporte ciudadano queda separado de alertas y observaciones instrumentales, pasa por revisión y no modifica automáticamente el estado público.

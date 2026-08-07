@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import type { Snapshot, Source } from '../../src/domain/snapshot';
 
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
@@ -130,6 +131,7 @@ const sources: Source[] = [
     feedName: 'GPM IMERG Early · estimación satelital',
     classification: 'SUPPLEMENTARY',
     determinesPrimaryState: false,
+    official: false,
   }),
 ];
 
@@ -159,7 +161,7 @@ const activeAlert = {
 
 const baseSnapshot: Snapshot = {
   schemaVersion: '1.0',
-  id: 'roast-019-live',
+  id: 'order-020-live',
   mode: 'LIVE',
   dataStatus: 'STALE',
   freshness: 'ACTUALIZACION_DEMORADA',
@@ -205,8 +207,8 @@ const baseSnapshot: Snapshot = {
   rain: {
     available: false,
     dataStatus: 'UNAVAILABLE',
-    accumulated1hMm: 0,
-    accumulated24hMm: 0,
+    accumulated1hMm: null,
+    accumulated24hMm: null,
     forecast: 'Sin muestra válida.',
     observedAt: generatedAt,
     fetchedAt: generatedAt,
@@ -239,13 +241,23 @@ async function mockPublicApi(page: Page, snapshot: Snapshot = baseSnapshot) {
   await page.route('**/api/session*', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
 }
 
+async function expectSnapshot(page: Page, snapshot: Snapshot): Promise<void> {
+  await expect(page.locator('main')).toHaveAttribute('data-snapshot-id', snapshot.id);
+  await expect(page.getByTestId('hydrometric-situation')).toBeVisible();
+}
+
+async function screenshotSha256(path: string): Promise<string> {
+  return createHash('sha256').update(await readFile(path)).digest('hex');
+}
+
+
 test.beforeAll(async () => {
   await mkdir(`${evidenceDir}/screenshots`, { recursive: true });
-  await writeFile(`${evidenceDir}/roast-019-scenario.json`, `${JSON.stringify({
-    order: 'SOS-SF-AUD-ROAST-HYDROMETRIC-FIRST-019',
+  await writeFile(`${evidenceDir}/order-020-scenario.json`, `${JSON.stringify({
+    order: 'SOS-SF-AUD-FULL-CODEBASE-REVIEW-AND-END-TO-END-CLOSE-020',
     generatedAt,
     viewports: ['390x844', '768x1024', '1440x900'],
-    states: ['LIVE', 'STALE', 'ALERTS_UNVERIFIED', 'OFFLINE'],
+    states: ['LIVE', 'STALE', 'ALERT_ACTIVE', 'ALERTS_UNVERIFIED', 'OFFLINE'],
   }, null, 2)}\n`);
 });
 
@@ -380,9 +392,10 @@ test('offline keeps the cached hydrometric surface and signals connection state'
   await expect(page.getByTestId('hydro-current-level')).toContainText('3,22');
 });
 
-test('captures required visual states and writes the comparison manifest', async ({ page }, testInfo) => {
+test('captures required visual states with unique hashes and verified semantics', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One deterministic evidence pass is sufficient.');
   const screenshots = `${evidenceDir}/screenshots`;
+  const manifest: Record<string, { readonly sha256: string; readonly snapshotId: string; readonly semantic: string }> = {};
 
   for (const viewport of [
     { width: 390, height: 844, name: 'after-390x844' },
@@ -392,42 +405,99 @@ test('captures required visual states and writes the comparison manifest', async
     await mockPublicApi(page);
     await page.setViewportSize(viewport);
     await page.goto('/');
-    await page.screenshot({ path: `${screenshots}/${viewport.name}.png`, fullPage: true });
+    await expectSnapshot(page, baseSnapshot);
+    const path = `${screenshots}/${viewport.name}.png`;
+    await page.screenshot({ path, fullPage: true });
+    manifest[viewport.name] = { sha256: await screenshotSha256(path), snapshotId: baseSnapshot.id, semantic: 'LIVE_HYDROMETRIC_FIRST' };
     await page.unrouteAll({ behavior: 'wait' });
   }
 
-  const stale = snapshotWith({
-    id: 'roast-019-stale',
-    systems: [{ ...systems[0], freshness: 'DESACTUALIZADO', dataStatus: 'STALE', observedAt: '2026-08-05T04:30:00.000Z', points: points(2.988, '2026-08-05T04:30:00.000Z') }, systems[1]],
-  });
-  await mockPublicApi(page, stale);
+  await mockPublicApi(page, baseSnapshot);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await page.screenshot({ path: `${screenshots}/state-stale.png`, fullPage: true });
+  await expectSnapshot(page, baseSnapshot);
+  await expect(page.getByTestId('hydro-current-level')).toContainText('3,22');
+  const livePath = `${screenshots}/state-live.png`;
+  await page.screenshot({ path: livePath, fullPage: true });
+  manifest['state-live'] = { sha256: await screenshotSha256(livePath), snapshotId: baseSnapshot.id, semantic: 'LIVE_VALUE_AND_CHART' };
   await page.unrouteAll({ behavior: 'wait' });
 
-  const active = snapshotWith({ id: 'roast-019-active-alert', alertStatus: 'ALERTA_OFICIAL_ACTIVA', alerts: [activeAlert] });
+  const staleObservedAt = '2026-08-05T04:30:00.000Z';
+  const staleSystem = {
+    ...systems[0],
+    freshness: 'DESACTUALIZADO' as const,
+    dataStatus: 'STALE' as const,
+    observedAt: staleObservedAt,
+    fetchedAt: '2026-08-06T04:25:00.000Z',
+    validUntil: '2026-08-05T10:30:00.000Z',
+    points: points(2.988, staleObservedAt),
+  };
+  const stale = snapshotWith({
+    id: 'order-020-stale',
+    dataStatus: 'STALE',
+    freshness: 'DESACTUALIZADO',
+    state: 'UNKNOWN',
+    stateLabel: 'No hay una medición vigente suficiente para clasificar el nivel',
+    systems: [staleSystem, systems[1]],
+    river: { ...baseSnapshot.river, dataStatus: 'STALE', observedAt: staleObservedAt, fetchedAt: staleSystem.fetchedAt, validUntil: staleSystem.validUntil, points: staleSystem.points },
+  });
+  await mockPublicApi(page, stale);
+  await page.goto('/');
+  await expectSnapshot(page, stale);
+  await expect(page.getByText(/Desactualizada/).first()).toBeVisible();
+  await expect(page.getByTestId('hydro-current-level')).toContainText('3,22');
+  await expect(page.getByTestId('main-hydro-chart')).toBeVisible();
+  const stalePath = `${screenshots}/state-stale.png`;
+  await page.screenshot({ path: stalePath, fullPage: true });
+  manifest['state-stale'] = { sha256: await screenshotSha256(stalePath), snapshotId: stale.id, semantic: 'STALE_VALUE_AND_CHART_PRESERVED' };
+  await page.unrouteAll({ behavior: 'wait' });
+
+  const active = snapshotWith({ id: 'order-020-active-alert', alertStatus: 'ALERTA_OFICIAL_ACTIVA', alerts: [activeAlert], recommendedAction: activeAlert.instruction });
   await mockPublicApi(page, active);
   await page.goto('/');
-  await page.screenshot({ path: `${screenshots}/state-active-alert.png`, fullPage: true });
+  await expectSnapshot(page, active);
+  await expect(page.locator('.verified-alert-banner')).toContainText('Alerta oficial vigente');
+  await expect(page.locator('.verified-alert-banner')).toContainText(activeAlert.headline);
+  const activePath = `${screenshots}/state-active-alert.png`;
+  await page.screenshot({ path: activePath, fullPage: true });
+  manifest['state-active-alert'] = { sha256: await screenshotSha256(activePath), snapshotId: active.id, semantic: 'VERIFIED_ACTIVE_ALERT_BAND' };
   await page.unrouteAll({ behavior: 'wait' });
 
   await mockPublicApi(page, baseSnapshot);
   await page.goto('/');
-  await page.screenshot({ path: `${screenshots}/state-alerts-unverified.png`, fullPage: true });
+  await expectSnapshot(page, baseSnapshot);
+  await expect(page.getByRole('button', { name: 'Alertas: sin verificar' })).toBeVisible();
+  await expect(page.locator('.verified-alert-banner')).toHaveCount(0);
+  const unverifiedPath = `${screenshots}/state-alerts-unverified.png`;
+  await page.screenshot({ path: unverifiedPath, fullPage: true });
+  manifest['state-alerts-unverified'] = { sha256: await screenshotSha256(unverifiedPath), snapshotId: baseSnapshot.id, semantic: 'HEADER_BADGE_ONLY' };
+  await page.unrouteAll({ behavior: 'wait' });
 
+  const semanticHashes = [manifest['state-stale']!.sha256, manifest['state-active-alert']!.sha256, manifest['state-alerts-unverified']!.sha256];
+  expect(new Set(semanticHashes).size).toBe(3);
+
+  await page.addInitScript(({ key, value }) => {
+    localStorage.setItem(key, value);
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+  }, { key: storageKey, value: JSON.stringify({ snapshot: baseSnapshot, savedAt: generatedAt }) });
+  await page.route('**/api/**', (route) => route.abort());
+  await page.goto('/');
+  await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
+  await expectSnapshot(page, baseSnapshot);
+  const offlinePath = `${screenshots}/state-offline.png`;
+  await page.screenshot({ path: offlinePath, fullPage: true });
+  manifest['state-offline'] = { sha256: await screenshotSha256(offlinePath), snapshotId: baseSnapshot.id, semantic: 'OFFLINE_CACHED_HYDROMETRY' };
+
+  await writeFile(`${evidenceDir}/state-screenshot-manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   await writeFile(`${evidenceDir}/ROAST_BEFORE_AFTER.md`, [
-    '# SOS-SF 019 — comparison',
+    '# SOS-SF 020 — comparación y evidencia semántica',
     '',
-    '| Owner-rejected baseline | Hydrometric-first rebuild |',
+    '| Base rechazada por el owner | Cierre hidrométrico 020 |',
     '|---|---|',
     '| `before-owner-rejected.png` | `screenshots/after-390x844.png` |',
     '',
-    '## ROAST',
-    '',
-    '- Before: alerts and defensive text preceded the river state; the graph arrived late; six visually similar blocks produced excessive scroll.',
-    '- After: station selector, level, freshness, trend, 24-hour change, timestamp, source receipt and graph occupy the first mobile viewport.',
-    '- Remaining acceptance is reserved to AUD and the owner.',
+    'Los estados LIVE, STALE, ALERT_ACTIVE, ALERTS_UNVERIFIED y OFFLINE fueron renderizados con snapshots identificables, aserciones semánticas previas y hashes individuales.',
+    'La aceptación queda reservada a AUD y al owner.',
     '',
   ].join('\n'));
 });

@@ -8,7 +8,7 @@ La bandeja pública está siempre abierta, es sólo lectura y muestra hasta cinc
 
 La V1 implementa una conversación por usuario autenticado con el equipo SOS, lista acotada para operadores verificados, páginas de hasta 40 mensajes y polling cada 15 segundos. Acepta sólo texto de 1–800 caracteres. No admite archivos, audio, ubicación, grupos, reacciones, presencia, typing indicators, perfiles sociales ni descubrimiento de personas.
 
-Google Identity Services entrega un ID token que el Worker verifica por firma RS256/JWK, issuer, audience, expiración, `sub` y `email_verified`. La identidad estable es `sub`; el email sólo decide server-side la allowlist de operadores y nunca sale en respuestas públicas. La sesión propia es `HttpOnly`, `Secure`, `SameSite=Lax`, dura ocho horas y se revoca con logout. Scopes: `openid email profile`; One Tap está deshabilitado.
+Google Identity Services entrega un ID token que el Worker verifica por firma RS256/JWK, issuer, audience, expiración, `sub` y `email_verified`. La identidad estable es `sub`; el email sólo decide server-side la allowlist de operadores y nunca sale en respuestas públicas. La sesión propia es `HttpOnly`, `Secure`, `SameSite=Strict`, dura ocho horas y se revoca con logout. Scopes: `openid email profile`; One Tap está deshabilitado.
 
 Cada endpoint privado autoriza la conversación. Los envíos requieren mismo origen, JSON exacto, clave de idempotencia, rate limit por identidad y hash de IP, TTL de 30 días y auditoría sin contenido. Estados: `DELIVERED_TO_SERVICE`, `READ_BY_OPERATOR`, `FAILED` o `UNKNOWN`; ninguno garantiza atención humana. Los mensajes de operadores se distinguen sólo cuando el rol fue derivado y firmado por el servidor.
 
