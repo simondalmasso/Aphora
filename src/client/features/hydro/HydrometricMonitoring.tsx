@@ -1,7 +1,7 @@
 import { useMemo, useState, type RefObject } from 'react';
 import type { HydrologicalSystem, Snapshot, Source } from '../../../domain/snapshot.ts';
 import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety.ts';
-import { HydroSeriesChart } from '../../components/ui/HydroSeriesChart.tsx';
+import { FreshnessBadge, HydrometricChart, HydrometricHero, SourceLine, StationSwitcher } from '../../components/civic/CivicSystem.tsx';
 
 const EMPTY_SYSTEMS: readonly HydrologicalSystem[] = Object.freeze([]);
 
@@ -65,65 +65,58 @@ export function HydrometricMonitoring({
   );
 
   return <section
+    id="situacion-hidrica"
     className="hydrometric-section"
     aria-labelledby="hydrometric-title"
     data-testid="hydrometric-situation"
   >
-    <header className="hydrometric-hero__header">
-      <div>
-        <p className="section-kicker">Situación hidrométrica</p>
-        <h1 id="hydrometric-title">Ríos de Santa Fe</h1>
-      </div>
-      {systems.length > 1 && <div className="station-selector" role="tablist" aria-label="Elegir estación hidrométrica">
-        {systems.map((system) => <button
-          key={system.id}
-          type="button"
-          role="tab"
-          aria-selected={system.id === selected?.id}
-          onClick={() => setSelectedId(system.id)}
-        >
-          {system.watercourse.replace('Río ', '')}
-        </button>)}
-      </div>}
-    </header>
-
-    {selected ? <article className="primary-station">
-      <div className="station-identification">
+    <HydrometricHero>
+      <header className="hydrometric-hero__header">
         <div>
-          <span>Estación {selected.stationName}</span>
-          <strong>{selected.watercourse}</strong>
+          <p className="section-kicker">Situación hidrométrica</p>
+          <h1 id="hydrometric-title">Ríos de Santa Fe</h1>
         </div>
-        <span className={`freshness-badge freshness-badge--${(selected.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}>
-          <i aria-hidden="true"/>{freshnessLabel(selected)} · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}
-        </span>
-      </div>
+        <StationSwitcher systems={systems} selectedId={selected?.id} onSelect={setSelectedId}/>
+      </header>
 
-      <div className="hydro-reading">
-        <div className="hydro-level">
-          <span>Nivel observado</span>
-          <strong data-testid="hydro-current-level">
-            {selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}
-            {selected.currentMetres !== null && <small>m</small>}
-          </strong>
-          <time dateTime={selected.observedAt ?? undefined}>{formatLocalDateTime(selected.observedAt)}</time>
+      {selected ? <article className="primary-station">
+        <div className="station-identification">
+          <div>
+            <span>Estación {selected.stationName}</span>
+            <strong>{selected.watercourse}</strong>
+          </div>
+          <FreshnessBadge
+            className={`freshness-badge--${(selected.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}
+            label={`${freshnessLabel(selected)} · ${formatHumanAge(selected.observedAt, snapshot.generatedAt)}`}
+          />
         </div>
-        <dl className="hydro-metrics">
-          <div><dt>Tendencia</dt><dd>{trendLabel(selected)}</dd></div>
-          <div><dt>Cambio 24 h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
-        </dl>
-      </div>
 
-      <div className="source-strip" data-testid="hydro-source-strip">
-        <span><b>{selectedSource?.organizationName ?? selected.sourceName}</b> · {sourceFamily(selectedSource, selected)}</span>
-        <span>Recibida {formatLocalDateTime(selected.fetchedAt)}</span>
-        <span>{corroboratingTransport ? `Mismo organismo · segundo transporte: ${corroboratingTransport.feedName ?? corroboratingTransport.name}` : 'Sin corroboración independiente'}</span>
-        {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
-        <button ref={sourcesButtonRef} type="button" onClick={(event) => onSources(event.currentTarget)}>Fuente</button>
-      </div>
+        <div className="hydro-reading">
+          <div className="hydro-level">
+            <span>Nivel observado</span>
+            <strong data-testid="hydro-current-level">
+              {selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}
+              {selected.currentMetres !== null && <small>m</small>}
+            </strong>
+            <time dateTime={selected.observedAt ?? undefined}>{formatLocalDateTime(selected.observedAt)}</time>
+          </div>
+          <dl className="hydro-metrics">
+            <div><dt>Tendencia</dt><dd>{trendLabel(selected)}</dd></div>
+            <div><dt>Cambio 24 h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
+          </dl>
+        </div>
 
-      {selected.available && selected.currentMetres !== null
-        ? <HydroSeriesChart system={selected} generatedAt={snapshot.generatedAt}/>
-        : <div className="data-caveat"><strong>Medición no disponible</strong><p>La estación no entregó una lectura utilizable.</p></div>}
-    </article> : <div className="data-caveat"><strong>Sin estaciones disponibles</strong><p>No se pudo construir la situación hidrométrica.</p></div>}
+        <SourceLine buttonRef={sourcesButtonRef} onOpen={onSources}>
+          <span><b>{selectedSource?.organizationName ?? selected.sourceName}</b> · {sourceFamily(selectedSource, selected)}</span>
+          <span>Recibida {formatLocalDateTime(selected.fetchedAt)}</span>
+          <span>{corroboratingTransport ? `Mismo organismo · segundo transporte: ${corroboratingTransport.feedName ?? corroboratingTransport.name}` : 'Sin corroboración independiente'}</span>
+          {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
+        </SourceLine>
+
+        {selected.available && selected.currentMetres !== null
+          ? <HydrometricChart system={selected} generatedAt={snapshot.generatedAt}/>
+          : <div className="data-caveat"><strong>Medición no disponible</strong><p>La estación no entregó una lectura utilizable.</p></div>}
+      </article> : <div className="data-caveat"><strong>Sin estaciones disponibles</strong><p>No se pudo construir la situación hidrométrica.</p></div>}
+    </HydrometricHero>
   </section>;
 }
