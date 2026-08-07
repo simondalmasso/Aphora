@@ -1,0 +1,23 @@
+{
+  "hosting": {
+    "target": "sos-sf",
+    "public": "firebase-alias-public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://sos-sf.simondalmasso44.workers.dev/",
+        "type": 302
+      },
+      {
+        "source": "/:path*",
+        "destination": "https://sos-sf.simondalmasso44.workers.dev/:path",
+        "type": 302
+      }
+    ]
+  }
+}
