@@ -1,0 +1,414 @@
+/* 021-HOVS — creative-direction layer. Preserves MUNI DNA; changes hierarchy, air, touch ergonomics and detail. */
+:root {
+  --hovs-section-gap: clamp(18px, 2vw, 30px);
+  --hovs-control-gap: 10px;
+  --hovs-mobile-gutter: 14px;
+  --hovs-rule: rgba(10, 39, 71, .17);
+}
+
+/* Composition: fewer nested boxes, stronger editorial relationships. */
+.dashboard {
+  padding-top: 18px;
+  padding-bottom: 34px;
+  gap: var(--hovs-section-gap);
+}
+.hydrometric-section {
+  padding: 20px 22px 22px;
+  border-top-width: 8px !important;
+  box-shadow: 0 16px 42px rgba(7, 28, 50, .09) !important;
+}
+.primary-station {
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--hovs-rule);
+}
+.hydrometric-hero__header { margin-bottom: 18px; }
+.hydrometric-hero__controls { display: flex; align-items: center; gap: 12px; }
+.hydro-refresh-button {
+  display: none;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--muni-navy-700);
+  background: #fff;
+  color: var(--muni-navy-900);
+  font-weight: 800;
+  cursor: pointer;
+}
+.hydro-reading {
+  grid-template-columns: minmax(290px, .92fr) minmax(300px, 1.08fr);
+  gap: 24px;
+  margin: 16px 0 18px;
+  align-items: stretch;
+}
+.hydro-level {
+  min-height: 150px;
+  padding: 18px 20px;
+  background: transparent;
+  border-left: 5px solid var(--muni-accent-600);
+}
+.hydro-level > span,
+.hydro-metrics dt {
+  font-size: .72rem;
+  letter-spacing: .105em;
+}
+.hydro-level strong {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: baseline;
+  white-space: nowrap;
+  font-size: clamp(4.6rem, 8vw, 7.25rem);
+  line-height: .88;
+  letter-spacing: -.065em;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.hydro-level strong small {
+  flex: none;
+  margin-left: .16em;
+  font-size: .25em;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.hydro-level time {
+  display: block;
+  margin-top: 16px;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+.hydro-metrics { gap: 12px; }
+.hydro-metrics div {
+  padding: 18px 20px;
+  border: 0;
+  border-top: 1px solid var(--hovs-rule);
+  background: transparent;
+}
+.hydro-metrics dd { font-size: clamp(1.25rem, 2vw, 1.65rem); }
+.source-strip {
+  min-height: 48px;
+  margin-bottom: 14px;
+  padding: 8px 0;
+  gap: 6px 18px;
+  border-width: 1px 0;
+  background: transparent;
+  font-size: .71rem;
+}
+.source-strip button { min-height: 40px; padding-inline: 14px; }
+.hydro-chart {
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--hovs-rule);
+  border-radius: 0;
+  background: #fff;
+}
+.hydro-chart__plot { fill: #f7fafb; }
+.hydro-chart__grid { stroke: rgba(10,39,71,.13); }
+.hydro-chart__axis-label, .hydro-chart__unit { fill: #5a6975; }
+.hydro-chart__line { stroke: var(--muni-navy-800); filter: none; }
+.hydro-chart__point { fill: #fff; stroke: var(--muni-accent-700); }
+.hydro-chart__meta { color: var(--text-secondary); }
+.hydro-chart__meta strong { color: var(--muni-navy-900); }
+
+.civic-discovery,
+.safety-actions,
+.source-transparency {
+  padding: 18px 0 0;
+  border-top: 1px solid var(--hovs-rule) !important;
+  border-bottom: 0 !important;
+  background: transparent;
+}
+.civic-discovery { gap: 16px 22px; }
+.civic-section-title,
+.compact-section-heading { margin-bottom: 14px; }
+.civic-section-title h2,
+.compact-section-heading h2 { font-size: clamp(1.1rem, 1.6vw, 1.4rem); }
+.civic-quick-grid { gap: 10px; }
+.civic-quick-tile {
+  min-height: 92px;
+  padding: 14px;
+  border: 0;
+}
+.civic-quick-tile span { font-size: .82rem; }
+.civic-campaign--compact { min-height: 150px; }
+.civic-campaign--compact .civic-campaign__copy { padding: 22px 24px; }
+.civic-campaign__copy a {
+  min-height: 44px;
+  align-items: center;
+  padding-block: 6px;
+  text-underline-offset: .25em;
+}
+.contact-grid { gap: 10px; }
+.contact-grid a {
+  min-height: 72px;
+  border-color: var(--muni-neutral-200);
+  background: #fff;
+}
+.contact-grid__primary { border-top: 4px solid #b42335 !important; }
+.secondary-actions { margin-top: 14px; }
+.secondary-actions summary { min-height: 44px; }
+.source-health-grid { gap: 10px; }
+.source-health-grid article {
+  padding: 13px 0;
+  border-width: 1px 0 0;
+  background: transparent;
+}
+.button { min-height: 44px; }
+
+/* Thematic surfaces: editorial rather than card stacks. */
+.civic-page { padding-top: 30px; padding-bottom: 48px; }
+.civic-page__intro { margin-bottom: 28px; }
+.civic-page-section { margin-top: 38px; }
+.official-source-badge { padding: 14px 0; border-width: 1px 0; background: transparent; }
+.el-nino-layout { gap: clamp(34px, 5vw, 72px); }
+.el-nino-content section { padding: 34px 0; }
+.el-nino-aside { padding: 18px 0; background: transparent; border-top-width: 5px; }
+.el-nino-aside a { min-height: 48px; display: flex; align-items: center; }
+.civic-faq summary { min-height: 52px; display: flex; align-items: center; }
+.civic-news-grid { gap: 18px; }
+.civic-news-grid article { padding: 18px 0; background: transparent; }
+.civic-news-grid article a { min-height: 44px; display: inline-flex; align-items: center; }
+.emergency-strip { padding: 14px 16px; gap: 10px 14px; }
+.emergency-strip a { min-height: 44px; display: inline-flex; align-items: center; padding-inline: 8px; }
+.civic-footer nav a { min-height: 36px; display: inline-flex; align-items: center; }
+
+/* Header: desktop keeps civic utility; mobile collapses to brand / trust / menu. */
+@media (min-width: 821px) {
+  .civic-header__main.header-inner { min-height: 68px; }
+  .civic-header .ui-icon-button { width: 44px; height: 44px; }
+}
+
+@media (max-width: 820px) {
+  html { scroll-padding-top: 72px; }
+  .civic-header__main.header-inner {
+    min-height: 68px;
+    padding: 8px 14px;
+    gap: 12px;
+  }
+  .sos-brand__mark { width: 48px; height: 42px; }
+  .civic-header__actions.header-actions { margin-left: auto; gap: 0 !important; }
+  .civic-header .connection-chip,
+  .civic-header .header-refresh-button,
+  .civic-header .header-messages-button { display: none !important; }
+  .civic-header .header-trust-action {
+    width: auto;
+    max-width: 148px;
+    min-height: 48px;
+    padding: 8px 12px;
+    font-size: .78rem;
+    line-height: 1.12;
+    white-space: normal;
+    text-overflow: clip;
+  }
+  .civic-menu-toggle {
+    display: block;
+    flex: none;
+    width: 48px;
+    height: 48px;
+    padding: 11px;
+  }
+  .civic-mobile-menu nav { padding: 10px 14px 18px; gap: 0; }
+  .civic-mobile-menu a {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 10px 4px;
+    font-size: .94rem;
+  }
+  .dashboard {
+    padding: 14px var(--hovs-mobile-gutter) 30px;
+    gap: 22px;
+  }
+  .hydrometric-section,
+  .civic-discovery,
+  .safety-actions,
+  .source-transparency { padding-left: 0; padding-right: 0; }
+  .hydrometric-section {
+    padding: 16px 0 20px;
+    border-top-width: 7px !important;
+    box-shadow: none !important;
+  }
+  .hydrometric-hero__header {
+    padding-inline: 2px;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .hydrometric-hero__controls { gap: 10px; }
+  .station-selector { gap: 10px; padding: 0; border: 0; background: transparent; }
+  .station-selector button {
+    min-width: 74px;
+    min-height: 48px;
+    padding: 9px 12px;
+    font-size: .9rem;
+  }
+  .hydro-refresh-button {
+    min-width: 96px;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .94rem;
+  }
+  .primary-station { padding-top: 16px; }
+  .station-identification { gap: 12px; }
+  .station-identification > div span { font-size: .78rem; }
+  .station-identification > div strong { font-size: 1.08rem; }
+  .freshness-badge {
+    min-height: 44px;
+    max-width: 52%;
+    padding: 7px 10px;
+    font-size: .75rem;
+    line-height: 1.22;
+    white-space: normal;
+  }
+  .hydro-reading { grid-template-columns: 1fr; gap: 12px; margin: 20px 0; }
+  .hydro-level {
+    min-height: 166px;
+    padding: 18px 14px 20px;
+    border-left-width: 5px;
+  }
+  .hydro-level > span { font-size: .76rem; }
+  .hydro-level strong {
+    margin-top: 8px;
+    font-size: clamp(4.25rem, 23vw, 6.2rem);
+    line-height: .88;
+    letter-spacing: -.06em;
+  }
+  .hydro-level time {
+    margin-top: 18px;
+    font-size: .84rem;
+    line-height: 1.35;
+  }
+  .hydro-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .hydro-metrics div { min-height: 78px; padding: 13px 12px; }
+  .hydro-metrics dt { font-size: .69rem; }
+  .hydro-metrics dd { font-size: 1.08rem; }
+  .source-strip {
+    min-height: 0;
+    padding: 12px 0;
+    gap: 8px 12px;
+    font-size: .78rem;
+    line-height: 1.4;
+  }
+  .source-strip span { flex: 1 1 210px; }
+  .source-strip span:nth-of-type(3), .source-strip__error { display: none; }
+  .source-strip button {
+    flex: none;
+    min-width: 88px;
+    min-height: 48px;
+    padding: 8px 14px;
+    font-size: .94rem;
+  }
+  .hydro-chart { padding-top: 12px; }
+  .hydro-chart__meta { min-height: 28px; font-size: .72rem; }
+  .hydro-chart svg { max-height: 250px; }
+  .data-table-disclosure summary { min-height: 48px; display: flex; align-items: center; font-size: .9rem; }
+  .civic-discovery,
+  .safety-actions,
+  .source-transparency { padding-top: 22px; }
+  .civic-section-title,
+  .compact-section-heading { align-items: flex-start; gap: 12px; }
+  .compact-section-heading .button,
+  .source-transparency .button { min-height: 48px; padding: 9px 12px; font-size: .94rem; }
+  .civic-quick-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .civic-quick-tile {
+    min-height: 94px;
+    padding: 14px;
+    gap: 12px;
+  }
+  .civic-quick-tile svg { width: 24px; height: 24px; }
+  .civic-quick-tile span { font-size: .94rem; line-height: 1.22; }
+  .civic-campaign--compact { min-height: 176px; margin-top: 4px; }
+  .civic-campaign--compact .civic-campaign__copy { width: 84%; padding: 22px 20px; }
+  .civic-campaign--compact .civic-campaign__copy h2 { font-size: 2rem; }
+  .civic-campaign__copy strong { font-size: .95rem; }
+  .civic-campaign__copy a { min-height: 48px; margin-top: 12px; font-size: .94rem; }
+  .contact-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .contact-grid a {
+    min-height: 72px;
+    padding: 10px;
+  }
+  .contact-grid__primary {
+    grid-column: 1 / -1;
+    min-height: 84px !important;
+    justify-items: start;
+    padding-inline: 18px !important;
+  }
+  .contact-grid strong { font-size: 1.35rem; }
+  .contact-grid span { font-size: .94rem; line-height: 1.2; }
+  .secondary-actions summary { min-height: 48px; font-size: .94rem; }
+  .secondary-actions > div { gap: 14px; }
+  .secondary-actions .button { min-height: 48px; font-size: .94rem; }
+  .source-health-grid article { padding: 14px 0; }
+  .source-health-grid article:nth-child(n+3) { display: block; }
+  .civic-page { padding: 22px var(--hovs-mobile-gutter) 40px; }
+  .civic-page > .civic-campaign { margin-inline: calc(var(--hovs-mobile-gutter) * -1); }
+  .el-nino-content section { padding: 28px 0; }
+  .el-nino-aside a,
+  .civic-faq summary,
+  .civic-news-grid article a,
+  .official-source-badge a { min-height: 48px; font-size: .94rem; }
+  .emergency-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 10px;
+    padding: 16px 0;
+    border-left: 0;
+    border-top: 4px solid #b42335;
+  }
+  .emergency-strip strong,
+  .emergency-strip span { grid-column: 1 / -1; }
+  .emergency-strip a {
+    min-height: 52px;
+    margin: 0 !important;
+    justify-content: center;
+    border: 1px solid #e2c3c8;
+    font-size: .94rem;
+  }
+  .emergency-strip a:first-of-type { grid-column: 1 / -1; min-height: 60px; font-size: 1.05rem; }
+  .civic-footer nav a { min-height: 48px; font-size: .9rem; }
+}
+
+@media (max-width: 520px) {
+  .civic-header .header-trust-action { width: auto; min-width: 0; max-width: 126px; font-size: .72rem; }
+  .hydrometric-hero__header { display: grid; grid-template-columns: 1fr; }
+  .hydrometric-hero__controls { justify-content: space-between; }
+  .station-selector { flex: 1; }
+  .station-selector button { flex: 1; min-width: 0; }
+  .hydro-refresh-button { flex: none; }
+  .civic-section-title h2, .compact-section-heading h2 { font-size: 1.14rem; }
+  .civic-section-title > span { display: none; }
+  .civic-footer__main { padding-inline: var(--hovs-mobile-gutter); }
+}
+
+@media (max-width: 430px) {
+  .dashboard { padding-inline: var(--hovs-mobile-gutter); }
+  .hydro-level strong { font-size: clamp(4rem, 22vw, 5.5rem); }
+}
+
+@media (max-width: 340px) {
+  .civic-header__main.header-inner { padding-inline: 10px; gap: 8px; }
+  .sos-brand__mark { width: 44px; height: 40px; }
+  .civic-header .header-trust-action { max-width: 108px; min-height: 48px; padding-inline: 8px; font-size: .67rem; }
+  .civic-menu-toggle { width: 48px; height: 48px; }
+  .hydrometric-hero__controls { display: grid; grid-template-columns: 1fr; }
+  .hydro-refresh-button { width: 100%; }
+  .hydro-level strong { font-size: clamp(3.55rem, 22vw, 4.6rem); }
+  .contact-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .contact-grid a:nth-child(n+4) { display: grid; }
+}
+
+/* Browser-zoom/text-scale fallback: remain usable below the nominal 320 CSS px floor. */
+@media (max-width: 260px) {
+  .civic-header .header-trust-action { display: none; }
+  .civic-quick-grid,
+  .contact-grid,
+  .hydro-metrics,
+  .emergency-strip { grid-template-columns: 1fr; }
+  .contact-grid__primary,
+  .emergency-strip a:first-of-type { grid-column: 1; }
+  .hydro-level strong { font-size: clamp(3rem, 31vw, 4rem); }
+  .civic-campaign__motif { opacity: .25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .civic-quick-tile { transform: none !important; }
+}
