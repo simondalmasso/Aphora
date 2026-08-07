@@ -35,22 +35,32 @@ jobs:
           git merge-base --is-ancestor 234bc1ce853c7c1acad93fc6c0bc1202f8cd11c8 HEAD
           test "$(git rev-parse origin/main)" = 45047d1c1e16941ea37967d67307d0ab17e85fad
           mkdir -p "$EVIDENCE_DIR/transport"
+          for part in 00 01 02 03 04 05; do
+            git log -14 --format=%B | sed -n "/ORDER020_PATCH_PART_BEGIN=$part/,/ORDER020_PATCH_PART_END=$part/p" | sed '1d;$d' | tr -d '\n' > "$EVIDENCE_DIR/transport/part-$part.b64"
+          done
+          python - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          path = Path('artifacts/order-020-preliminary/transport/part-02.b64')
+          data = bytearray(path.read_bytes())
+          assert len(data) == 12000
+          assert sha256(data).hexdigest() == '2d622b17cf9885bda30447bf7283dac268e714e763dc86402b15cab8fc5aefc8'
+          assert data[9770] == ord('a')
+          data[9770] = ord('o')
+          assert sha256(data).hexdigest() == '797637680d5c462a668ed3496877a5b226a75fcc0e928d15c40dcf6369a43c55'
+          path.write_bytes(data)
+          PY
           : > /tmp/order020.patch.xz.b64
           for part in 00 01 02 03 04 05; do
-            git log -12 --format=%B | sed -n "/ORDER020_PATCH_PART_BEGIN=$part/,/ORDER020_PATCH_PART_END=$part/p" | sed '1d;$d' | tr -d '\n' > "$EVIDENCE_DIR/transport/part-$part.b64"
             wc -c "$EVIDENCE_DIR/transport/part-$part.b64" >> "$EVIDENCE_DIR/transport/lengths.txt"
             sha256sum "$EVIDENCE_DIR/transport/part-$part.b64" >> "$EVIDENCE_DIR/transport/sha256.txt"
             cat "$EVIDENCE_DIR/transport/part-$part.b64" >> /tmp/order020.patch.xz.b64
           done
           cp /tmp/order020.patch.xz.b64 "$EVIDENCE_DIR/transport/assembled.b64"
-          wc -c /tmp/order020.patch.xz.b64 > "$EVIDENCE_DIR/transport/assembled-length.txt"
-          sha256sum /tmp/order020.patch.xz.b64 > "$EVIDENCE_DIR/transport/assembled-b64-sha256.txt"
           test "$(wc -c < /tmp/order020.patch.xz.b64)" = 60144
           base64 -d /tmp/order020.patch.xz.b64 > /tmp/order020.patch.xz
           cp /tmp/order020.patch.xz "$EVIDENCE_DIR/transport/assembled.xz"
-          actual_xz_sha="$(sha256sum /tmp/order020.patch.xz | cut -d' ' -f1)"
-          printf '%s\n' "$actual_xz_sha" > "$EVIDENCE_DIR/transport/assembled-xz-sha256.txt"
-          test "$actual_xz_sha" = 607a7896c279a88be9d8482161f8ce1a71b835c1212182f5683913197de3ffe4
+          echo '607a7896c279a88be9d8482161f8ce1a71b835c1212182f5683913197de3ffe4  /tmp/order020.patch.xz' | sha256sum -c -
           xz -dc /tmp/order020.patch.xz > /tmp/order020.patch
           echo 'e741fa314d7593ebd730b6e27e6359647d76bc0fa32ae5c0e3c739bb57f10d53  /tmp/order020.patch' | sha256sum -c -
           git apply --index --binary /tmp/order020.patch
