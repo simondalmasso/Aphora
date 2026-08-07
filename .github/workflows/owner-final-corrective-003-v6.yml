@@ -1,0 +1,138 @@
+name: SOS-SF Owner Final Corrective 003 v6
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/owner-final-corrective-003-v6.yml]
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  PRODUCT_COMMIT: a772393883460f64fd5ff7bdcf5d1bdcbf1639f2
+  MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+  PRODUCTION_URL: https://sos-sf.simondalmasso44.workers.dev
+  OUT: artifacts/owner-final-corrective-003
+
+jobs:
+  correct-deploy-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Authority and immutable product gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main arq/visual-dashboard-v3
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          git diff --quiet "$PRODUCT_COMMIT" HEAD -- . ':(exclude).github/workflows/owner-final-corrective-003-v6.yml'
+          ! grep -q 'r2_buckets' wrangler.jsonc
+          mkdir -p "$OUT/logs" "$OUT/screenshots"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Full predeploy verification
+        env:
+          EVIDENCE_DIR: artifacts/owner-final-corrective-003/predeploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$OUT/logs/lint.log"
+          npm audit 2>&1 | tee "$OUT/logs/npm-audit.log"
+          npm run test:unit 2>&1 | tee "$OUT/logs/unit.log"
+          npm run test:contract 2>&1 | tee "$OUT/logs/contract.log"
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          if ! npm run test:worker 2>&1 | tee "$OUT/logs/worker-attempt-1.log"; then npm run test:worker 2>&1 | tee "$OUT/logs/worker-attempt-2.log"; fi
+          npm run test:e2e 2>&1 | tee "$OUT/logs/e2e.log"
+          npm run deploy:dry 2>&1 | tee "$OUT/logs/deploy-dry.log"
+      - name: Capture Cloudflare baseline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --json > "$OUT/cloudflare-before.json"
+      - name: Exactly one authorized product deploy
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 1 > "$OUT/deploy-command-count.txt"
+          npx wrangler deploy 2>&1 | tee "$OUT/logs/wrangler-deploy.log"
+          version_id=$(grep -Eo 'Current Version ID: [0-9a-f-]+' "$OUT/logs/wrangler-deploy.log" | awk '{print $4}' | tail -n1)
+          test -n "$version_id"
+          echo "$version_id" > "$OUT/deployment-version-id.txt"
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+      - name: Verify Cloudflare deployment provenance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 5
+          npx wrangler deployments list --json > "$OUT/cloudflare-after.json"
+          node --input-type=module <<'NODE'
+          import {readFile,writeFile} from 'node:fs/promises';
+          const arr=v=>Array.isArray(v)?v:(v.deployments||[]);
+          const before=arr(JSON.parse(await readFile(process.env.OUT+'/cloudflare-before.json','utf8')));
+          const after=arr(JSON.parse(await readFile(process.env.OUT+'/cloudflare-after.json','utf8')));
+          const latest=[...after].sort((a,b)=>Date.parse(a.created_on||a.createdAt||0)-Date.parse(b.created_on||b.createdAt||0)).at(-1);
+          const version=(latest?.versions||[]).find(v=>(v.version_id||v.id)===process.env.VERSION_ID);
+          const percentage=Number(version?.percentage??version?.traffic_percentage??0);
+          const isNew=Boolean(latest)&&!new Set(before.map(x=>x.id)).has(latest.id);
+          const result={versionId:process.env.VERSION_ID,deploymentId:latest?.id||null,createdOn:latest?.created_on||latest?.createdAt||null,percentage,isNewDeployment:isNew,deployCommandCount:1,postdeployRedeployCount:0,pass:Boolean(version)&&percentage===100&&isNew};
+          await writeFile(process.env.OUT+'/deployment-provenance.json',JSON.stringify(result,null,2)+'\n');
+          if(!result.pass) throw new Error('deployment provenance mismatch '+JSON.stringify(result));
+          NODE
+      - name: Verify production final corrective truth
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-owner-final-corrective-003.mjs 2>&1 | tee "$OUT/logs/postdeploy-verification.log"
+      - name: Terminal invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          test "$(cat "$OUT/deploy-command-count.txt")" = "1"
+          echo 0 > "$OUT/postdeploy-redeploy-count.txt"
+      - name: Upload terminal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-owner-final-corrective-003-${{ github.run_id }}
+          path: ${{ env.OUT }}
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Terminally disarm corrective workflow
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          gh workflow disable owner-final-corrective-003-v6.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/owner-final-corrective-003-v6.yml
+          git commit -m "ci: terminally disarm owner final corrective 003 v6"
+          git push origin HEAD:arq/visual-dashboard-v3
