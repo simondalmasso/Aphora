@@ -1,0 +1,40 @@
+/* 021-HOVS-R2 terminal lock: alert order + immutable desktop density. */
+@media (min-width: 960px) {
+  .hovs-r2 .dashboard {
+    grid-template-rows: auto auto auto auto;
+    row-gap: 4px;
+    padding-bottom: 8px;
+  }
+  .hovs-r2 .verified-alert-banner { grid-column: 1 / -1; grid-row: 1; margin-block: 4px; }
+  .hovs-r2 .hydrometric-section { grid-column: 1 / -1; grid-row: 2; }
+  .hovs-r2 .civic-discovery { grid-column: 1 / 7; grid-row: 3 / 5; }
+  .hovs-r2 .safety-actions { grid-column: 7 / -1; grid-row: 3; }
+  .hovs-r2 .source-transparency { grid-column: 7 / -1; grid-row: 4; }
+
+  .hovs-r2 .muni-hydrometric-hero { padding-top: 6px; }
+  .hovs-r2 .hydrometric-hero__header { min-height: 50px; padding-bottom: 4px; }
+  .hovs-r2 .hydrometric-hero__header h1 { font-size: clamp(2.6rem,3.7vw,3.5rem); }
+  .hovs-r2 .primary-station { grid-template-rows: 38px 18px 172px 36px; }
+  .hovs-r2 .station-identification { min-height: 38px; padding-block: 3px; }
+  .hovs-r2 .hydro-signature-axis { min-height: 18px; }
+  .hovs-r2 .hydro-level strong { min-height: 72px; font-size: clamp(5rem,7vw,6.4rem); }
+  .hovs-r2 .hydro-chart svg { max-height: 148px; }
+  .hovs-r2 .source-strip button { min-height: 34px; }
+  .hovs-r2 .data-table-disclosure summary { min-height: 24px; }
+
+  .hovs-r2 .civic-discovery { grid-template-rows: auto auto 90px; gap-block: 4px; }
+  .hovs-r2 .civic-campaign { min-height: 90px; }
+  .hovs-r2 .civic-campaign__copy { padding-block: 7px; }
+  .hovs-r2 .civic-campaign__copy h2 { font-size: 2.7rem; }
+
+  .hovs-r2 .safety-actions .compact-section-heading,
+  .hovs-r2 .source-transparency .compact-section-heading { padding-block: 4px; }
+  .hovs-r2 .contact-grid__primary { min-height: 58px !important; }
+  .hovs-r2 .contact-grid a { min-height: 44px; }
+  .hovs-r2 .secondary-actions summary { min-height: 30px; }
+  .hovs-r2 .source-health-grid article { padding-block: 3px; }
+
+  .hovs-r2 .civic-footer { padding-block: 6px; }
+  .hovs-r2 .civic-footer__main nav a { min-height: 22px; }
+  .hovs-r2 .civic-footer__legal { margin-top: 2px; padding-top: 3px; }
+}
