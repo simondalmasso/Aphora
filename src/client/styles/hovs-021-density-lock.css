@@ -13,6 +13,7 @@
     line-height: 1.08;
     white-space: normal;
   }
+  .hydrometric-hero__controls { gap: 10px; }
   .hydro-chart svg { max-height: 145px; }
   .station-selector button { font-size: .94rem; }
 
