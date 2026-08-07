@@ -39,8 +39,8 @@
   .hovs-r2 .civic-footer__legal { margin-top: 2px; padding-top: 3px; }
 }
 
-/* Tablet header: switch to the real menu before desktop navigation + global actions overflow. */
-@media (min-width: 821px) and (max-width: 1150px) {
+/* Compact header through small desktop: desktop nav becomes safe only above this width. */
+@media (min-width: 821px) and (max-width: 1280px) {
   .hovs-r2 .civic-header__main.header-inner { min-height: 68px; padding-inline: 22px; gap: 14px; }
   .hovs-r2 .civic-nav { display: none; }
   .hovs-r2 .civic-menu-toggle { display: inline-flex; width: 48px; height: 48px; margin-left: 0; border-radius: 0; }
