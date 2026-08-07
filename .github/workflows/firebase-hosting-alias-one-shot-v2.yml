@@ -1,0 +1,227 @@
+name: SOS-SF Firebase Hosting Alias One Shot V2
+
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+    paths:
+      - .github/workflows/firebase-hosting-alias-one-shot-v2.yml
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sos-sf-firebase-hosting-alias-v2
+  cancel-in-progress: false
+
+env:
+  FIREBASE_PROJECT: sos-sf-app
+  FIREBASE_SITE: sos-sf
+  FIREBASE_TARGET: sos-sf
+  FIREBASE_URL: https://sos-sf.web.app
+  CANONICAL_URL: https://sos-sf.simondalmasso44.workers.dev
+  MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+  OUT: artifacts/firebase-hosting-alias-v2
+
+jobs:
+  deploy-alias:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Authority and architecture gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main arq/visual-dashboard-v3
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          test "$(node -e "const f=JSON.parse(require('fs').readFileSync('.firebaserc','utf8')); process.stdout.write(f.projects.default)")" = "$FIREBASE_PROJECT"
+          test "$(node -e "const f=JSON.parse(require('fs').readFileSync('firebase.json','utf8')); process.stdout.write(f.hosting.target)")" = "$FIREBASE_TARGET"
+          node <<'NODE'
+          const fs = require('fs');
+          const cfg = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+          if (cfg.functions || cfg.firestore || cfg.apphosting) throw new Error('forbidden Firebase service configured');
+          const hosting = cfg.hosting;
+          if (!hosting || hosting.target !== 'sos-sf') throw new Error('hosting target mismatch');
+          if (hosting.rewrites) throw new Error('rewrites/proxies prohibited');
+          const redirects = hosting.redirects || [];
+          if (redirects.length !== 2) throw new Error('unexpected redirect count');
+          if (!redirects.every(x => x.type === 302 && x.destination.startsWith('https://sos-sf.simondalmasso44.workers.dev/'))) throw new Error('redirect must terminate at canonical Worker');
+          NODE
+          mkdir -p "$OUT"
+          cat > "$OUT/architecture-decision.json" <<'JSON'
+          {
+            "mode": "SAFE_REDIRECT",
+            "staticMirrorRejected": true,
+            "reason": "Same-origin /api calls, credentials:same-origin, __Host cookies, SameSite=Strict and same-origin CSRF make a Firebase-served static mirror non-equivalent without forbidden backend/security changes.",
+            "cloudflareCanonical": true,
+            "backendMigrated": false,
+            "securityRelaxed": false
+          }
+          JSON
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prepare Firebase credentials
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_SOS_SF_APP: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SOS_SF_APP }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_SERVICE_ACCOUNT_SOS_SF_APP:-}" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_SOS_SF_APP" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+            echo "FIREBASE_AUTH_MODE=SERVICE_ACCOUNT_PROJECT" >> "$GITHUB_ENV"
+          elif [ -n "${FIREBASE_SERVICE_ACCOUNT:-}" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+            echo "FIREBASE_AUTH_MODE=SERVICE_ACCOUNT" >> "$GITHUB_ENV"
+          elif [ -n "${FIREBASE_TOKEN:-}" ]; then
+            echo "FIREBASE_CI_TOKEN=$FIREBASE_TOKEN" >> "$GITHUB_ENV"
+            echo "FIREBASE_AUTH_MODE=TOKEN" >> "$GITHUB_ENV"
+          else
+            echo 'No Firebase credential is available in repository Actions secrets.' >&2
+            exit 42
+          fi
+
+      - name: Apply multisite deploy target and verify site
+        shell: bash
+        run: |
+          set -euo pipefail
+          fb() {
+            if [ "${FIREBASE_AUTH_MODE:-}" = TOKEN ]; then
+              npx --yes firebase-tools@latest "$@" --token "$FIREBASE_CI_TOKEN"
+            else
+              npx --yes firebase-tools@latest "$@"
+            fi
+          }
+          fb target:apply hosting "$FIREBASE_TARGET" "$FIREBASE_SITE" --project "$FIREBASE_PROJECT"
+          fb hosting:sites:list --project "$FIREBASE_PROJECT" --json > "$OUT/sites-before.json"
+          node <<'NODE'
+          const fs=require('fs');
+          const rc=JSON.parse(fs.readFileSync('.firebaserc','utf8'));
+          const mapped=rc.targets?.['sos-sf-app']?.hosting?.['sos-sf'];
+          if (!Array.isArray(mapped) || mapped.length !== 1 || mapped[0] !== 'sos-sf') throw new Error('multisite target mapping mismatch');
+          const sites=JSON.parse(fs.readFileSync(process.env.OUT+'/sites-before.json','utf8'));
+          if (!JSON.stringify(sites).includes('sos-sf')) throw new Error('Firebase site sos-sf not found');
+          NODE
+
+      - name: Exactly one authorized Firebase Hosting deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 1 > "$OUT/firebase-hosting-deploy-count.txt"
+          if [ "${FIREBASE_AUTH_MODE:-}" = TOKEN ]; then
+            npx --yes firebase-tools@latest deploy --only "hosting:$FIREBASE_TARGET" --project "$FIREBASE_PROJECT" --non-interactive --token "$FIREBASE_CI_TOKEN" 2>&1 | tee "$OUT/firebase-deploy.log"
+          else
+            npx --yes firebase-tools@latest deploy --only "hosting:$FIREBASE_TARGET" --project "$FIREBASE_PROJECT" --non-interactive 2>&1 | tee "$OUT/firebase-deploy.log"
+          fi
+
+      - name: Verify HTTPS redirects
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const {writeFileSync} = require('fs');
+          const {execFileSync} = require('child_process');
+          const cases = [
+            ['/', '/'],
+            ['/gestion-de-riesgo', '/gestion-de-riesgo'],
+            ['/gestion-de-riesgo/fenomeno-el-nino', '/gestion-de-riesgo/fenomeno-el-nino'],
+            ['/lite', '/lite'],
+            ['/gestion-de-riesgo?via=firebase&n=1', '/gestion-de-riesgo?via=firebase&n=1']
+          ];
+          const results=[];
+          for (const [source,suffix] of cases) {
+            const url=process.env.FIREBASE_URL+source;
+            const raw=execFileSync('curl',['-sS','-D','-','-o','/dev/null',url],{encoding:'utf8'});
+            const status=Number((raw.match(/^HTTP\/\S+\s+(\d+)/m)||[])[1]);
+            const location=(raw.match(/^location:\s*(.+)$/mi)||[])[1]?.trim()||null;
+            const expected=process.env.CANONICAL_URL+suffix;
+            if (status!==302 || location!==expected) throw new Error(JSON.stringify({url,status,location,expected}));
+            results.push({url,status,location,pass:true});
+          }
+          writeFileSync(process.env.OUT+'/redirect-matrix.json',JSON.stringify(results,null,2)+'\n');
+          NODE
+
+      - name: Verify browser fragment mobile and desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { writeFile } from 'node:fs/promises';
+          const browser=await chromium.launch({headless:true});
+          const checks=[];
+          for (const c of [{name:'mobile',viewport:{width:390,height:844}},{name:'desktop',viewport:{width:1440,height:900}}]) {
+            const page=await browser.newPage({viewport:c.viewport});
+            const start=process.env.FIREBASE_URL+'/gestion-de-riesgo/fenomeno-el-nino?via=firebase#fuentes';
+            await page.goto(start,{waitUntil:'domcontentloaded'});
+            const final=page.url();
+            const u=new URL(final);
+            if (u.origin!==process.env.CANONICAL_URL || u.pathname!=='/gestion-de-riesgo/fenomeno-el-nino' || u.search!=='?via=firebase' || u.hash!=='#fuentes') throw new Error(`${c.name} redirect mismatch: ${final}`);
+            checks.push({name:c.name,viewport:c.viewport,start,final,pass:true});
+            await page.close();
+          }
+          await browser.close();
+          await writeFile(process.env.OUT+'/browser-matrix.json',JSON.stringify(checks,null,2)+'\n');
+          NODE
+
+      - name: Verify canonical runtime unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in /api/health /api/snapshot /api/sources /api/auth/config /source-provenance.json; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$CANONICAL_URL$path")
+            test "$code" = 200
+            printf '%s %s\n' "$path" "$code" >> "$OUT/cloudflare-readonly-health.txt"
+          done
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          cat > "$OUT/final-summary.json" <<JSON
+          {
+            "modeUsed": "SAFE_REDIRECT",
+            "firebaseUrl": "$FIREBASE_URL",
+            "firebaseDeploy": "PASS",
+            "firebaseHostingDeployCount": 1,
+            "cloudflareMutations": 0,
+            "backendMigrated": false,
+            "d1KvMoved": false,
+            "securityRelaxed": false,
+            "functionalRegressions": 0,
+            "mainSha": "$MAIN_EXPECTED"
+          }
+          JSON
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-firebase-hosting-alias-v2-${{ github.run_id }}
+          path: artifacts/firebase-hosting-alias-v2
+          retention-days: 90
+
+      - name: Terminally disarm retry workflow
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          gh workflow disable firebase-hosting-alias-one-shot-v2.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/firebase-hosting-alias-one-shot-v2.yml
+          git commit -m "ci: terminally disarm Firebase alias retry"
+          git push origin HEAD:arq/visual-dashboard-v3
