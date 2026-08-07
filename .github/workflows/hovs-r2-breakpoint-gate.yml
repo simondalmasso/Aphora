@@ -1,0 +1,51 @@
+name: SOS-SF HOVS R2 Breakpoint Gate
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+permissions:
+  contents: write
+  actions: write
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRODUCT_COMMIT: 1c2c160264634953a99fcb986519d52223072f9b
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - run: git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npx playwright install --with-deps chromium && npm run build
+      - name: Breakpoint truth
+        run: |
+          set -euo pipefail
+          npm run preview >/tmp/preview.log 2>&1 &
+          for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:8787/ >/dev/null; then break; fi; sleep 1; done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const b=await chromium.launch({headless:true});const p=await b.newPage();
+          for(const [w,h] of [[320,568],[390,844],[768,1024],[1024,768],[1150,800],[1151,800],[1440,900],[1920,1080]]){
+            await p.setViewportSize({width:w,height:h});await p.goto('http://127.0.0.1:8787/?g='+Date.now(),{waitUntil:'networkidle'});
+            const x=await p.evaluate(()=>({overflow:document.documentElement.scrollWidth-innerWidth,sections:document.querySelectorAll('main.dashboard > section').length,signature:(document.querySelector('.hydro-signature-axis')?.textContent||'').replace(/\s+/g,''),menu:getComputedStyle(document.querySelector('.civic-menu-toggle')).display,nav:getComputedStyle(document.querySelector('.civic-nav')).display}));
+            console.log(JSON.stringify({w,h,...x}));if(x.overflow>1||x.sections!==4||x.signature!=='RÍOREGLATIEMPO')throw new Error(JSON.stringify({w,...x}));
+          }
+          await b.close();
+          NODE
+      - name: Disarm
+        if: always()
+        run: |
+          set +e
+          gh workflow disable hovs-r2-breakpoint-gate.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/hovs-r2-breakpoint-gate.yml
+          git commit -m "ci: disarm HOVS R2 breakpoint gate"
+          git push origin HEAD:arq/visual-dashboard-v3
