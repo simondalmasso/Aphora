@@ -18,7 +18,8 @@ describe('hydrometric-first progressive rendering', () => {
     expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section"/);
     expect(html).toContain('data-testid="hydrometric-situation"');
     expect(html).toContain('Situación hidrométrica');
-    expect(html).toContain('Ríos de Santa Fe');
+    expect(html).toContain('Pulso hídrico de Santa Fe');
+    expect(html).not.toContain('<h1 id="hydrometric-title">Ríos de Santa Fe</h1>');
     expect(html).toContain('Río Paraná');
     expect(html).toContain('Río Salado');
     expect(html).toContain('Alertas sin verificar');
