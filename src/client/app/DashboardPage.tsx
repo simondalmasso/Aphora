@@ -8,8 +8,10 @@ import { SourceTransparency } from '../features/sources/SourceTransparency.tsx';
 
 interface Props {
   readonly snapshot: Snapshot;
+  readonly refreshing: boolean;
   readonly sourcesButtonRef: RefObject<HTMLButtonElement | null>;
   readonly reportButtonRef: RefObject<HTMLButtonElement | null>;
+  readonly onRefresh: () => void;
   readonly onSources: (opener?: HTMLButtonElement | null) => void;
   readonly onAlerts: (opener?: HTMLButtonElement | null) => void;
   readonly onReport: (opener?: HTMLButtonElement | null) => void;
@@ -20,7 +22,9 @@ export function DashboardPage(props: Props) {
     <VerifiedAlertBanner snapshot={props.snapshot} onOpen={props.onAlerts}/>
     <HydrometricMonitoring
       snapshot={props.snapshot}
+      refreshing={props.refreshing}
       sourcesButtonRef={props.sourcesButtonRef}
+      onRefresh={props.onRefresh}
       onSources={props.onSources}
     />
     <CivicDiscovery snapshot={props.snapshot}/>
