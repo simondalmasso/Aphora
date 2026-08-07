@@ -6,7 +6,7 @@ BRANCH="arq/visual-dashboard-v3"
 MAIN_SHA="45047d1c1e16941ea37967d67307d0ab17e85fad"
 CURRENT_RUN="${GITHUB_RUN_ID:?}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-artifacts/order-020b-final-corrective}"
-TEMP_WORKFLOW_PATH="order-020b-final-corrective.yml"
+TEMP_WORKFLOW_PATH="${TEMP_WORKFLOW_PATH:-order-020b-final-corrective.yml}"
 mkdir -p "$EVIDENCE_DIR"
 
 temp_workflow_id="$(gh api "repos/$REPO/actions/workflows/$TEMP_WORKFLOW_PATH" --jq '.id')"
@@ -28,7 +28,7 @@ for run_id in "${completed_ids[@]}"; do
 done
 
 rm -rf .github/workflows .github/order020b-amend
-rm -f .github/order-020b-final-corrective-trigger
+rm -f .github/order-020b-final-corrective-trigger .github/order-020b-final-get-only-trigger
 find .github -maxdepth 1 -type f \( -name '*trigger*' -o -name '*020b*' \) -delete 2>/dev/null || true
 rmdir .github 2>/dev/null || true
 
