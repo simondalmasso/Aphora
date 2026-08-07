@@ -61,3 +61,24 @@
   }
   .hovs-r2 .civic-quick-tile span { font-size: .94rem; line-height: 1.12; }
 }
+
+/* 200% zoom layout-equivalent: keep one actionable header control and let content reflow. */
+@media (max-width: 220px) {
+  .hovs-r2 .civic-header__main.header-inner { padding-inline: 8px; gap: 8px; }
+  .hovs-r2 .header-trust-action { display: none; }
+  .hovs-r2 .civic-header__actions { display: none; }
+  .hovs-r2 .civic-menu-toggle { margin-left: auto; }
+  .hovs-r2 .dashboard { padding-inline: 6px; }
+  .hovs-r2 .hydrometric-hero__controls { grid-template-columns: minmax(0,1fr) 44px; gap: 5px; }
+  .hovs-r2 .station-selector { gap: 5px; }
+  .hovs-r2 .station-selector button { padding-inline: 4px; font-size: .88rem; }
+  .hovs-r2 .hydro-refresh-button { width: 44px; height: 48px; min-width: 44px; }
+  .hovs-r2 .hydro-reading { grid-template-columns: 1fr; }
+  .hovs-r2 .hydro-metrics { display: grid; grid-template-columns: 1fr 1fr; border-left: 0; padding-left: 0; }
+  .hovs-r2 .hydro-metrics > div + div { border-top: 0; border-left: 1px solid var(--r2-rule); padding: 0 0 0 7px; }
+  .hovs-r2 .civic-quick-grid,
+  .hovs-r2 .contact-grid,
+  .hovs-r2 .civic-footer__main { grid-template-columns: 1fr; }
+  .hovs-r2 .civic-quick-tile,
+  .hovs-r2 .contact-grid a { min-width: 0; }
+}
