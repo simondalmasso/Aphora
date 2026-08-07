@@ -1,0 +1,56 @@
+name: SOS-SF HOVS 021 Visual v12
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/hovs-021-visual-v12.yml]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OUT: artifacts/hovs-021-visual-v12
+      MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: arq/visual-dashboard-v3, fetch-depth: 0 }
+      - name: Authority
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git diff --quiet 829e9434f2c2838aa1941f1619a6eb02b9cd55e7 HEAD -- wrangler.jsonc migrations src/worker
+          mkdir -p "$OUT/logs" "$OUT/screenshots"
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - name: Visual truth
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npm run preview > "$OUT/logs/preview.log" 2>&1 &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:8787/ >/dev/null && break; sleep 1; done
+          BASE_URL=http://127.0.0.1:8787 OUT="$OUT" node scripts/verify-hovs-021.mjs 2>&1 | tee "$OUT/logs/hovs-visual.log"
+          npm run deploy:dry 2>&1 | tee "$OUT/logs/deploy-dry.log"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-hovs-021-visual-v12-${{ github.run_id }}
+          path: artifacts/hovs-021-visual-v12
+          retention-days: 30
+      - name: Disarm
+        if: always()
+        run: |
+          set +e
+          gh workflow disable hovs-021-visual-v12.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/hovs-021-visual-v12.yml
+          git commit -m "ci: disarm HOVS 021 visual v12"
+          git push origin HEAD:arq/visual-dashboard-v3
