@@ -1,0 +1,100 @@
+name: SOS-SF 020-B Terminal Material Blocker V2
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/order-020b-blocked-final-v2-trigger]
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-order-020b-terminal-material-blocker-v2
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/order-020b-terminal-blocked
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout current canonical branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze every registered workflow before evidence collection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t ids < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" --jq '.workflows[] | select(.state == "active") | .id')
+          for id in "${ids[@]}"; do
+            gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable" >/dev/null || true
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deterministic dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          mkdir -p node_modules/.tmp
+          cp .github/order020b-blocked/post-cleanup.mjs node_modules/.tmp/order020b-post-cleanup.mjs
+          cp .github/order020b-blocked/publish-blocker.mjs node_modules/.tmp/order020b-publish-blocker.mjs
+
+      - name: Execute fresh terminal evidence without production mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/order020b-blocked/evidence.sh
+
+      - name: Terminally disarm all workflows and historical production mutation paths
+        id: cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TEMP_WORKFLOW_PATH: order-020b-blocked-final-v2.yml
+        run: bash .github/order020b/cleanup.sh
+
+      - name: Revalidate final HEAD and derive terminal blocker summary
+        run: node node_modules/.tmp/order020b-post-cleanup.mjs
+
+      - name: Upload terminal screenshots
+        id: screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-terminal-blocked-screenshots
+          path: artifacts/order-020b-terminal-blocked/screenshots
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload terminal evidence
+        id: evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-terminal-blocked-evidence
+          path: artifacts/order-020b-terminal-blocked
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish the only terminal ARQ blocker checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        run: node node_modules/.tmp/order020b-publish-blocker.mjs
+
+      - name: Remove local temporary copies
+        if: always()
+        run: rm -f node_modules/.tmp/order020b-post-cleanup.mjs node_modules/.tmp/order020b-publish-blocker.mjs
