@@ -19,10 +19,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Validate current production snapshot with client validator
+        run: npx vitest run .github/order020b/validation-diagnostic.test.ts --reporter=verbose
       - run: npx playwright install --with-deps chromium
       - run: node .github/order020b/ui-diagnostic.mjs
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: sos-sf-order-020b-ui-diagnostic
           path: artifacts/order-020b-ui-diagnostic
-          if-no-files-found: error
+          if-no-files-found: warn
