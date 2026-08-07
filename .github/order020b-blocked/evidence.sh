@@ -80,11 +80,12 @@ const entries=[];
 for(const name of controlledNames){const path=`${dir}/screenshots/${name}.png`;const bytes=await readFile(path);entries.push({name,kind:'CONTROLLED_TEST_STATE',path,sha256:hash(bytes),semantic:controlled[name]?.semantic??null});}
 for(const view of blackbox.views){const name=`production-live-${view.viewport.width}x${view.viewport.height}`;const path=`${dir}/screenshots/${name}.png`;const bytes=await readFile(path);entries.push({name,kind:'PRODUCTION_REAL_FAIL',path,sha256:hash(bytes),semantic:'API_HAS_USABLE_INA_HYDROMETRY_BUT_UI_REJECTS_SNAPSHOT'});}
 {const name='before-owner-rejected-390x844';const path=`${dir}/screenshots/${name}.png`;const bytes=await readFile(path);entries.push({name,kind:'REJECTED_BASELINE_REAL_PRODUCTION',path,sha256:hash(bytes),semantic:'PRE_020B_PRODUCTION_BASELINE',snapshotId:before.snapshotId??null});}
-const controlledHashes=entries.filter(e=>e.kind==='CONTROLLED_TEST_STATE').map(e=>e.sha256);
-const controlledHashGate=new Set(controlledHashes).size===controlledHashes.length?'PASS':'FAIL';
+const semanticNames=['state-stale','state-active-alert','state-alerts-unverified'];
+const semanticHashes=semanticNames.map(name=>entries.find(e=>e.name===name)?.sha256).filter(Boolean);
+const controlledHashGate=semanticHashes.length===semanticNames.length&&new Set(semanticHashes).size===semanticHashes.length?'PASS':'FAIL';
 const required=['production-live-390x844','production-live-768x1024','production-live-1440x900','state-stale','state-active-alert','state-alerts-unverified','state-offline','before-owner-rejected-390x844'];
 const setComplete=required.every(name=>entries.some(e=>e.name===name));
-await writeFile(`${dir}/screenshot-manifest.json`,JSON.stringify({generatedAt:new Date().toISOString(),setComplete,hashGate:controlledHashGate,semanticGate:'FAIL',productionSemanticGate:'FAIL_API_UI_INCONSISTENT',entries},null,2)+'\n');
+await writeFile(`${dir}/screenshot-manifest.json`,JSON.stringify({generatedAt:new Date().toISOString(),setComplete,hashGate:controlledHashGate,hashGateScope:semanticNames,semanticGate:'FAIL',productionSemanticGate:'FAIL_API_UI_INCONSISTENT',entries},null,2)+'\n');
 const budgets={390:2.4,768:1.9,1440:1.35};
 const metrics=blackbox.views.map(v=>({viewport:v.viewport,horizontalOverflow:v.ui.horizontalOverflow,scrollRatio:v.ui.scrollRatio,maxScrollRatio:budgets[v.viewport.width],viewportBudgetPass:v.ui.horizontalOverflow<=1&&v.ui.scrollRatio<=budgets[v.viewport.width],snapshotId:v.ui.snapshotId,hasChart:v.ui.hasChart,levelText:v.ui.levelText,sourceText:v.ui.sourceText}));
 await writeFile(`${dir}/viewport-metrics.json`,JSON.stringify(metrics,null,2)+'\n');
