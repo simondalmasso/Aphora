@@ -1,4 +1,6 @@
 /* Final density lock. Interactive neighbors keep >=10px where adjacent; targets retain owner minimums. */
+.secondary-actions:not([open]) > div { display: none; }
+
 @media (max-width: 820px) {
   .dashboard { gap: 6px; }
   .sos-brand { min-height: 48px; }
