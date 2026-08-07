@@ -78,7 +78,7 @@ export function HydrometricMonitoring({
       <header className="hydrometric-hero__header">
         <div>
           <p className="section-kicker">Situación hidrométrica</p>
-          <h1 id="hydrometric-title">Ríos de Santa Fe</h1>
+          <h1 id="hydrometric-title">Pulso hídrico de Santa Fe</h1>
         </div>
         <div className="hydrometric-hero__controls">
           <StationSwitcher systems={systems} selectedId={selected?.id} onSelect={setSelectedId}/>
