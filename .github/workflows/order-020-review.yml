@@ -42,18 +42,30 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Remediate vulnerable tooling dependency
+      - name: Apply review remediations
         shell: bash
         run: |
           set -euo pipefail
           npm pkg set overrides.undici=7.29.0
           npm install --package-lock-only --ignore-scripts --save-dev --save-exact wrangler@4.119.0 @cloudflare/workers-types@5.20260801.1
-          git add package.json package-lock.json
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/worker/auth.ts')
+          text = path.read_text()
+          old = "if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT');"
+          new = "if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT', { cause: error });"
+          if old in text:
+              text = text.replace(old, new)
+          elif new not in text:
+              raise SystemExit('Google JWKS timeout remediation target is absent')
+          path.write_text(text)
+          PY
+          git add package.json package-lock.json src/worker/auth.ts
           git diff --cached --check
           git config user.name sos-sf-automation
           git config user.email sos-sf-automation@users.noreply.github.com
           if ! git diff --cached --quiet; then
-            git commit -m 'chore: pin fully audited Cloudflare toolchain'
+            git commit -m 'fix: preserve JWKS timeout cause under strict lint'
             git push origin HEAD:arq/visual-dashboard-v3
           fi
           git rev-parse HEAD > "$EVIDENCE_DIR/review-commit.txt"
