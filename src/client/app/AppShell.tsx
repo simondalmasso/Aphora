@@ -57,7 +57,7 @@ export function AppShell({
     <IconButton className="header-messages-button" ref={messagesButtonRef} label="Abrir comunicaciones" badge={unread} onClick={onMessages} aria-haspopup="dialog" icon={<svg viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3V5Z"/><path d="M8 9h8M8 12h5"/></svg>}/>
   </>;
 
-  return <div className="site-shell">
+  return <div className="site-shell hovs-r2">
     <a className="skip-link" href="#main">Saltar al contenido principal</a>
     <MuniCivicHeader currentPath={currentPath} actions={actions}/>
     {children}
