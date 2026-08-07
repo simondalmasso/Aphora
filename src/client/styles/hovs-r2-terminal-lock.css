@@ -39,6 +39,20 @@
   .hovs-r2 .civic-footer__legal { margin-top: 2px; padding-top: 3px; }
 }
 
+/* Tablet header: switch to the real menu before desktop navigation + global actions overflow. */
+@media (min-width: 821px) and (max-width: 1150px) {
+  .hovs-r2 .civic-header__main.header-inner { min-height: 68px; padding-inline: 22px; gap: 14px; }
+  .hovs-r2 .civic-nav { display: none; }
+  .hovs-r2 .civic-menu-toggle { display: inline-flex; width: 48px; height: 48px; margin-left: 0; border-radius: 0; }
+  .hovs-r2 .civic-header__actions { margin-left: auto; }
+  .hovs-r2 .connection-chip,
+  .hovs-r2 .header-refresh-button,
+  .hovs-r2 .header-messages-button { display: none; }
+  .hovs-r2 .header-trust-action { min-height: 44px; max-width: 165px; white-space: normal; }
+  .hovs-r2 .civic-mobile-menu { display: none; }
+  .hovs-r2 .civic-mobile-menu--open { display: block; }
+}
+
 @media (max-width: 820px) {
   .hovs-r2 .data-table-disclosure summary {
     min-height: 44px;
