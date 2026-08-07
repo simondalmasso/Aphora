@@ -18,6 +18,14 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/client/components/civic/CivicSystem.tsx'],
+    rules: {
+      // This module is intentionally the public civic component barrel required by MUNI 021.
+      // Its two frozen navigation definitions are immutable UI configuration, not mutable app state.
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     files: ['src/worker/**/*.ts'],
     languageOptions: { globals: globals.worker },
   },
