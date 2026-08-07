@@ -3,6 +3,7 @@ import { visibleMessages } from '../domain/messages.ts';
 import { AppShell } from './app/AppShell.tsx';
 import { DashboardPage } from './app/DashboardPage.tsx';
 import { DetailsDialog } from './components/DetailsDialog.tsx';
+import { ElNinoLanding, RiskHub } from './components/civic/CivicSystem.tsx';
 import { AlertDetailsDialog } from './features/alerts/OfficialAlertPanel.tsx';
 import { SecureMessagesPanel } from './features/messages/SecureMessagesPanel.tsx';
 import { ReportDialog } from './features/reports/ReportDialog.tsx';
@@ -11,6 +12,12 @@ import './styles/app.css';
 import './styles/roast-019-density.css';
 import './styles/design-021.css';
 import './styles/design-021-density.css';
+import './styles/muni-021.css';
+
+function canonicalPath(): string {
+  const path = window.location.pathname.replace(/\/+$/, '');
+  return path || '/';
+}
 
 export default function App() {
   const { snapshot, online, refresh, refreshing } = useSnapshot();
@@ -25,6 +32,7 @@ export default function App() {
   const messagesButtonRef = useRef<HTMLButtonElement | null>(null);
   const messages = useMemo(() => visibleMessages(snapshot.messages, new Date(snapshot.generatedAt)), [snapshot]);
   const unread = messagesSeen ? 0 : messages.length;
+  const currentPath = canonicalPath();
 
   const openSources = (opener?: HTMLButtonElement | null) => {
     if (opener) sourcesOpenerRef.current = opener;
@@ -51,7 +59,21 @@ export default function App() {
     setMessagesOpen(true);
   };
 
+  const page = currentPath === '/gestion-de-riesgo/fenomeno-el-nino'
+    ? <ElNinoLanding/>
+    : currentPath === '/gestion-de-riesgo'
+      ? <RiskHub/>
+      : <DashboardPage
+        snapshot={snapshot}
+        sourcesButtonRef={sourcesOpenerRef}
+        reportButtonRef={reportOpenerRef}
+        onSources={openSources}
+        onAlerts={openAlerts}
+        onReport={openReport}
+      />;
+
   return <AppShell
+    currentPath={currentPath}
     online={online}
     refreshing={refreshing}
     unread={unread}
@@ -63,14 +85,7 @@ export default function App() {
     onMessages={openMessages}
     disclaimer={snapshot.emergencyDisclaimer}
   >
-    <DashboardPage
-      snapshot={snapshot}
-      sourcesButtonRef={sourcesOpenerRef}
-      reportButtonRef={reportOpenerRef}
-      onSources={openSources}
-      onAlerts={openAlerts}
-      onReport={openReport}
-    />
+    {page}
     <DetailsDialog snapshot={snapshot} open={detailsOpen} onClose={closeSources}/>
     <AlertDetailsDialog snapshot={snapshot} open={alertsOpen} onClose={closeAlerts}/>
     <ReportDialog snapshot={snapshot} online={online} open={reportOpen} openerRef={reportOpenerRef} onClose={() => setReportOpen(false)}/>
