@@ -15,6 +15,7 @@ import './styles/design-021.css';
 import './styles/design-021-density.css';
 import './styles/muni-021.css';
 import './styles/muni-021-tuning.css';
+import './styles/hovs-021.css';
 
 function canonicalPath(): string {
   const path = window.location.pathname.replace(/\/+$/, '');
@@ -67,8 +68,10 @@ export default function App() {
       ? <RiskHub/>
       : <DashboardPage
         snapshot={snapshot}
+        refreshing={refreshing}
         sourcesButtonRef={sourcesOpenerRef}
         reportButtonRef={reportOpenerRef}
+        onRefresh={() => void refresh()}
         onSources={openSources}
         onAlerts={openAlerts}
         onReport={openReport}
