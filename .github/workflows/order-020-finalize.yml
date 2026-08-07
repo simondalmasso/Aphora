@@ -1,0 +1,115 @@
+name: SOS-SF Order 020 Finalize
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths:
+      - .github/order-020-final-trigger
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-order-020-finalize
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/order-020-final
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  SESSION_SIGNING_KEY: ${{ secrets.SESSION_SIGNING_KEY }}
+  SOS_SF_OPERATOR_EMAILS: ${{ secrets.SOS_SF_OPERATOR_EMAILS }}
+  MESSAGE_BLOCKLIST: ${{ secrets.MESSAGE_BLOCKLIST }}
+  REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+  INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+  INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+  PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+  SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+  SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assemble deterministic final runtime
+        run: |
+          cat .github/order020-runtime/part-*.mjs > .order020-runtime.mjs
+          node --check .order020-runtime.mjs
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Reverify complete codebase before production
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          npm audit --json | tee "$EVIDENCE_DIR/npm-audit.json"
+          npm audit --audit-level=high
+          npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
+          npm run lint 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+          npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/unit.log"
+          npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/contract.log"
+          npm run build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+          npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/worker.log"
+          npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/e2e.log"
+          node scripts/revalidate-public-sources.mjs 2>&1 | tee "$EVIDENCE_DIR/source-revalidation.log"
+
+      - name: Deploy exactly once and verify production
+        id: deploy
+        run: node .order020-runtime.mjs verify-deploy
+
+      - name: Upload production screenshots
+        id: screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020-production-screenshots
+          path: artifacts/order-020-final/screenshots
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Globally disarm workflows and remove mutation routes
+        id: cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+        run: node .order020-runtime.mjs cleanup
+
+      - name: Upload complete final evidence
+        id: evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020-final-evidence
+          path: artifacts/order-020-final
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish unique AUD checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        run: node .order020-runtime.mjs checkpoint
+
+      - name: Remove protected temporary material
+        if: always()
+        run: rm -f .worker-secrets.json wrangler.generated.jsonc .order020-runtime.mjs
