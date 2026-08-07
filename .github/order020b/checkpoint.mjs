@@ -24,7 +24,10 @@ const tests = await j('test-results-manifest.json');
 const byName = new Map(tests.gates.map((gate) => [gate.name, gate]));
 const pass = (name) => byName.get(name)?.exitCode === 0;
 const deploymentGates = tests.gates.filter((gate) => gate.name === 'deployment' && gate.exitCode === 0);
+const deploymentHistory = await j('deployment-history.json');
 const deployCount = deploymentGates.length;
+const deploymentRun = deploymentHistory.deploymentRuns?.[0];
+const observedVersion = deploymentHistory.uniqueVersionIds?.[0];
 const codeReview = await j('code-review-manifest.json');
 const findings = await j('findings-matrix.json');
 const sourceMatrix = await j('source-runtime-matrix.json');
@@ -38,7 +41,8 @@ const open = findings.filter((finding) => finding.FINAL_STATE !== 'VERIFIED_CLOS
 const operational = [...new Set(sourceMatrix.sources.filter((source) => source.CONFIGURED && source.REACHABLE_NOW && source.DATA_AVAILABLE_NOW && !source.FALLBACK_ONLY).map((source) => family(source.id)))];
 const unavailable = [...new Set(sourceMatrix.sources.filter((source) => source.CONFIGURED && !source.REACHABLE_NOW).map((source) => family(source.id)))];
 const maxOverflow = Math.max(...metrics.map((metric) => metric.horizontalOverflow));
-if (deployCount !== 1) throw new Error(`DEPLOY_COUNT_NOT_EXACTLY_ONE:${deployCount}`);
+if (deployCount !== 1 || deploymentHistory.observedDeployCompletions !== 1 || !deploymentRun?.runId || !observedVersion) throw new Error('DEPLOY_HISTORY_NOT_EXACTLY_ONE');
+if (cloudflare.deploymentVersionId !== observedVersion) throw new Error(`DEPLOYMENT_VERSION_DRIFT:${cloudflare.deploymentVersionId}:${observedVersion}`);
 const body = [
   'STATUS=VERIFIED_NOT_ACCEPTED',
   `ORDER=${ORDER}`,
@@ -47,7 +51,7 @@ const body = [
   `REMOTE_HEAD_AFTER=${governance.terminalSha}`,
   `PRODUCT_COMMIT_SHA=${PRODUCT_FIX_SHA}`,
   `DEPLOY_COMMAND_COUNT=${deployCount}`,
-  `DEPLOYMENT_RUN_ID=${process.env.DEPLOYMENT_RUN_ID}`,
+  `DEPLOYMENT_RUN_ID=${deploymentRun.runId}`,
   `DEPLOYMENT_VERSION_ID=${cloudflare.deploymentVersionId}`,
   `CLOUDFLARE_MUTATION_COUNT=${deployCount}`,
   `CODE_REVIEW_MANIFEST_COUNT=${codeReview.filter((entry) => entry.reviewed).length}`,
@@ -92,7 +96,7 @@ const body = [
   'AUD_HOLD=ACTIVE',
 ].join('\n');
 if (open.length || !screenshots.setComplete || screenshots.semanticHashGate !== 'PASS' || screenshots.semanticGate !== 'PASS' || maxOverflow > 1) throw new Error('CHECKPOINT_TERMINAL_GATE_FAILED');
-for (const required of ['deployment','dependency-audit','typecheck','lint','unit','contract','build','worker','e2e','accessibility','offline','source-freshness-fallback','security-endpoints']) if (!pass(required)) throw new Error(`CHECKPOINT_GATE_NOT_VERIFIED:${required}`);
+for (const required of ['deployment','repo-security','dependency-audit','typecheck','lint','unit','contract','build','worker','e2e','accessibility','offline','source-freshness-fallback','performance','security-endpoints']) if (!pass(required)) throw new Error(`CHECKPOINT_GATE_NOT_VERIFIED:${required}`);
 const comments = JSON.parse(gh('api', `repos/${REPO}/issues/14/comments?per_page=100`));
 if (comments.some((comment) => String(comment.body || '').includes(`SUBORDER=${SUBORDER}`) && String(comment.body || '').includes('STATUS=VERIFIED_NOT_ACCEPTED'))) throw new Error('020B_CHECKPOINT_ALREADY_EXISTS');
 gh('api', '-X', 'POST', `repos/${REPO}/issues/14/comments`, '-f', `body=${body}`);
