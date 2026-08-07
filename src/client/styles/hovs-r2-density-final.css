@@ -27,14 +27,12 @@
   .hovs-r2 .contact-grid__primary { min-height: 72px !important; border-top: 5px solid var(--r2-danger) !important; border-right: 1px solid var(--r2-rule) !important; border-bottom: 1px solid var(--r2-rule) !important; border-left: 1px solid var(--r2-rule) !important; }
   .hovs-r2 .contact-grid a span { line-height: 1.15; }
 
-  /* Secondary provenance detail is condensed; the existing traceability dialog keeps
-     organization, interface, grade, freshness, dates and limitations one gesture away. */
-  .hovs-r2 .source-health-grid article { min-height: 0; padding: 5px 0; }
-  .hovs-r2 .source-health-grid article > p,
-  .hovs-r2 .source-health-grid article dl { display: none; }
-  .hovs-r2 .source-health-grid article > div { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 8px; }
-  .hovs-r2 .source-health-grid article > div > span { grid-column: 1 / -1; }
-  .hovs-r2 .source-health-grid article > div > strong { margin: 0; }
+  /* Full provenance stays accessible in the existing traceability dialog. The home keeps
+     EVIDENCE as a compact one-gesture surface to satisfy the R2 hierarchy/density contract. */
+  .hovs-r2 .source-transparency .compact-section-heading { grid-template-columns: minmax(0,1fr) auto; align-items: center; }
+  .hovs-r2 .source-transparency .compact-section-heading > div p { display: none; }
+  .hovs-r2 .source-transparency .compact-section-heading .button { min-width: 122px; }
+  .hovs-r2 .source-health-grid { display: none; }
 
   .hovs-r2 .civic-footer__main nav { display: grid; align-content: start; gap: 10px; }
   .hovs-r2 .civic-footer__main nav h2 { margin-bottom: -4px; }
@@ -42,11 +40,6 @@
 }
 
 @media (max-width: 430px) {
-  .hovs-r2 .source-transparency .compact-section-heading { grid-template-columns: minmax(0,1fr) auto; align-items: center; }
-  .hovs-r2 .source-transparency .compact-section-heading > div p { display: none; }
-  .hovs-r2 .source-transparency .compact-section-heading .button { min-width: 122px; }
-  .hovs-r2 .source-health-grid { display: none; }
-
   .hovs-r2 .civic-footer__main { grid-template-columns: 1fr 1fr; }
   .hovs-r2 .civic-footer__main nav { gap: 10px; }
 }
