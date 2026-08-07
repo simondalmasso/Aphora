@@ -46,13 +46,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install --package-lock-only --ignore-scripts --save-dev --save-exact wrangler@4.35.0 @cloudflare/workers-types@4.20260702.1
+          npm pkg set overrides.undici=7.29.0
+          npm install --package-lock-only --ignore-scripts --save-dev --save-exact wrangler@4.119.0 @cloudflare/workers-types@5.20260801.1
           git add package.json package-lock.json
           git diff --cached --check
           git config user.name sos-sf-automation
           git config user.email sos-sf-automation@users.noreply.github.com
           if ! git diff --cached --quiet; then
-            git commit -m 'chore: pin audited Cloudflare toolchain'
+            git commit -m 'chore: pin fully audited Cloudflare toolchain'
             git push origin HEAD:arq/visual-dashboard-v3
           fi
           git rev-parse HEAD > "$EVIDENCE_DIR/review-commit.txt"
