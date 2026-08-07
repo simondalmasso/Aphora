@@ -1,4 +1,4 @@
-import { unavailableSnapshot } from '../data/unavailable-snapshot';
+import { unavailableSnapshot } from '../data/unavailable-snapshot.ts';
 import {
   alertVerificationState,
   classificationForSource,
@@ -6,7 +6,7 @@ import {
   freshnessFor,
   highestFreshness,
   timelineFor,
-} from '../domain/public-safety';
+} from '../domain/public-safety.ts';
 import type {
   ChangeItem,
   DataStatus,
@@ -20,12 +20,12 @@ import type {
   Snapshot,
   Source,
   SourceOrganization,
-} from '../domain/snapshot';
-import { providerHealth, publishProviderBlock, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core';
-import { fetchInaSeries, fetchInaWaterMl } from './providers/ina';
-import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa';
-import { fetchPortsHydrometers, type PortsHydrometerReading } from './providers/ports';
-import { fetchSmnAlerts, fetchSmnObservations, type SmnAlertSummary, type SmnObservationSummary } from './providers/smn';
+} from '../domain/snapshot.ts';
+import { providerHealth, publishProviderBlock, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core.ts';
+import { fetchInaSeries, fetchInaWaterMl } from './providers/ina.ts';
+import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa.ts';
+import { fetchPortsHydrometers, type PortsHydrometerReading } from './providers/ports.ts';
+import { fetchSmnAlerts, fetchSmnObservations, type SmnAlertSummary, type SmnObservationSummary } from './providers/smn.ts';
 
 export interface LiveDataEnv {
   readonly INA_WATERML_PARANA_URL?: string;

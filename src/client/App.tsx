@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { visibleMessages } from '../domain/messages';
-import { AppShell } from './app/AppShell';
-import { DashboardPage } from './app/DashboardPage';
-import { DetailsDialog } from './components/DetailsDialog';
-import { AlertDetailsDialog } from './features/alerts/OfficialAlertPanel';
-import { SecureMessagesPanel } from './features/messages/SecureMessagesPanel';
-import { ReportDialog } from './features/reports/ReportDialog';
-import { useSnapshot } from './pwa/useSnapshot';
+import { visibleMessages } from '../domain/messages.ts';
+import { AppShell } from './app/AppShell.tsx';
+import { DashboardPage } from './app/DashboardPage.tsx';
+import { DetailsDialog } from './components/DetailsDialog.tsx';
+import { AlertDetailsDialog } from './features/alerts/OfficialAlertPanel.tsx';
+import { SecureMessagesPanel } from './features/messages/SecureMessagesPanel.tsx';
+import { ReportDialog } from './features/reports/ReportDialog.tsx';
+import { useSnapshot } from './pwa/useSnapshot.ts';
 import './styles/app.css';
 import './styles/roast-019-density.css';
 

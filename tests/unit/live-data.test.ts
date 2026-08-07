@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildLiveSnapshot } from '../../src/worker/live-data';
+import { buildLiveSnapshot } from '../../src/worker/live-data.ts';
 
 const originalFetch = globalThis.fetch;
 beforeEach(() => {

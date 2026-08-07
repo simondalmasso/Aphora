@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import type { Snapshot } from '../../../domain/snapshot';
-import { privateHeaders } from '../../security/csrf';
-import { prepareReportPhoto } from './image-processing';
+import type { Snapshot } from '../../../domain/snapshot.ts';
+import { privateHeaders } from '../../security/csrf.ts';
+import { prepareReportPhoto } from './image-processing.ts';
 import {
   clearReportDraft,
   loadReportDraft,
@@ -10,7 +10,7 @@ import {
   storedPhotos,
   type StoredLocationReading,
   type StoredReportDraft,
-} from './report-draft-store';
+} from './report-draft-store.ts';
 
 const CONTACTS = Object.freeze([
   { number: '911', label: 'Central de Emergencias', href: 'tel:911' },

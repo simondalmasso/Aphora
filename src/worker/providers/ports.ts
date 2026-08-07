@@ -1,4 +1,4 @@
-import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core';
+import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core.ts';
 
 export interface PortsHydrometerReading {
   readonly station: string;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { demoSnapshot } from '../../src/data/demo-snapshot';
-import { mapToZungunEnvelope } from '../../src/domain/zungun-compat/mapper';
-import { validateCriticalMessage } from '../../src/domain/zungun-compat/validation';
+import { demoSnapshot } from '../../src/data/demo-snapshot.ts';
+import { mapToZungunEnvelope } from '../../src/domain/zungun-compat/mapper.ts';
+import { validateCriticalMessage } from '../../src/domain/zungun-compat/validation.ts';
 
 describe('zungun-compatible boundary', () => {
   it('maps stable identity, TTL, priority and commitment', () => {

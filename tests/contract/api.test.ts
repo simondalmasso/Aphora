@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import worker from '../../src/worker/index';
-import type { WorkerEnv } from '../../src/worker/router';
+import worker from '../../src/worker/index.ts';
+import type { WorkerEnv } from '../../src/worker/router.ts';
 
 const originalFetch = globalThis.fetch;
 const env: WorkerEnv = {

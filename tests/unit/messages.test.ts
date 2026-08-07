@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { messageIsActive, visibleMessages } from '../../src/domain/messages';
-import { demoSnapshot } from '../../src/data/demo-snapshot';
+import { messageIsActive, visibleMessages } from '../../src/domain/messages.ts';
+import { demoSnapshot } from '../../src/data/demo-snapshot.ts';
 
 describe('critical messages', () => {
   it('applies strict TTL boundaries', () => {

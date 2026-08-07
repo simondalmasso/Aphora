@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sourceAgeLabel, sourceFreshness } from '../../src/domain/sources';
+import { sourceAgeLabel, sourceFreshness } from '../../src/domain/sources.ts';
 
 describe('source freshness', () => {
   it('marks a source fresh only inside its validity interval', () => {

@@ -1,6 +1,6 @@
-import type { SessionPrincipal } from '../domain/private-messaging/types';
-import { randomSecurityToken, securityTokenHash } from './auth';
-import type { D1DatabaseLike } from './d1-message-store';
+import type { SessionPrincipal } from '../domain/private-messaging/types.ts';
+import { randomSecurityToken, securityTokenHash } from './auth.ts';
+import type { D1DatabaseLike } from './d1-message-store.ts';
 
 export interface ReportPhotoMetadata {
   readonly mime: string;

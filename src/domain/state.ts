@@ -1,4 +1,4 @@
-import type { PublicState } from './snapshot';
+import type { PublicState } from './snapshot.ts';
 
 export interface StateSignals {
   readonly modelRisk: 'NORMAL' | 'ELEVATED' | 'HIGH' | 'UNKNOWN';

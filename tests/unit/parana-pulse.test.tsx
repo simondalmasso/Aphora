@@ -1,8 +1,8 @@
 import { createRef } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { DashboardPage } from '../../src/client/app/DashboardPage';
-import { unavailableSnapshot } from '../../src/data/unavailable-snapshot';
+import { DashboardPage } from '../../src/client/app/DashboardPage.tsx';
+import { unavailableSnapshot } from '../../src/data/unavailable-snapshot.ts';
 
 describe('hydrometric-first progressive rendering', () => {
   it('renders hydrometric status first, four primary sections, emergency channels and no decorative canvas', () => {

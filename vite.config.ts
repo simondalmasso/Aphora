@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import type { Connect } from 'vite';
-import { routeRequest } from './src/worker/router';
+import { routeRequest } from './src/worker/router.ts';
 
 function localWorkerMiddleware(): Connect.NextHandleFunction {
   return (request, response, next) => {

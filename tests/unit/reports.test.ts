@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
-import { consumeReportPhotoAccess, createReport, createReportPhotoAccess, listReports, purgeExpiredReports, updatePhotoReview, updateReport, type KVNamespaceLike, type ReportPhotoMetadata } from '../../src/worker/reports';
-import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store';
+import type { SessionPrincipal } from '../../src/domain/private-messaging/types.ts';
+import { consumeReportPhotoAccess, createReport, createReportPhotoAccess, listReports, purgeExpiredReports, updatePhotoReview, updateReport, type KVNamespaceLike, type ReportPhotoMetadata } from '../../src/worker/reports.ts';
+import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store.ts';
 
 class FakeStatement implements D1Statement {
   values: unknown[] = [];

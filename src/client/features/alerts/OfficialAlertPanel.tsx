@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import type { OfficialAlert, Snapshot } from '../../../domain/snapshot';
-import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety';
+import type { OfficialAlert, Snapshot } from '../../../domain/snapshot.ts';
+import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety.ts';
 
 function activeOfficialAlert(snapshot: Snapshot): OfficialAlert | undefined {
   if (snapshot.alertStatus !== 'ALERTA_OFICIAL_ACTIVA') return undefined;

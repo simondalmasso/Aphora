@@ -1,4 +1,4 @@
-import type { CriticalMessage } from './zungun-compat/types';
+import type { CriticalMessage } from './zungun-compat/types.ts';
 
 export function messageIsActive(message: CriticalMessage, now: Date): boolean {
   if (message.status !== 'ACTIVE') return false;

@@ -1,5 +1,5 @@
-import type { HydrologicalSystem, OfficialAlert, RiverForecastPoint, RiverPoint, RiverThreshold, Snapshot, Source, SourceOrganization, TimelineEvent } from './snapshot';
-import { validateCriticalMessage } from './zungun-compat/validation';
+import type { HydrologicalSystem, OfficialAlert, RiverForecastPoint, RiverPoint, RiverThreshold, Snapshot, Source, SourceOrganization, TimelineEvent } from './snapshot.ts';
+import { validateCriticalMessage } from './zungun-compat/validation.ts';
 
 function plain(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError(`${label} debe ser un objeto`);

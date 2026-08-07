@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { demoSnapshot } from '../../src/data/demo-snapshot';
-import { compactSnapshot } from '../../src/domain/snapshot';
-import { validateSnapshot } from '../../src/domain/validation';
+import { demoSnapshot } from '../../src/data/demo-snapshot.ts';
+import { compactSnapshot } from '../../src/domain/snapshot.ts';
+import { validateSnapshot } from '../../src/domain/validation.ts';
 
 describe('snapshot contract', () => {
   it('validates and serializes the fixture without losing uncertainty', () => {

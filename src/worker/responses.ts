@@ -1,4 +1,4 @@
-import { withSecurityHeaders } from './security';
+import { withSecurityHeaders } from './security.ts';
 
 export interface ApiMeta {
   readonly schemaVersion: '1.0';

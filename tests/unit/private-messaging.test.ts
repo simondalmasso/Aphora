@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MemoryMessageStore } from '../../src/domain/private-messaging/memory-store';
-import { MessagingService } from '../../src/domain/private-messaging/service';
-import { normalizeSendMessage } from '../../src/domain/private-messaging/validation';
-import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
+import { MemoryMessageStore } from '../../src/domain/private-messaging/memory-store.ts';
+import { MessagingService } from '../../src/domain/private-messaging/service.ts';
+import { normalizeSendMessage } from '../../src/domain/private-messaging/validation.ts';
+import type { SessionPrincipal } from '../../src/domain/private-messaging/types.ts';
 
 const user: SessionPrincipal = { sessionId: 'session:user-10001', sub: 'user:10001', email: 'user10001@example.org', role: 'AUTHENTICATED_USER', expiresAt: '2026-08-03T00:00:00.000Z' };
 const otherUser: SessionPrincipal = { ...user, sessionId: 'session:user-20002', sub: 'user:20002', email: 'user20002@example.org' };

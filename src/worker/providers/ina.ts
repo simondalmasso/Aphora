@@ -1,5 +1,5 @@
-import type { RiverPoint } from '../../domain/snapshot';
-import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core';
+import type { RiverPoint } from '../../domain/snapshot.ts';
+import { fetchProvider, type ProviderPolicy, type ProviderResult } from './core.ts';
 const A5: ProviderPolicy=Object.freeze({id:'ina-a5',hosts:Object.freeze(['alerta.ina.gob.ar']),paths:Object.freeze([/^\/a5\/getObservaciones$/]),contentTypes:Object.freeze(['application/json']),maxBytes:1_500_000,refreshMs:5*60_000,freshMs:36*60*60_000,staleMs:365*24*60*60_000});
 const WML: ProviderPolicy=Object.freeze({id:'ina-waterml',hosts:Object.freeze(['alerta.ina.gob.ar']),paths:Object.freeze([/^\/a5\/obs\/puntual\/series\/\d+$/]),contentTypes:Object.freeze(['application/xml','text/xml']),maxBytes:1_500_000,refreshMs:5*60_000,freshMs:36*60*60_000,staleMs:365*24*60*60_000});
 function record(v:unknown):v is Record<string,unknown>{return typeof v==='object'&&v!==null&&!Array.isArray(v)}

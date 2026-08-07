@@ -1,5 +1,5 @@
-import type { MessagePage, PrivateConversation, PrivateMessage } from './types';
-import type { MessageStore } from './service';
+import type { MessagePage, PrivateConversation, PrivateMessage } from './types.ts';
+import type { MessageStore } from './service.ts';
 
 export class MemoryMessageStore implements MessageStore {
   readonly conversations: PrivateConversation[] = [];

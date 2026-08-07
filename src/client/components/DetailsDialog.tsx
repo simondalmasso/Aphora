@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import type { Snapshot, Source } from '../../domain/snapshot';
-import { formatHumanAge, formatLocalDateTime } from '../../domain/public-safety';
+import type { Snapshot, Source } from '../../domain/snapshot.ts';
+import { formatHumanAge, formatLocalDateTime } from '../../domain/public-safety.ts';
 
 const FUNCTION_ORDER = ['Hidrometría', 'Alertas oficiales', 'Meteorología y lluvia', 'Canales de verificación'] as const;
 type SourceFunction = typeof FUNCTION_ORDER[number];

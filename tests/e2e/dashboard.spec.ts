@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import type { Snapshot, Source } from '../../src/domain/snapshot';
+import type { Snapshot, Source } from '../../src/domain/snapshot.ts';
 
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/current-run';
 const generatedAt = '2026-08-06T04:30:00.000Z';

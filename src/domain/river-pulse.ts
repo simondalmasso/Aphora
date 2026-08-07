@@ -1,4 +1,4 @@
-import type { RiverForecastPoint, RiverPoint, RiverThreshold } from './snapshot';
+import type { RiverForecastPoint, RiverPoint, RiverThreshold } from './snapshot.ts';
 
 export interface RiverPulseData {
   readonly points: readonly RiverPoint[];

@@ -1,4 +1,4 @@
-import type { Source, SourceStatus } from './snapshot';
+import type { Source, SourceStatus } from './snapshot.ts';
 
 export function sourceFreshness(source: Pick<Source, 'observedAt' | 'validUntil'>, now: Date): SourceStatus {
   const observedAt = Date.parse(source.observedAt);

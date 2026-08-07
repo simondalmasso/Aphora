@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { unavailableSnapshot } from '../../src/data/unavailable-snapshot';
-import type { HydrologicalSystem, Snapshot, Source } from '../../src/domain/snapshot';
-import { validateSnapshot } from '../../src/domain/validation';
+import { unavailableSnapshot } from '../../src/data/unavailable-snapshot.ts';
+import type { HydrologicalSystem, Snapshot, Source } from '../../src/domain/snapshot.ts';
+import { validateSnapshot } from '../../src/domain/validation.ts';
 
 const at = '2026-08-03T12:00:00.000Z';
 const source: Source = { id: 'ina-rest-30', name: 'INA REST · Río Paraná, Santa Fe', kind: 'OFFICIAL_OBSERVATION', status: 'FRESH', observedAt: at, fetchedAt: at, lastCheckedAt: at, validUntil: '2026-08-03T18:00:00.000Z', contribution: 'Lectura publicada.', official: true, connected: true, organizationId: 'ina', organizationName: 'Instituto Nacional del Agua', feedId: 'ina-rest-30', feedName: 'INA REST · Río Paraná, Santa Fe', classification: 'OPERATIONAL_FRESH', freshness: 'ACTUALIZADO', determinesPrimaryState: true };

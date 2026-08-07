@@ -1,4 +1,4 @@
-import type { SessionPrincipal, UserRole } from '../domain/private-messaging/types';
+import type { SessionPrincipal, UserRole } from '../domain/private-messaging/types.ts';
 
 const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
 const SESSION_COOKIE = '__Host-sos_sf_session';

@@ -1,7 +1,7 @@
 import { useMemo, useState, type RefObject } from 'react';
-import type { HydrologicalSystem, Snapshot, Source } from '../../../domain/snapshot';
-import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety';
-import { HydroSeriesChart } from '../../components/ui/HydroSeriesChart';
+import type { HydrologicalSystem, Snapshot, Source } from '../../../domain/snapshot.ts';
+import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety.ts';
+import { HydroSeriesChart } from '../../components/ui/HydroSeriesChart.tsx';
 
 const EMPTY_SYSTEMS: readonly HydrologicalSystem[] = Object.freeze([]);
 

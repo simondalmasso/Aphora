@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchProvider, type ProviderPolicy } from '../../src/worker/providers/core';
+import { fetchProvider, type ProviderPolicy } from '../../src/worker/providers/core.ts';
 
 const policy: ProviderPolicy = {
   id: 'test-provider',

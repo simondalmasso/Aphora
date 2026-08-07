@@ -1,5 +1,5 @@
-import type { MessagePage, PrivateConversation, PrivateMessage } from '../domain/private-messaging/types';
-import type { MessageStore } from '../domain/private-messaging/service';
+import type { MessagePage, PrivateConversation, PrivateMessage } from '../domain/private-messaging/types.ts';
+import type { MessageStore } from '../domain/private-messaging/service.ts';
 
 export interface D1Result<T = unknown> { readonly results?: T[]; readonly success?: boolean }
 export interface D1Statement {

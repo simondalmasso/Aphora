@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import type { PrivateConversation, PrivateMessage, SessionPrincipal } from '../../../domain/private-messaging/types';
-import type { CriticalMessage } from '../../../domain/zungun-compat/types';
-import { privateHeaders } from '../../security/csrf';
+import type { PrivateConversation, PrivateMessage, SessionPrincipal } from '../../../domain/private-messaging/types.ts';
+import type { CriticalMessage } from '../../../domain/zungun-compat/types.ts';
+import { privateHeaders } from '../../security/csrf.ts';
 
 interface AuthConfig { readonly enabled: boolean; readonly reportingEnabled: boolean; readonly googleClientId: string | null }
 interface Envelope<T> { readonly data: T; readonly error?: { readonly message?: string } }

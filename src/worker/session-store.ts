@@ -1,5 +1,5 @@
-import type { SessionPrincipal } from '../domain/private-messaging/types';
-import type { D1DatabaseLike } from './d1-message-store';
+import type { SessionPrincipal } from '../domain/private-messaging/types.ts';
+import type { D1DatabaseLike } from './d1-message-store.ts';
 
 export async function rotateSession(db: D1DatabaseLike, principal: SessionPrincipal, csrfHash: string, now: Date): Promise<string | null> {
   const previous = await db.prepare('SELECT id FROM auth_sessions WHERE sub = ? AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1').bind(principal.sub).first<{ id: string }>();

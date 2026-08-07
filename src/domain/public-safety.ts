@@ -1,4 +1,4 @@
-import type { AlertVerificationState, DataStatus, FeedClassification, FreshnessState, HydrologicalSystem, OfficialAlert, Source, TimelineEvent } from './snapshot';
+import type { AlertVerificationState, DataStatus, FeedClassification, FreshnessState, HydrologicalSystem, OfficialAlert, Source, TimelineEvent } from './snapshot.ts';
 
 export const LOCAL_TIME_ZONE = 'America/Argentina/Cordoba';
 const EARLIEST_PUBLIC_TIMESTAMP = Date.UTC(2000, 0, 1);

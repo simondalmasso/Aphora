@@ -1,6 +1,6 @@
-import type { Snapshot } from '../domain/snapshot';
-import { formatLocalDateTime } from '../domain/public-safety';
-import { withSecurityHeaders } from './security';
+import type { Snapshot } from '../domain/snapshot.ts';
+import { formatLocalDateTime } from '../domain/public-safety.ts';
+import { withSecurityHeaders } from './security.ts';
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));

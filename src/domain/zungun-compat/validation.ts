@@ -1,4 +1,4 @@
-import type { CriticalMessage, CriticalMessageStatus, CriticalMessageType } from './types';
+import type { CriticalMessage, CriticalMessageStatus, CriticalMessageType } from './types.ts';
 
 const TYPES = new Set<CriticalMessageType>(['OFFICIAL_NOTICE', 'WEATHER_WARNING', 'SHELTER_UPDATE', 'SOURCE_CONTRADICTION', 'SYSTEM_STATUS', 'COMMUNITY_VERIFIED_REPORT']);
 const STATUSES = new Set<CriticalMessageStatus>(['ACTIVE', 'EXPIRED', 'RETRACTED', 'UNKNOWN']);

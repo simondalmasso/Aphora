@@ -1,4 +1,4 @@
-import type { CriticalMessage } from './zungun-compat/types';
+import type { CriticalMessage } from './zungun-compat/types.ts';
 
 export type PublicState = 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'UMBRAL_EVACUACION_ALCANZADO' | 'EVACUACION_OFICIAL' | 'UNKNOWN';
 export type DataStatus = 'LIVE' | 'STALE' | 'UNAVAILABLE' | 'OFFLINE';

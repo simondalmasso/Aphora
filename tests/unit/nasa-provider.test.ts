@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchNasaGpm } from '../../src/worker/providers/nasa';
+import { fetchNasaGpm } from '../../src/worker/providers/nasa.ts';
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {

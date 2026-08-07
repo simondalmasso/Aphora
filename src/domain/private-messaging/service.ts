@@ -1,5 +1,5 @@
-import type { MessagePage, PrivateConversation, PrivateMessage, SendMessageInput, SessionPrincipal } from './types';
-import { PRIVATE_PAGE_LIMIT, messagePassesModeration, normalizeSendMessage } from './validation';
+import type { MessagePage, PrivateConversation, PrivateMessage, SendMessageInput, SessionPrincipal } from './types.ts';
+import { PRIVATE_PAGE_LIMIT, messagePassesModeration, normalizeSendMessage } from './validation.ts';
 
 export interface MessageStore {
   findConversation(id: string): Promise<PrivateConversation | null>;

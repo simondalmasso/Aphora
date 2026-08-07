@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { createTestHarness } from 'wrangler';
-import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
-import { createSessionCookieForPrincipal, securityTokenHash } from '../../src/worker/auth';
+import type { SessionPrincipal } from '../../src/domain/private-messaging/types.ts';
+import { createSessionCookieForPrincipal, securityTokenHash } from '../../src/worker/auth.ts';
 
 interface TestEnv {
   readonly MESSAGES_DB: D1Database;

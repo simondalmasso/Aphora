@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
-import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store';
-import { rotateSession } from '../../src/worker/session-store';
+import type { SessionPrincipal } from '../../src/domain/private-messaging/types.ts';
+import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store.ts';
+import { rotateSession } from '../../src/worker/session-store.ts';
 
 class Statement implements D1Statement {
   values: unknown[] = [];

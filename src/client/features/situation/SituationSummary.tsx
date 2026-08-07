@@ -1,5 +1,5 @@
-import type { Snapshot } from '../../../domain/snapshot';
-import { formatHumanAge } from '../../../domain/public-safety';
+import type { Snapshot } from '../../../domain/snapshot.ts';
+import { formatHumanAge } from '../../../domain/public-safety.ts';
 
 function trendSymbol(trend: NonNullable<Snapshot['systems']>[number]['trend']): string {
   if (trend === 'RISING' || trend === 'RISING_SLOWLY') return '↗';

@@ -1,6 +1,6 @@
-import type { PrivateMessage } from '../private-messaging/types';
-import type { CriticalMessage, PrivateZungunEnvelopeSubset, ZungunEnvelopeSubset } from './types';
-import { validateCriticalMessage } from './validation';
+import type { PrivateMessage } from '../private-messaging/types.ts';
+import type { CriticalMessage, PrivateZungunEnvelopeSubset, ZungunEnvelopeSubset } from './types.ts';
+import { validateCriticalMessage } from './validation.ts';
 
 export function mapToZungunEnvelope(message: CriticalMessage, now: Date): ZungunEnvelopeSubset {
   validateCriticalMessage(message);

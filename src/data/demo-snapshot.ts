@@ -1,5 +1,5 @@
-import type { Snapshot } from '../domain/snapshot';
-import { derivePublicState } from '../domain/state';
+import type { Snapshot } from '../domain/snapshot.ts';
+import { derivePublicState } from '../domain/state.ts';
 
 const decision = derivePublicState({
   modelRisk: 'ELEVATED',

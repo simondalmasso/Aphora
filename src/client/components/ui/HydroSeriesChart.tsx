@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import type { HydrologicalSystem, RiverPoint } from '../../../domain/snapshot';
-import { formatHumanAge, formatLocalDateTime, isPublicTimestamp, LOCAL_TIME_ZONE } from '../../../domain/public-safety';
+import type { HydrologicalSystem, RiverPoint } from '../../../domain/snapshot.ts';
+import { formatHumanAge, formatLocalDateTime, isPublicTimestamp, LOCAL_TIME_ZONE } from '../../../domain/public-safety.ts';
 
 const WIDTH = 760;
 const HEIGHT = 310;

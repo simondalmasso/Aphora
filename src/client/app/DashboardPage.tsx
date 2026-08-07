@@ -1,10 +1,10 @@
 import type { RefObject } from 'react';
-import type { Snapshot } from '../../domain/snapshot';
-import { SafetyActions } from '../features/actions/SafetyActions';
-import { VerifiedAlertBanner } from '../features/alerts/OfficialAlertPanel';
-import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring';
-import { SituationSummary } from '../features/situation/SituationSummary';
-import { SourceTransparency } from '../features/sources/SourceTransparency';
+import type { Snapshot } from '../../domain/snapshot.ts';
+import { SafetyActions } from '../features/actions/SafetyActions.tsx';
+import { VerifiedAlertBanner } from '../features/alerts/OfficialAlertPanel.tsx';
+import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';
+import { SituationSummary } from '../features/situation/SituationSummary.tsx';
+import { SourceTransparency } from '../features/sources/SourceTransparency.tsx';
 
 interface Props {
   readonly snapshot: Snapshot;

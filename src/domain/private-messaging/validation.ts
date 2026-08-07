@@ -1,4 +1,4 @@
-import type { SendMessageInput } from './types';
+import type { SendMessageInput } from './types.ts';
 
 export const PRIVATE_MESSAGE_MAX_LENGTH = 280;
 export const PRIVATE_PAGE_LIMIT = 40;

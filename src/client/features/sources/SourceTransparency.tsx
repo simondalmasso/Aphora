@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
-import type { Snapshot, Source } from '../../../domain/snapshot';
-import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety';
+import type { Snapshot, Source } from '../../../domain/snapshot.ts';
+import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety.ts';
 
 function statusLabel(source: Source | undefined): string {
   if (!source) return 'No publicada';

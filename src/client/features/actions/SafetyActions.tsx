@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import type { Snapshot } from '../../../domain/snapshot';
+import type { Snapshot } from '../../../domain/snapshot.ts';
 
 const CONTACTS = Object.freeze([
   { number: '911', label: 'Emergencias', href: 'tel:911' },

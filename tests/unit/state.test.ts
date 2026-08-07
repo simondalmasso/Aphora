@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { derivePublicState } from '../../src/domain/state';
+import { derivePublicState } from '../../src/domain/state.ts';
 
 describe('derivePublicState', () => {
   it('preserves contradictory demo signals as surveillance', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { alertVerificationState, classificationForSource, dataStatusForFreshness, formatHumanAge, formatLocalDateTime, freshnessFor, highestFreshness, isPublicTimestamp, timelineFor } from '../../src/domain/public-safety';
-import type { HydrologicalSystem, OfficialAlert, Source } from '../../src/domain/snapshot';
+import { alertVerificationState, classificationForSource, dataStatusForFreshness, formatHumanAge, formatLocalDateTime, freshnessFor, highestFreshness, isPublicTimestamp, timelineFor } from '../../src/domain/public-safety.ts';
+import type { HydrologicalSystem, OfficialAlert, Source } from '../../src/domain/snapshot.ts';
 
 const now = new Date('2026-08-05T12:00:00.000Z');
 const source = (overrides: Partial<Source> = {}): Source => ({

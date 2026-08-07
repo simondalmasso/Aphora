@@ -1,13 +1,13 @@
-import { MessagingService } from '../domain/private-messaging/service';
-import type { SessionPrincipal } from '../domain/private-messaging/types';
-import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookieForPrincipal, createSessionPrincipal, randomSecurityToken, readSession, roleForEmail, securityTokenHash, verifyGoogleIdToken } from './auth';
-import { D1MessageStore, type D1DatabaseLike } from './d1-message-store';
-import { buildLiveSnapshot, liveProviderHealth, type LiveDataEnv } from './live-data';
-import { liteResponse } from './lite';
-import { consumeReportPhotoAccess, createReport, createReportPhotoAccess, listReports, updatePhotoReview, updateReport, type KVNamespaceLike, type ReportEnv } from './reports';
-import { errorResponse, jsonResponse, privateErrorResponse, privateJsonResponse } from './responses';
-import { withSecurityHeaders } from './security';
-import { rotateSession } from './session-store';
+import { MessagingService } from '../domain/private-messaging/service.ts';
+import type { SessionPrincipal } from '../domain/private-messaging/types.ts';
+import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookieForPrincipal, createSessionPrincipal, randomSecurityToken, readSession, roleForEmail, securityTokenHash, verifyGoogleIdToken } from './auth.ts';
+import { D1MessageStore, type D1DatabaseLike } from './d1-message-store.ts';
+import { buildLiveSnapshot, liveProviderHealth, type LiveDataEnv } from './live-data.ts';
+import { liteResponse } from './lite.ts';
+import { consumeReportPhotoAccess, createReport, createReportPhotoAccess, listReports, updatePhotoReview, updateReport, type KVNamespaceLike, type ReportEnv } from './reports.ts';
+import { errorResponse, jsonResponse, privateErrorResponse, privateJsonResponse } from './responses.ts';
+import { withSecurityHeaders } from './security.ts';
+import { rotateSession } from './session-store.ts';
 
 export interface AssetFetcher { fetch(request: Request): Promise<Response> }
 export interface WorkerEnv extends LiveDataEnv, ReportEnv {

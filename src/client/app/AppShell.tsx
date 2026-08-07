@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
-import type { AlertVerificationState } from '../../domain/snapshot';
-import { IconButton } from '../components/ui/IconButton';
+import type { AlertVerificationState } from '../../domain/snapshot.ts';
+import { IconButton } from '../components/ui/IconButton.tsx';
 
 interface AppShellProps {
   readonly online: boolean;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { SessionPrincipal } from '../../src/domain/private-messaging/types';
-import { createSessionCookieForPrincipal, securityTokenHash } from '../../src/worker/auth';
-import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store';
-import { routeRequest } from '../../src/worker/router';
+import type { SessionPrincipal } from '../../src/domain/private-messaging/types.ts';
+import { createSessionCookieForPrincipal, securityTokenHash } from '../../src/worker/auth.ts';
+import type { D1DatabaseLike, D1Statement } from '../../src/worker/d1-message-store.ts';
+import { routeRequest } from '../../src/worker/router.ts';
 
 class Statement implements D1Statement {
   values: unknown[] = [];

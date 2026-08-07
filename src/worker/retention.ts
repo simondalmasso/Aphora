@@ -1,5 +1,5 @@
-import type { WorkerEnv } from './router';
-import { purgeExpiredReports } from './reports';
+import type { WorkerEnv } from './router.ts';
+import { purgeExpiredReports } from './reports.ts';
 
 export interface RetentionResult {
   readonly deletedPhotos: number;

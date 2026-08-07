@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookie, readSession, resetGoogleJwksCacheForTests, securityTokenHash, validateGoogleClaims, verifyGoogleIdToken, type GoogleClaims } from '../../src/worker/auth';
+import { clearCsrfCookie, clearSessionCookie, createCsrfCookie, createSessionCookie, readSession, resetGoogleJwksCacheForTests, securityTokenHash, validateGoogleClaims, verifyGoogleIdToken, type GoogleClaims } from '../../src/worker/auth.ts';
 
 const clientId = 'client.apps.googleusercontent.com';
 const now = Date.parse('2026-08-02T15:00:00.000Z');

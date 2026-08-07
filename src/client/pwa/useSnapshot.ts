@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { unavailableSnapshot } from '../../data/unavailable-snapshot';
-import type { Snapshot } from '../../domain/snapshot';
-import { validateSnapshot } from '../../domain/validation';
+import { unavailableSnapshot } from '../../data/unavailable-snapshot.ts';
+import type { Snapshot } from '../../domain/snapshot.ts';
+import { validateSnapshot } from '../../domain/validation.ts';
 
 const STORAGE_KEY = 'sos-sf:last-public-safety-snapshot:v4';
 

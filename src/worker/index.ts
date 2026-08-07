@@ -1,7 +1,7 @@
-import { purgeExpiredPrivateData } from './retention';
-import { routeRequest, type WorkerEnv } from './router';
-import { errorResponse } from './responses';
-import { withSecurityHeaders } from './security';
+import { purgeExpiredPrivateData } from './retention.ts';
+import { routeRequest, type WorkerEnv } from './router.ts';
+import { errorResponse } from './responses.ts';
+import { withSecurityHeaders } from './security.ts';
 
 interface ExecutionContextLike { waitUntil(promise: Promise<unknown>): void }
 interface ScheduledControllerLike { readonly scheduledTime: number; readonly cron: string }
