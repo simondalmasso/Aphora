@@ -1,0 +1,112 @@
+/* 021-HOVS terminal polish: preserve touch ergonomics while restoring information density budgets. */
+@media (max-width: 820px) {
+  .dashboard { padding-top: 12px; padding-bottom: 20px; gap: 14px; }
+  .hydrometric-section { padding: 10px 0 12px; }
+  .hydrometric-hero__header { margin-bottom: 10px; gap: 8px; }
+  .hydrometric-hero__controls { gap: 8px; }
+  .hydro-refresh-button { min-width: 48px; width: 48px; min-height: 48px; padding: 0; font-size: 1.35rem; }
+  .primary-station { padding-top: 10px; }
+  .station-identification { gap: 8px; }
+  .hydro-reading { margin: 10px 0; gap: 8px; }
+  .hydro-level { min-height: 128px; padding: 12px 12px 14px; }
+  .hydro-level strong { margin-top: 4px; font-size: clamp(3.8rem, 20vw, 5rem); }
+  .hydro-level time { margin-top: 10px; }
+  .hydro-metrics { gap: 8px; }
+  .hydro-metrics div { min-height: 58px; padding: 8px 10px; }
+  .source-strip { padding: 6px 0; gap: 6px 10px; line-height: 1.25; }
+  .source-strip button { min-height: 48px; }
+  .hydro-chart { padding-top: 6px; }
+  .hydro-chart svg { max-height: 190px; }
+  .data-table-disclosure summary { min-height: 44px; }
+
+  .civic-discovery,
+  .safety-actions,
+  .source-transparency { padding-top: 12px; }
+  .civic-section-title,
+  .compact-section-heading { margin-bottom: 8px; gap: 8px; }
+  .civic-quick-grid { gap: 8px; }
+  .civic-quick-tile { min-height: 68px; padding: 9px 10px; gap: 8px; }
+  .civic-quick-tile span { font-size: .94rem; }
+  .civic-campaign--compact { min-height: 130px; }
+  .civic-campaign--compact .civic-campaign__copy { padding: 15px 18px; }
+  .civic-campaign--compact .civic-campaign__copy h2 { font-size: 1.65rem; }
+  .civic-campaign--compact .civic-campaign__copy a { min-height: 44px; margin-top: 5px; }
+
+  .contact-grid { gap: 8px; }
+  .contact-grid a { min-height: 56px; padding: 6px 8px; }
+  .contact-grid__primary { min-height: 62px !important; padding-inline: 14px !important; }
+  .contact-grid strong { font-size: 1.25rem; }
+  .contact-grid span { font-size: .94rem; }
+  .secondary-actions { margin-top: 8px; }
+  .secondary-actions summary { min-height: 44px; }
+  .secondary-actions > div { gap: 8px; }
+
+  .source-health-grid { gap: 5px; }
+  .source-health-grid article { padding: 8px 0; }
+  .source-health-grid article p,
+  .source-health-grid article small { font-size: .75rem; line-height: 1.25; }
+  .source-health-grid article strong { font-size: .84rem; line-height: 1.18; }
+  .source-health-grid dt,
+  .source-health-grid dd { font-size: .72rem; }
+
+  .civic-footer__main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 14px;
+    padding: 12px 14px;
+  }
+  .civic-footer__main > div { grid-column: 1 / -1; }
+  .civic-footer__main > div p { margin-block: 4px; }
+  .civic-footer nav { align-content: start; gap: 0; }
+  .civic-footer nav a { min-height: 44px; font-size: .86rem; line-height: 1.2; }
+  .civic-footer__legal { padding: 7px 14px; }
+
+  /* Keep the required offline trust state visible without restoring a five-control header. */
+  .civic-header .connection-chip--offline {
+    display: inline-flex !important;
+    width: auto;
+    min-width: 96px;
+    max-width: 128px;
+    min-height: 48px;
+    padding: 8px 10px;
+    border: 1px solid var(--muni-neutral-300);
+    background: #fff;
+    color: var(--text-secondary);
+    white-space: normal;
+    font-size: .78rem;
+    line-height: 1.15;
+  }
+  .civic-header:has(.connection-chip--offline) .header-trust-action { display: none; }
+}
+
+@media (max-width: 430px) {
+  .dashboard { padding-inline: 14px; }
+  .hydro-level strong { font-size: clamp(3.75rem, 20vw, 4.85rem); }
+}
+
+@media (min-width: 821px) {
+  .dashboard { padding-top: 12px; padding-bottom: 20px; gap: 12px; }
+  .hydrometric-section { padding: 12px 16px 14px; }
+  .hydrometric-hero__header { margin-bottom: 10px; }
+  .primary-station { padding-top: 10px; }
+  .hydro-reading { margin: 10px 0 12px; gap: 16px; }
+  .hydro-level { min-height: 105px; padding: 12px 16px; }
+  .hydro-level strong { font-size: clamp(4rem, 6vw, 5.7rem); }
+  .hydro-level time { margin-top: 8px; }
+  .hydro-metrics div { padding: 10px 14px; }
+  .source-strip { min-height: 42px; margin-bottom: 8px; padding-block: 5px; }
+  .hydro-chart { padding-top: 6px; }
+  .hydro-chart svg { max-height: 160px; }
+  .civic-discovery,
+  .safety-actions,
+  .source-transparency { padding-top: 10px; }
+  .civic-section-title,
+  .compact-section-heading { margin-bottom: 7px; }
+  .civic-quick-grid { gap: 7px; }
+  .civic-quick-tile { min-height: 56px; padding: 8px 10px; }
+  .civic-campaign--compact { min-height: 100px; }
+  .civic-campaign--compact .civic-campaign__copy { padding: 10px 18px; }
+  .contact-grid { gap: 7px; }
+  .contact-grid a { min-height: 48px; }
+  .source-health-grid article { padding-block: 7px; }
+}
