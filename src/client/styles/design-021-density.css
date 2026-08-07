@@ -1,7 +1,16 @@
 /* 021 density correction: keep primary hydrometry explicit while moving secondary detail behind existing affordances. */
 
 @media (max-width: 700px) {
-  .dashboard { padding: 5px 6px 10px; gap: 6px; }
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 5px 6px 10px;
+    gap: 6px;
+  }
+  .dashboard > section {
+    grid-column: 1;
+    min-width: 0;
+    width: 100%;
+  }
   .hydrometric-section { padding: 8px 9px 7px; }
   .hydrometric-hero__header { margin-bottom: 3px; }
   .hydrometric-hero__header h1 { font-size: 1.06rem; }
