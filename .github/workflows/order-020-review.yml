@@ -50,22 +50,38 @@ jobs:
           npm install --package-lock-only --ignore-scripts --save-dev --save-exact wrangler@4.119.0 @cloudflare/workers-types@5.20260801.1
           python - <<'PY'
           from pathlib import Path
-          path = Path('src/worker/auth.ts')
-          text = path.read_text()
-          old = "if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT');"
-          new = "if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT', { cause: error });"
-          if old in text:
-              text = text.replace(old, new)
-          elif new not in text:
+
+          auth = Path('src/worker/auth.ts')
+          auth_text = auth.read_text()
+          auth_old = "if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT');"
+          auth_new = "if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT', { cause: error });"
+          if auth_old in auth_text:
+              auth_text = auth_text.replace(auth_old, auth_new)
+          elif auth_new not in auth_text:
               raise SystemExit('Google JWKS timeout remediation target is absent')
-          path.write_text(text)
+          auth.write_text(auth_text)
+
+          test = Path('tests/unit/auth.test.ts')
+          test_text = test.read_text()
+          test_old = """    const verification = verifyGoogleIdToken(token, clientId, now);
+    await vi.advanceTimersByTimeAsync(5_001);
+    await expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');"""
+          test_new = """    const verification = verifyGoogleIdToken(token, clientId, now);
+    const expectedRejection = expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');
+    await vi.advanceTimersByTimeAsync(5_001);
+    await expectedRejection;"""
+          if test_old in test_text:
+              test_text = test_text.replace(test_old, test_new)
+          elif test_new not in test_text:
+              raise SystemExit('Google JWKS timeout test remediation target is absent')
+          test.write_text(test_text)
           PY
-          git add package.json package-lock.json src/worker/auth.ts
+          git add package.json package-lock.json src/worker/auth.ts tests/unit/auth.test.ts
           git diff --cached --check
           git config user.name sos-sf-automation
           git config user.email sos-sf-automation@users.noreply.github.com
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: preserve JWKS timeout cause under strict lint'
+            git commit -m 'test: observe JWKS timeout rejection before advancing timers'
             git push origin HEAD:arq/visual-dashboard-v3
           fi
           git rev-parse HEAD > "$EVIDENCE_DIR/review-commit.txt"
