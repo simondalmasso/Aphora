@@ -7,7 +7,16 @@ function isActive(currentPath: string, href: string): boolean {
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
-export function MuniCivicHeader({ currentPath, actions }: { readonly currentPath: string; readonly actions: ReactNode }) {
+interface CommunicationsAction {
+  readonly unread: number;
+  readonly onOpen: (opener?: HTMLButtonElement | null) => void;
+}
+
+export function MuniCivicHeader({ currentPath, actions, communications }: {
+  readonly currentPath: string;
+  readonly actions: ReactNode;
+  readonly communications: CommunicationsAction;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   return <header className="civic-header app-header">
     <div className="civic-header__utility">
@@ -31,6 +40,16 @@ export function MuniCivicHeader({ currentPath, actions }: { readonly currentPath
     </div>
     <div id="civic-mobile-menu" className={`civic-mobile-menu${menuOpen ? ' civic-mobile-menu--open' : ''}`} aria-hidden={!menuOpen}>
       <nav aria-label="Navegación móvil">
+        <button
+          type="button"
+          className="civic-mobile-communications"
+          aria-haspopup="dialog"
+          onClick={(event) => communications.onOpen(event.currentTarget)}
+        >
+          <span>Comunicaciones</span>
+          {communications.unread > 0 && <span className="civic-mobile-communications__badge" aria-hidden="true">{Math.min(communications.unread, 9)}</span>}
+          {communications.unread > 0 && <span className="sr-only">{communications.unread} {communications.unread === 1 ? 'mensaje sin leer' : 'mensajes sin leer'}</span>}
+        </button>
         {CIVIC_PRIMARY_NAV.map((item) => <a key={item.label} href={item.href} aria-current={isActive(currentPath, item.href) ? 'page' : undefined} onClick={() => setMenuOpen(false)}>{item.label}</a>)}
         <div className="civic-mobile-menu__secondary">
           {CIVIC_SECONDARY_NAV.map((item) => <a key={item.label} href={item.href} onClick={() => setMenuOpen(false)}>{item.label}</a>)}
