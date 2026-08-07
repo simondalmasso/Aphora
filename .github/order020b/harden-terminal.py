@@ -28,6 +28,11 @@ replacements = [
         "if (!primary || typeof primary.currentMetres !== 'number') throw new Error('PRIMARY_SYSTEM_NOT_USABLE');\n  if (!String(primary.sourceId || '').startsWith('ina-rest')) throw new Error(`PRIMARY_SOURCE_NOT_INA_REST:${primary.sourceId || 'NONE'}`);",
         'primary hydrometric source must be same-run INA REST data',
     ),
+    (
+        "if (provenance?.productTreeSha256 !== digest.productTreeSha256 || provenance?.suborder !== SUBORDER) throw new Error('CLOUDFLARE_GITHUB_PROVENANCE_DRIFT');",
+        "const expectedProvenance = JSON.parse(await readFile('public/source-provenance.json', 'utf8'));\n  if (expectedProvenance?.productTreeSha256 !== digest.productTreeSha256) throw new Error(`GITHUB_PRODUCT_DIGEST_DRIFT:${expectedProvenance?.productTreeSha256}:${digest.productTreeSha256}`);\n  if (provenance?.productTreeSha256 !== expectedProvenance.productTreeSha256 || provenance?.suborder !== SUBORDER) throw new Error(`CLOUDFLARE_GITHUB_PROVENANCE_DRIFT:${provenance?.productTreeSha256}:${expectedProvenance.productTreeSha256}:${provenance?.suborder}`);",
+        'production provenance must equal both committed provenance and recomputed product digest',
+    ),
 ]
 for old, new, label in replacements:
     count = text.count(old)
