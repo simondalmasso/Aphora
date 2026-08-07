@@ -18,6 +18,7 @@ import './styles/muni-021-tuning.css';
 import './styles/hovs-021.css';
 import './styles/hovs-021-polish.css';
 import './styles/hovs-021-density-final.css';
+import './styles/hovs-021-density-lock.css';
 
 function canonicalPath(): string {
   const path = window.location.pathname.replace(/\/+$/, '');
