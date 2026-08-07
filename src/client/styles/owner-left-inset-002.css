@@ -1,0 +1,134 @@
+/* OWNER amendment 021-HOVS-OWNER-LEFT-INSET-EDGE-COLLISION-002.
+   One shared content axis: border -> reserved civic rule -> breathing gap -> content. */
+
+@media (max-width: 820px) {
+  .hovs-r2 {
+    --owner-page-gutter: 16px;
+    --owner-hero-inset: 20px;
+    --owner-decorative-rule-width: 4px;
+    --owner-rule-to-content-gap: 16px;
+  }
+
+  .hovs-r2 .dashboard {
+    padding-left: var(--owner-page-gutter);
+    padding-right: var(--owner-page-gutter);
+  }
+
+  .hovs-r2 .hydrometric-section {
+    padding-left: 0;
+    padding-right: 0;
+    overflow: visible;
+  }
+
+  .hovs-r2 .muni-hydrometric-hero {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    padding-left: var(--owner-hero-inset);
+    padding-right: var(--owner-hero-inset);
+  }
+
+  .hovs-r2 .muni-hydrometric-hero::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--owner-decorative-rule-width);
+    background: var(--r2-green);
+    pointer-events: none;
+  }
+
+  .hovs-r2 .hydrometric-hero__header,
+  .hovs-r2 .primary-station,
+  .hovs-r2 .station-identification,
+  .hovs-r2 .hydro-signature-axis,
+  .hovs-r2 .hydro-reading,
+  .hovs-r2 .source-strip,
+  .hovs-r2 .hydro-chart,
+  .hovs-r2 .data-table-disclosure {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* The hero-level rule is the only left decorative axis on mobile. */
+  .hovs-r2 .hydro-level {
+    border-left: 0 !important;
+    padding-left: 0;
+  }
+
+  .hovs-r2 .hydro-chart,
+  .hovs-r2 .hydro-chart__plot,
+  .hovs-r2 [data-testid="main-hydro-chart"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .hovs-r2 .dashboard {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .hovs-r2 .hydro-reading {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .hovs-r2 .hydro-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .hovs-r2 .hydro-metrics > div + div {
+    padding: 0 0 0 10px;
+    border-top: 0;
+    border-left: 1px solid var(--r2-rule);
+  }
+}
+
+/* 390px at 200% zoom is layout-equivalent to roughly a 195px CSS viewport.
+   Keep the same spatial contract; reduce simultaneous controls instead of reducing inset. */
+@media (max-width: 220px) {
+  .hovs-r2 .dashboard {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .hovs-r2 .muni-hydrometric-hero {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .hovs-r2 .hydrometric-hero__controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hovs-r2 .station-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hovs-r2 .hydro-refresh-button {
+    justify-self: start;
+  }
+
+  .hovs-r2 .hydro-reading,
+  .hovs-r2 .hydro-metrics,
+  .hovs-r2 .civic-quick-grid,
+  .hovs-r2 .contact-grid,
+  .hovs-r2 .civic-footer__main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hovs-r2 .hydro-metrics > div + div {
+    padding: 7px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--r2-rule);
+  }
+}
