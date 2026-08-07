@@ -65,8 +65,8 @@ export function HydrometricMonitoring({
   );
 
   return <section
-    id="situacion-hidrica"
     className="hydrometric-section"
+    id="situacion-hidrica"
     aria-labelledby="hydrometric-title"
     data-testid="hydrometric-situation"
   >
