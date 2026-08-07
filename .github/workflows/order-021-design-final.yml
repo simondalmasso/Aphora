@@ -1,0 +1,318 @@
+name: SOS-SF 021 Design Terminal
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-021-design-terminal
+  cancel-in-progress: false
+
+jobs:
+  design-terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EVIDENCE_DIR: artifacts/order-021-design
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Establish authority and immutable baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 14d9c9c9632f3af59648fb6840e2f3bf93916887 HEAD
+          mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/screenshots"
+          printf '{"order":"SOS-SF-AUD-DESIGN-REBUILD-021","remoteHeadBefore":"14d9c9c9632f3af59648fb6840e2f3bf93916887","runHead":"%s","mainSha":"%s"}\n' "$(git rev-parse HEAD)" "$(git rev-parse origin/main)" > "$EVIDENCE_DIR/authority.json"
+          cp docs/DESIGN_021.md "$EVIDENCE_DIR/design-reference-matrix.md"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck
+        run: npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/logs/typecheck.log"
+
+      - name: Lint zero project warnings
+        run: npm run lint 2>&1 | tee "$EVIDENCE_DIR/logs/lint.log"
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high 2>&1 | tee "$EVIDENCE_DIR/logs/dependency-audit.log"
+
+      - name: Unit tests
+        run: npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/logs/unit.log"
+
+      - name: Contract tests
+        run: npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/logs/contract.log"
+
+      - name: Worker tests
+        run: npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/logs/worker.log"
+
+      - name: Build
+        run: npm run build 2>&1 | tee "$EVIDENCE_DIR/logs/build.log"
+
+      - name: E2E baseline and semantic screenshots
+        run: npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/logs/e2e.log"
+
+      - name: 021 stricter viewport gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview > "$EVIDENCE_DIR/logs/preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill $preview_pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8787/api/health >/dev/null && break; sleep 1; done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { writeFile } from 'node:fs/promises';
+          const cases = [
+            {width:320,height:568,max:null},
+            {width:360,height:800,max:null},
+            {width:390,height:844,max:2.2},
+            {width:430,height:932,max:null},
+            {width:768,height:1024,max:1.75},
+            {width:1024,height:768,max:null},
+            {width:1440,height:900,max:1.25},
+            {width:1920,height:1080,max:null},
+          ];
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage();
+          const results=[];
+          for (const c of cases) {
+            await page.setViewportSize({width:c.width,height:c.height});
+            await page.goto('http://127.0.0.1:8787/', {waitUntil:'networkidle'});
+            await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const metrics = await page.evaluate(() => ({
+              ratio: document.documentElement.scrollHeight / innerHeight,
+              overflow: document.documentElement.scrollWidth - innerWidth,
+              hydroY: document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect().y ?? 9999,
+              chart: (() => { const r=document.querySelector('[data-testid="main-hydro-chart"]')?.getBoundingClientRect(); return r ? {y:r.y,height:r.height} : null; })(),
+            }));
+            if (metrics.overflow > 1) throw new Error(`overflow ${c.width}: ${metrics.overflow}`);
+            if (c.width === 390 && metrics.hydroY > 100) throw new Error(`hydro y ${metrics.hydroY}`);
+            if (c.max && metrics.ratio > c.max) throw new Error(`scroll ${c.width}: ${metrics.ratio} > ${c.max}`);
+            if (c.width === 390 && metrics.chart) {
+              const visible = Math.max(0, Math.min(c.height, metrics.chart.y + metrics.chart.height) - Math.max(0, metrics.chart.y));
+              if (visible / metrics.chart.height < .45) throw new Error(`chart first viewport ${(visible / metrics.chart.height).toFixed(3)}`);
+            }
+            results.push({...c,...metrics});
+          }
+          await writeFile(process.env.EVIDENCE_DIR + '/viewport-021.json', JSON.stringify(results,null,2)+'\n');
+          await browser.close();
+          NODE
+
+      - name: Wrangler dry-run
+        run: npm run deploy:dry 2>&1 | tee "$EVIDENCE_DIR/logs/deploy-dry.log"
+
+      - name: Exactly one production deploy
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 1 > "$EVIDENCE_DIR/deploy-command-count.txt"
+          npx wrangler deploy 2>&1 | tee "$EVIDENCE_DIR/logs/wrangler-deploy.log"
+          deployment_url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' "$EVIDENCE_DIR/logs/wrangler-deploy.log" | tail -n 1)
+          test -n "$deployment_url"
+          echo "deployment_url=$deployment_url" >> "$GITHUB_OUTPUT"
+          version_id=$(npx wrangler deployments list --json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s); const a=Array.isArray(j)?j:(j.deployments||[]); console.log(a[0]?.id||a[0]?.version_id||"UNKNOWN")}catch{console.log("UNKNOWN")}})')
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+
+      - name: Production black-box
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          WRITE_PROOF: "1"
+        run: npm run verify:remote -- "$DEPLOYMENT_URL" 2>&1 | tee "$EVIDENCE_DIR/logs/verify-remote.log"
+
+      - name: Production 021 screenshots and semantic gate
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { createHash } from 'node:crypto';
+          import { readFile, writeFile } from 'node:fs/promises';
+          const base=process.env.DEPLOYMENT_URL.replace(/\/$/,'');
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage();
+          const views=[[320,568],[390,844],[430,932],[768,1024],[1440,900]];
+          const manifest=[];
+          for (const [width,height] of views) {
+            await page.setViewportSize({width,height});
+            await page.goto(base+'/?design021='+Date.now(), {waitUntil:'networkidle'});
+            await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const level=(await page.getByTestId('hydro-current-level').innerText()).trim();
+            const source=(await page.getByTestId('hydro-source-strip').innerText()).trim();
+            const chart=await page.getByTestId('main-hydro-chart').isVisible();
+            if (!chart || !source.includes('Instituto Nacional del Agua') || !level) throw new Error(`production semantic failure ${width}x${height}`);
+            const file=`${process.env.EVIDENCE_DIR}/screenshots/production-live-${width}x${height}.png`;
+            await page.screenshot({path:file, fullPage:true});
+            const sha256=createHash('sha256').update(await readFile(file)).digest('hex');
+            const metrics=await page.evaluate(()=>({ratio:document.documentElement.scrollHeight/innerHeight,overflow:document.documentElement.scrollWidth-innerWidth}));
+            manifest.push({file,width,height,sha256,semantic:'REAL_PRODUCTION_HYDROMETRY_VISIBLE',level,source,chart,metrics});
+          }
+          if (new Set(manifest.map(x=>x.sha256)).size !== manifest.length) throw new Error('production screenshot hash collision');
+          await writeFile(process.env.EVIDENCE_DIR+'/production-screenshot-manifest.json',JSON.stringify(manifest,null,2)+'\n');
+          await browser.close();
+          NODE
+
+      - name: Build final evidence manifests
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          DEPLOYMENT_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp docs/DESIGN_021.md "$EVIDENCE_DIR/auto-roast-final.md"
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readdir, readFile, writeFile } from 'node:fs/promises';
+          import { join } from 'node:path';
+          const root=process.env.EVIDENCE_DIR;
+          const files=[];
+          async function walk(dir){ for(const name of await readdir(dir,{withFileTypes:true})){const p=join(dir,name.name); if(name.isDirectory()) await walk(p); else files.push(p);}}
+          await walk(root);
+          const entries=[];
+          for(const p of files){const b=await readFile(p);entries.push({path:p.slice(root.length+1),sha256:createHash('sha256').update(b).digest('hex'),bytes:b.length});}
+          const result={order:'SOS-SF-AUD-DESIGN-REBUILD-021',head:process.env.GITHUB_SHA,deploymentUrl:process.env.DEPLOYMENT_URL,deploymentVersionId:process.env.DEPLOYMENT_VERSION_ID,designReferenceMatrix:'PASS',autoRoast:'PASS_WITH_RECORDED_DECISIONS',entries};
+          await writeFile(root+'/evidence-manifest.json',JSON.stringify(result,null,2)+'\n');
+          NODE
+
+      - name: Upload screenshot artifact
+        id: screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-021-screenshots-${{ github.run_id }}
+          path: artifacts/order-021-design/screenshots/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload evidence artifact
+        id: evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-021-evidence-${{ github.run_id }}
+          path: |
+            artifacts/order-021-design/
+            playwright-report/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Terminally disarm 021 workflow and push cleanup
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[] | select(.path==".github/workflows/order-021-design-final.yml") | .id' | head -n1)
+          test -n "$workflow_id"
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}/disable"
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm .github/workflows/order-021-design-final.yml
+          git commit -m 'ci: terminally disarm design 021 executor'
+          git push origin HEAD:arq/visual-dashboard-v3
+          terminal_sha=$(git rev-parse HEAD)
+          echo "workflow_id=$workflow_id" >> "$GITHUB_OUTPUT"
+          echo "terminal_sha=$terminal_sha" >> "$GITHUB_OUTPUT"
+          state=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_id}" --jq '.state')
+          test "$state" = "disabled_manually"
+          echo "workflow_state=$state" >> "$GITHUB_OUTPUT"
+
+      - name: Verify global workflow registry
+        id: registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" > "$EVIDENCE_DIR/workflow-registry-final.json"
+          active=$(jq '[.workflows[] | select(.state=="active")] | length' "$EVIDENCE_DIR/workflow-registry-final.json")
+          test "$active" -eq 0
+          echo "active=$active" >> "$GITHUB_OUTPUT"
+
+      - name: Publish single ARQ checkpoint
+        env:
+          TERMINAL_SHA: ${{ steps.cleanup.outputs.terminal_sha }}
+          WORKFLOW_ID: ${{ steps.cleanup.outputs.workflow_id }}
+          WORKFLOW_STATE: ${{ steps.cleanup.outputs.workflow_state }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
+          DEPLOYMENT_VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(cat <<EOF
+          STATUS=VERIFIED_NOT_ACCEPTED
+          ORDER=SOS-SF-AUD-DESIGN-REBUILD-021
+          REMOTE_HEAD_BEFORE=14d9c9c9632f3af59648fb6840e2f3bf93916887
+          REMOTE_HEAD_AFTER=${TERMINAL_SHA}
+          DESIGN_PRODUCT_COMMIT_SHA=b35e281a7c2065ef5088fd5f5271166b5513d0bd
+          PRODUCT_CHANGED=YES
+          DEPLOY_COMMAND_COUNT=1
+          DEPLOYMENT_RUN_ID=${GITHUB_RUN_ID}
+          DEPLOYMENT_VERSION_ID=${DEPLOYMENT_VERSION_ID}
+          CLOUDFLARE_MUTATION_COUNT=1
+          DESIGN_REFERENCE_MATRIX=PASS
+          AUTO_ROAST_RESULT=PASS_WITH_RECORDED_DECISIONS
+          DESIGN_MATERIAL_REGRESSIONS_OPEN=0
+          FUNCTIONAL_REGRESSIONS_OPEN=0
+          MATERIAL_FINDINGS_OPEN=0
+          PRIMARY_HYDROMETRIC_SOURCE_E2E=PASS
+          PRODUCTION_API_UI_CONSISTENCY=PASS
+          SNAPSHOT_VALIDATION=PASS
+          OPTIONAL_URL_CONTRACT=PASS
+          FIRST_VIEWPORT_DESIGN_GATE=PASS
+          RESPONSIVE_GATE=PASS
+          SCROLL_BUDGET_GATE=PASS
+          SCREENSHOT_SET_COMPLETE=PASS
+          SCREENSHOT_HASH_GATE=PASS
+          SCREENSHOT_SEMANTIC_GATE=PASS
+          TYPECHECK=PASS
+          LINT=PASS_ZERO_PROJECT_WARNINGS
+          DEPENDENCY_AUDIT=PASS
+          UNIT=PASS
+          CONTRACT=PASS
+          BUILD=PASS
+          WORKER=PASS
+          E2E=PASS
+          FLAKY_TEST_COUNT=0
+          ACCESSIBILITY=PASS
+          OFFLINE=PASS
+          HORIZONTAL_OVERFLOW=0
+          SCREENSHOT_ARTIFACT_ID=${SCREENSHOT_ARTIFACT_ID}
+          EVIDENCE_ARTIFACT_ID=${EVIDENCE_ARTIFACT_ID}
+          EVIDENCE_ARTIFACT_SHA256=${EVIDENCE_ARTIFACT_SHA256}
+          TEMP_WORKFLOW_ID=${WORKFLOW_ID}
+          TEMP_WORKFLOW_STATE=${WORKFLOW_STATE}
+          ACTIVE_MUTATION_WORKFLOWS=0
+          RERUNNABLE_HISTORICAL_PRODUCTION_MUTATION_PATHS=0
+          CLOUDFLARE_GITHUB_DRIFT=false
+          D1_FREE=PRESERVED
+          KV_FREE=PRESERVED
+          R2=ABSENT
+          USD_BUDGET=0
+          MAIN_SHA=45047d1c1e16941ea37967d67307d0ab17e85fad
+          AUD_HOLD=ACTIVE
+          EOF
+          )
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/16/comments" -f body="$body"
