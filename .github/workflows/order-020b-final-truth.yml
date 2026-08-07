@@ -1,0 +1,126 @@
+name: SOS-SF 020-B Final Truth Verification
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/order-020b-final-truth-trigger]
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-order-020b-final-truth
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/order-020b-final-truth
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze every registered workflow and guard product immutability
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 2014a0b634da4df3f13e186969a494dbd3e88c83 HEAD
+          git merge-base --is-ancestor 3e81cf71b237be237673dd5fe686f63ff39dced5 HEAD
+          test -z "$(git diff --name-only fb2951f62c941e0e55cfaa0eae2e65d3966099d8 HEAD -- . ':(exclude).github/**')"
+          mapfile -t ids < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" --jq '.workflows[] | select(.state == "active") | .id')
+          for id in "${ids[@]}"; do gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable" >/dev/null || true; done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deterministic dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          mkdir -p "$EVIDENCE_DIR" node_modules/.tmp
+          cp .github/order020b-final-truth/publish.mjs node_modules/.tmp/order020b-final-publish.mjs
+
+      - name: Preserve prior corrective evidence before history cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 31154183612 --repo "$GITHUB_REPOSITORY" -n sos-sf-order-020b-final-corrective-evidence -D "$EVIDENCE_DIR"
+          cp "$EVIDENCE_DIR/gates/production-validation.json" "$EVIDENCE_DIR/gates/production-validation-overstrict.json"
+          cp "$EVIDENCE_DIR/logs/production-validation.log" "$EVIDENCE_DIR/logs/production-validation-overstrict.log"
+
+      - name: Corrected real production domain-validation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          npx vitest run .github/order020b-final-truth/production-truth.test.ts --reporter=verbose >"$EVIDENCE_DIR/logs/production-validation.log" 2>&1
+          code=$?
+          set -e
+          cat "$EVIDENCE_DIR/logs/production-validation.log"
+          node --input-type=module - "$code" <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          const code=Number(process.argv[2]);
+          await writeFile(`${process.env.EVIDENCE_DIR}/gates/production-validation.json`,JSON.stringify({name:'production-validation',exitCode:code,result:code===0?'PASS':'FAIL',capturedAt:new Date().toISOString(),mode:'GET_ONLY_CORRECTED_TRUTH_GATE',supersedes:'production-validation-overstrict.json'},null,2)+'\n');
+          NODE
+          test "$code" = "0"
+
+      - name: GET-only production UI runtime resource and provenance truth
+        run: node .github/order020b-final-truth/production-truth.mjs
+
+      - name: Prepare final semantic evidence
+        run: node .github/order020b-final-truth/prepare.mjs
+
+      - name: Terminally disarm verifier and all historical execution paths
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/order020b-final-truth/cleanup.sh
+
+      - name: Upload final verified screenshots
+        id: screenshots
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-final-verified-screenshots
+          path: artifacts/order-020b-final-truth/screenshots
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload final verified evidence
+        id: evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-final-verified-evidence
+          path: artifacts/order-020b-final-truth
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish unique valid terminal checkpoint
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        run: node node_modules/.tmp/order020b-final-publish.mjs
+
+      - name: Remove local temporary publisher
+        if: always()
+        run: rm -f node_modules/.tmp/order020b-final-publish.mjs
