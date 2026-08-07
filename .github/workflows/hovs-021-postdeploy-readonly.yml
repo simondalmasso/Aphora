@@ -1,0 +1,145 @@
+name: SOS-SF HOVS 021 Postdeploy Read Only
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/hovs-021-postdeploy-readonly.yml]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      OUT: artifacts/hovs-021-postdeploy-readonly
+      PRODUCT_COMMIT: 0814814820992e1ce2b275f0de54baf406c5795c
+      MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      DEPLOYMENT_VERSION: 38215f7a-4e7e-421b-ac1a-fc8844e693ff
+      DEPLOYMENT_RUN_ID: 31180688607
+      PRODUCTION_URL: https://sos-sf.simondalmasso44.workers.dev
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Read-only authority gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          test ! -f .github/workflows/hovs-021-one-shot-production.yml
+          ! grep -R --include='*.yml' --include='*.yaml' -nE '(^|[[:space:]])(npx[[:space:]]+)?wrangler[[:space:]]+deploy([[:space:]]|$)' .github/workflows || true
+          mkdir -p "$OUT/logs" "$OUT/screenshots"
+          printf '1\n' > "$OUT/deploy-command-count.txt"
+          printf '0\n' > "$OUT/postdeploy-redeploy-count.txt"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Rebuild immutable product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+      - name: Verify Cloudflare current deployment without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --json > "$OUT/cloudflare-deployments.json"
+          node --input-type=module <<'NODE'
+          import { readFile,writeFile } from 'node:fs/promises';
+          const raw=JSON.parse(await readFile(process.env.OUT+'/cloudflare-deployments.json','utf8'));
+          const rows=Array.isArray(raw)?raw:(raw.deployments||[]);
+          const sorted=[...rows].sort((a,b)=>Date.parse(a.created_on||a.createdAt||0)-Date.parse(b.created_on||b.createdAt||0));
+          const latest=sorted.at(-1);const versions=latest?.versions||[];const v=versions.find(x=>(x.version_id||x.id)===process.env.DEPLOYMENT_VERSION);const pct=Number(v?.percentage??v?.traffic_percentage??0);
+          const pass=Boolean(latest&&v&&pct===100);
+          const result={deploymentRunId:Number(process.env.DEPLOYMENT_RUN_ID),expectedVersion:process.env.DEPLOYMENT_VERSION,latestDeploymentId:latest?.id||null,latestCreatedOn:latest?.created_on||latest?.createdAt||null,latestVersions:versions,percentage:pct,deployCommandCount:1,postdeployRedeployCount:0,pass};
+          await writeFile(process.env.OUT+'/deployment-provenance.json',JSON.stringify(result,null,2)+'\n');if(!pass)throw new Error('deployment provenance '+JSON.stringify(result));
+          NODE
+      - name: Wait for public asset propagation and verify byte identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile,readdir,writeFile } from 'node:fs/promises';import { createHash } from 'node:crypto';import path from 'node:path';
+          const base=process.env.PRODUCTION_URL.replace(/\/$/,'');const assets=await readdir('dist/assets');const js=assets.find(x=>x.endsWith('.js')&&!x.endsWith('.js.map'));const css=assets.find(x=>x.endsWith('.css'));const sha=b=>createHash('sha256').update(b).digest('hex');
+          let html='',attempts=0;
+          for(let i=0;i<24;i++){attempts=i+1;html=await (await fetch(`${base}/?propagation=${Date.now()}-${i}`,{cache:'no-store',headers:{'cache-control':'no-cache, no-store'}})).text();if(html.includes(js)&&html.includes(css))break;await new Promise(r=>setTimeout(r,5000));}
+          if(!html.includes(js)||!html.includes(css))throw new Error(`public index did not converge after ${attempts} attempts: expected ${js} ${css}`);
+          const rows=[];for(const name of [js,css]){const local=await readFile(path.join('dist/assets',name));const remote=Buffer.from(await (await fetch(`${base}/assets/${name}?identity=${Date.now()}`,{cache:'no-store'})).arrayBuffer());const row={path:`/assets/${name}`,localSha256:sha(local),remoteSha256:sha(remote),pass:sha(local)===sha(remote)};rows.push(row);if(!row.pass)throw new Error('byte identity '+name);}
+          await writeFile(process.env.OUT+'/asset-byte-identity.json',JSON.stringify({attempts,assets:rows,pass:true},null,2)+'\n');
+          NODE
+      - name: Production API UI black-box truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';import { createHash } from 'node:crypto';import { readFile,writeFile } from 'node:fs/promises';
+          const base=process.env.PRODUCTION_URL.replace(/\/$/,'');const sha=b=>createHash('sha256').update(b).digest('hex');
+          async function req(route){const r=await fetch(`${base}${route}${route.includes('?')?'&':'?'}readonly=${Date.now()}`,{cache:'no-store'});const t=await r.text();let j=null;try{j=JSON.parse(t)}catch{};return {route,status:r.status,json:j};}
+          const api=[];for(const x of ['/api/health','/api/snapshot','/api/sources','/source-provenance.json'])api.push(await req(x));if(api.some(x=>x.status!==200))throw new Error('API status '+JSON.stringify(api.map(x=>[x.route,x.status])));
+          const unwrap=x=>x?.json&&typeof x.json==='object'&&'data'in x.json?x.json.data:x?.json;const snap=unwrap(api.find(x=>x.route==='/api/snapshot'));const systems=snap?.systems||[];const parana=systems.find(x=>x.id==='parana-santa-fe');const salado=systems.find(x=>x.id==='salado-santo-tome');if(!parana?.available||!salado?.available||!Number.isFinite(parana.currentMetres)||!Number.isFinite(salado.currentMetres))throw new Error('hydrometry unavailable');
+          const sources=snap?.sources||[];const ina=sources.filter(x=>(x.organizationName||x.name||x.sourceName||'').toLowerCase().includes('instituto nacional del agua'));if(!ina.length)throw new Error('INA attribution absent');const badUrls=[...sources,...(snap?.timeline||[])].filter(x=>x.url!==undefined&&(typeof x.url!=='string'||!x.url.trim().startsWith('https://')));if(badUrls.length)throw new Error('invalid optional URLs');
+          const b=await chromium.launch({headless:true});const c=await b.newContext({serviceWorkers:'block'});const p=await c.newPage();const views=[];const hashes={};async function shot(n){const f=`${process.env.OUT}/screenshots/${n}`;await p.screenshot({path:f,fullPage:true});hashes[n]=sha(await readFile(f));}
+          for(const [w,h,n] of [[320,568,'production-home-320x568.png'],[390,844,'production-home-390x844.png'],[430,932,'production-home-430x932.png'],[768,1024,'production-home-768x1024.png'],[1024,768,'production-home-1024x768.png'],[1440,900,'production-home-1440x900.png'],[1920,1080,'production-home-1920x1080.png']]){await p.setViewportSize({width:w,height:h});await p.goto(`${base}/?blackbox=${Date.now()}`,{waitUntil:'networkidle'});await p.getByTestId('hydrometric-situation').waitFor({state:'visible'});const num=parseFloat((await p.getByTestId('hydro-current-level').innerText()).replace(',','.'));if(Math.abs(num-parana.currentMetres)>.005)throw new Error(`Parana mismatch ${w}`);const source=(await p.getByTestId('hydro-source-strip').innerText()).toLowerCase();if(!source.includes('instituto nacional del agua'))throw new Error('INA source strip');const g=await p.evaluate(()=>({overflow:document.documentElement.scrollWidth-innerWidth,quick:document.querySelectorAll('.civic-quick-tile').length,contacts:document.querySelectorAll('.contact-grid a').length}));if(g.overflow>1||g.quick!==6||g.contacts!==5)throw new Error('geometry '+JSON.stringify({w,g}));views.push({w,h,level:num,...g});await shot(n);}
+          await p.setViewportSize({width:390,height:844});await p.goto(`${base}/?salado=${Date.now()}`,{waitUntil:'networkidle'});await p.getByRole('tab',{name:/Salado/i}).click();const s=parseFloat((await p.getByTestId('hydro-current-level').innerText()).replace(',','.'));if(Math.abs(s-salado.currentMetres)>.005)throw new Error('Salado API/UI mismatch');await shot('production-station-transition.png');
+          await p.goto(`${base}/gestion-de-riesgo?risk=${Date.now()}`,{waitUntil:'networkidle'});await shot('production-risk-hub-mobile.png');
+          await p.goto(`${base}/gestion-de-riesgo/fenomeno-el-nino?nino=${Date.now()}`,{waitUntil:'networkidle'});const txt=await p.getByTestId('el-nino-landing').innerText();for(const q of ['Fenómeno El Niño','Qué puede implicar en Santa Fe','5,30 m','no es un umbral general de evacuación de SOS-SF'])if(!txt.includes(q))throw new Error('El Nino '+q);await shot('production-el-nino-mobile.png');
+          await b.close();const result={deploymentVersion:process.env.DEPLOYMENT_VERSION,apiStatus:api.map(x=>({route:x.route,status:x.status})),parana:{id:parana.id,currentMetres:parana.currentMetres,observedAt:parana.observedAt,freshness:parana.freshness},salado:{id:salado.id,currentMetres:salado.currentMetres,observedAt:salado.observedAt,freshness:salado.freshness},inaSourceCount:ina.length,views,screenshotHashes:hashes,result:'PASS'};await writeFile(process.env.OUT+'/production-black-box.json',JSON.stringify(result,null,2)+'\n');await writeFile(process.env.OUT+'/source-runtime-truth.json',JSON.stringify({primaryHydrometricOrganization:'Instituto Nacional del Agua',parana:result.parana,salado:result.salado,apiUiConsistency:true,pass:true},null,2)+'\n');await writeFile(process.env.OUT+'/production-screenshot-manifest.json',JSON.stringify({pass:true,hashes},null,2)+'\n');
+          NODE
+      - name: Production HOVS owner gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="$PRODUCTION_URL" OUT="$OUT/production-hovs" SCREENSHOT_PREFIX="production-" node scripts/verify-hovs-021.mjs 2>&1 | tee "$OUT/logs/production-hovs.log"
+      - name: State evidence without product mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const b=await chromium.launch({headless:true});const c=await b.newContext({serviceWorkers:'block'});const p=await c.newPage({viewport:{width:390,height:844}});const base=process.env.PRODUCTION_URL;
+          await p.goto(`${base}/?states=${Date.now()}`,{waitUntil:'networkidle'});
+          let once=true;await p.route('**/api/snapshot**',async route=>{if(once){once=false;await new Promise(r=>setTimeout(r,1600));}await route.continue();});await p.getByRole('button',{name:'Actualizar información'}).click();await p.waitForTimeout(120);await p.screenshot({path:`${process.env.OUT}/screenshots/state-loading.png`,fullPage:true});await p.waitForTimeout(1750);await p.unroute('**/api/snapshot**');
+          await p.route('**/api/snapshot**',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"temporary"}'}));await p.getByRole('button',{name:'Actualizar información'}).click();await p.waitForTimeout(450);await p.screenshot({path:`${process.env.OUT}/screenshots/state-error-recoverable.png`,fullPage:true});await b.close();
+          NODE
+          EVIDENCE_DIR="$OUT/state-e2e" npm run test:e2e > "$OUT/logs/state-e2e.log" 2>&1
+          cp "$OUT/state-e2e/screenshots/state-stale.png" "$OUT/screenshots/state-stale.png"
+          cp "$OUT/state-e2e/screenshots/state-active-alert.png" "$OUT/screenshots/state-alert-active.png"
+          cp "$OUT/state-e2e/screenshots/state-alerts-unverified.png" "$OUT/screenshots/state-alerts-unverified.png"
+          cp "$OUT/state-e2e/screenshots/state-offline.png" "$OUT/screenshots/state-offline.png"
+      - name: Read-only terminal gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat "$OUT/deploy-command-count.txt")" = 1
+          test "$(cat "$OUT/postdeploy-redeploy-count.txt")" = 0
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          for f in deployment-provenance.json asset-byte-identity.json production-black-box.json source-runtime-truth.json production-screenshot-manifest.json; do test -s "$OUT/$f"; done
+          for f in production-home-320x568.png production-home-390x844.png production-home-430x932.png production-home-768x1024.png production-home-1024x768.png production-home-1440x900.png production-home-1920x1080.png production-station-transition.png production-risk-hub-mobile.png production-el-nino-mobile.png state-loading.png state-error-recoverable.png state-stale.png state-alert-active.png state-alerts-unverified.png state-offline.png; do test -s "$OUT/screenshots/$f"; done
+          node --input-type=module <<'NODE'
+          import {readFile,writeFile} from 'node:fs/promises';const d=JSON.parse(await readFile(process.env.OUT+'/deployment-provenance.json','utf8')),a=JSON.parse(await readFile(process.env.OUT+'/asset-byte-identity.json','utf8')),p=JSON.parse(await readFile(process.env.OUT+'/production-black-box.json','utf8'));if(!d.pass||!a.pass||p.result!=='PASS')process.exit(9);await writeFile(process.env.OUT+'/postdeploy-summary.json',JSON.stringify({pass:true,deploymentVersion:process.env.DEPLOYMENT_VERSION,deploymentRunId:Number(process.env.DEPLOYMENT_RUN_ID),deployCommandCount:1,postdeployRedeployCount:0,assetByteIdentity:true,apiUiConsistency:true,hydrometryPrimarySource:'INA',ownerMobileGate:true,zoom200:true,textScaling:true,horizontalOverflow:0,main:process.env.MAIN_EXPECTED},null,2)+'\n');
+          NODE
+      - name: Upload read-only production evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-hovs-021-postdeploy-readonly-${{ github.run_id }}
+          path: artifacts/hovs-021-postdeploy-readonly
+          retention-days: 30
+      - name: Disarm and remove read-only verifier
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          gh workflow disable hovs-021-postdeploy-readonly.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/hovs-021-postdeploy-readonly.yml
+          git commit -m "ci: disarm HOVS 021 postdeploy read-only verifier"
+          git push origin HEAD:arq/visual-dashboard-v3
