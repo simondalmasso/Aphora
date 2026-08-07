@@ -1,0 +1,195 @@
+name: SOS-SF 020-B Final GET-only Close
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/order-020b-final-get-only-trigger]
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-order-020b-final-get-only-close
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/order-020b-final-corrective
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze every registered workflow immediately
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 2014a0b634da4df3f13e186969a494dbd3e88c83 HEAD
+          mapfile -t ids < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" --jq '.workflows[] | select(.state == "active") | .id')
+          for id in "${ids[@]}"; do gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable" >/dev/null || true; done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deterministic dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/gates" "$EVIDENCE_DIR/screenshots" node_modules/.tmp
+          cp .github/order020b-amend/finalize.mjs node_modules/.tmp/order020b-finalize.mjs
+
+      - name: Preserve the consumed corrective deployment run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run view 31153648173 --repo "$GITHUB_REPOSITORY" --log > "$EVIDENCE_DIR/corrective-deploy-run-31153648173.log"
+
+      - name: Resolve corrective deployment identity with GET only
+        id: deployment
+        run: node .github/order020b-amend/get-only-deployment.mjs
+
+      - name: Dependency audit
+        run: bash .github/order020b-amend/run-gate.sh dependency-audit npm audit --audit-level=high
+      - name: Typecheck
+        run: bash .github/order020b-amend/run-gate.sh typecheck npm run typecheck
+      - name: Lint
+        run: bash .github/order020b-amend/run-gate.sh lint npx eslint . --max-warnings=0 --ignore-pattern '.github/**'
+      - name: Unit
+        run: bash .github/order020b-amend/run-gate.sh unit npm run test:unit
+      - name: Contract
+        run: bash .github/order020b-amend/run-gate.sh contract npm run test:contract
+      - name: Build
+        run: bash .github/order020b-amend/run-gate.sh build npm run build
+      - name: Worker
+        run: bash .github/order020b-amend/run-gate.sh worker npm run test:worker
+      - name: E2E
+        run: bash .github/order020b-amend/run-gate.sh e2e npm run test:e2e
+      - name: Accessibility
+        run: bash .github/order020b-amend/run-gate.sh accessibility npx playwright test -g "chart supports keyboard reading|skip link is hidden|alert feed failure"
+      - name: Offline
+        run: bash .github/order020b-amend/run-gate.sh offline npx playwright test -g "offline keeps the cached hydrometric surface"
+      - name: Source runtime
+        run: bash .github/order020b-amend/run-gate.sh source-runtime node scripts/revalidate-public-sources.mjs
+      - name: Local corrected contract expectation
+        run: bash .github/order020b-amend/run-gate.sh predeploy-consistency bash -lc "npx vitest run tests/unit/live-data.test.ts tests/unit/snapshot-validation.test.ts && echo PRODUCTION_API_UI_CONSISTENCY_EXPECTED=PASS"
+
+      - name: Wait only for propagation and validate production contract
+        id: settle
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$EVIDENCE_DIR/logs/production-validation.log"
+          : > "$log"
+          code=1
+          for attempt in $(seq 1 12); do
+            echo "GET_ONLY_VALIDATION_ATTEMPT=$attempt" | tee -a "$log"
+            set +e
+            npx vitest run .github/order020b-amend/production-validation.test.ts --reporter=verbose >>"$log" 2>&1
+            code=$?
+            set -e
+            if [[ "$code" == "0" ]]; then break; fi
+            sleep 5
+          done
+          cat "$log"
+          node --input-type=module - "$code" <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          const code=Number(process.argv[2]);
+          await writeFile(`${process.env.EVIDENCE_DIR}/gates/production-validation.json`,JSON.stringify({name:'production-validation',exitCode:code,result:code===0?'PASS':'FAIL',capturedAt:new Date().toISOString(),mode:'GET_ONLY_PROPAGATION_RETRY'},null,2)+'\n');
+          NODE
+          test "$code" = "0"
+
+      - name: Verify real production UI, sources, resources and provenance
+        env:
+          CORRECTIVE_DEPLOYMENT_VERSION_ID: ${{ steps.deployment.outputs.deployment_version_id }}
+        run: node .github/order020b-amend/postdeploy.mjs
+
+      - name: Prepare semantic screenshot manifest before artifact handoff
+        run: node node_modules/.tmp/order020b-finalize.mjs prepare-screenshots
+
+      - name: Terminally disarm all execution routes
+        id: cleanup
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TEMP_WORKFLOW_PATH: order-020b-final-get-only-close.yml
+        run: bash .github/order020b-amend/cleanup.sh
+
+      - name: Upload final corrective screenshots
+        id: screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-final-corrective-screenshots
+          path: artifacts/order-020b-final-corrective/screenshots
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload final corrective evidence
+        id: evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-final-corrective-evidence
+          path: artifacts/order-020b-final-corrective
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish unique final ARQ checkpoint
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORRECTIVE_PRODUCT_COMMIT_SHA: 3e81cf71b237be237673dd5fe686f63ff39dced5
+          CORRECTIVE_DEPLOY_RUN_ID: 31153648173
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        run: node node_modules/.tmp/order020b-finalize.mjs publish
+
+      - name: Publish authority-exhausted blocker if any terminal gate still fails
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(cat <<EOF
+          VALID_TERMINAL_CHECKPOINT=NO
+          ORDER=020
+          SUBORDER=020-B
+          STATUS=BLOCKED_AUTHORITY_EXHAUSTED
+          REMOTE_HEAD_BEFORE=2014a0b634da4df3f13e186969a494dbd3e88c83
+          CORRECTIVE_PRODUCT_COMMIT_SHA=3e81cf71b237be237673dd5fe686f63ff39dced5
+          CORRECTIVE_DEPLOY_RUN=31153648173
+          ADDITIONAL_DEPLOY_COMMAND_COUNT=1
+          TOTAL_CLOUDFLARE_MUTATIONS_THIS_AMENDMENT=1
+          SECOND_CORRECTIVE_DEPLOY_PERFORMED=NO
+          SCREENSHOT_ARTIFACT_ID=${SCREENSHOT_ARTIFACT_ID}
+          EVIDENCE_ARTIFACT_ID=${EVIDENCE_ARTIFACT_ID}
+          EVIDENCE_ARTIFACT_SHA256=${EVIDENCE_ARTIFACT_SHA256#sha256:}
+          AUD_HOLD=ACTIVE
+          NEXT_ORDER=NONE
+          EOF
+          )
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/14/comments" -f "body=$body"
+
+      - name: Remove local temporary finalizer copy
+        if: always()
+        run: rm -f node_modules/.tmp/order020b-finalize.mjs
