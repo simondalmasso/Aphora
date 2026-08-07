@@ -6,134 +6,39 @@
 }
 
 @media (min-width: 1081px) {
-  .hydrometric-section {
-    padding-block: 9px 10px;
-  }
-
-  .primary-station {
-    padding: 8px;
-  }
-
-  .hydro-level {
-    min-height: 82px;
-  }
-
-  .hydro-chart svg {
-    max-height: 190px;
-  }
-
-  .civic-discovery {
-    gap: 6px 10px;
-    padding-top: 4px;
-  }
-
-  .civic-quick-tile {
-    min-height: 58px;
-    padding: 7px 8px;
-    gap: 5px;
-  }
-
-  .civic-quick-tile svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .civic-campaign--compact {
-    min-height: 112px;
-  }
-
-  .civic-campaign--compact .civic-campaign__copy {
-    padding: 11px 16px;
-  }
-
-  .civic-campaign--compact .civic-campaign__copy h2 {
-    font-size: 1.72rem;
-  }
-
-  .civic-campaign--compact .civic-campaign__copy strong {
-    margin-top: 3px;
-    font-size: .78rem;
-  }
-
-  .civic-campaign--compact .civic-campaign__copy a {
-    margin-top: 6px;
-  }
-
-  .source-transparency {
-    grid-column: 1;
-    grid-row: 3;
-  }
-
-  .safety-actions {
-    grid-column: 2;
-    grid-row: 3;
-  }
-
-  .source-health-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .source-health-grid article {
-    min-height: 0;
-    padding: 6px 7px;
-  }
-
+  .hydrometric-section { padding-block: 9px 10px; }
+  .primary-station { padding: 8px; }
+  .hydro-level { min-height: 82px; }
+  .hydro-chart svg { max-height: 190px; }
+  .civic-discovery { gap: 6px 10px; padding-top: 4px; }
+  .civic-quick-tile { min-height: 58px; padding: 7px 8px; gap: 5px; }
+  .civic-quick-tile svg { width: 18px; height: 18px; }
+  .civic-campaign--compact { min-height: 112px; }
+  .civic-campaign--compact .civic-campaign__copy { padding: 11px 16px; }
+  .civic-campaign--compact .civic-campaign__copy h2 { font-size: 1.72rem; }
+  .civic-campaign--compact .civic-campaign__copy strong { margin-top: 3px; font-size: .78rem; }
+  .civic-campaign--compact .civic-campaign__copy a { margin-top: 6px; }
+  .source-transparency { grid-column: 1; grid-row: 3; }
+  .safety-actions { grid-column: 2; grid-row: 3; }
+  .source-health-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .source-health-grid article { min-height: 0; padding: 6px 7px; }
   .source-health-grid article p,
-  .source-health-grid article small {
-    font-size: .59rem;
-    line-height: 1.2;
-  }
-
-  .source-health-grid article strong {
-    font-size: .75rem;
-    line-height: 1.1;
-  }
-
-  .source-health-grid dl {
-    margin-top: 4px;
-  }
-
+  .source-health-grid article small { font-size: .59rem; line-height: 1.2; }
+  .source-health-grid article strong { font-size: .75rem; line-height: 1.1; }
+  .source-health-grid dl { margin-top: 4px; }
   .source-health-grid dt,
-  .source-health-grid dd {
-    font-size: .56rem;
-  }
-
-  .contact-grid a {
-    min-height: 48px;
-  }
-
-  .secondary-actions summary {
-    min-height: 28px;
-    padding-block: 4px;
-  }
-
-  .civic-footer__main {
-    padding-block: 10px 8px;
-    gap: 24px;
-  }
-
-  .civic-footer__main > div p {
-    margin-block: 4px 2px;
-    line-height: 1.25;
-  }
-
-  .civic-footer nav {
-    gap: 2px;
-  }
-
-  .civic-footer nav h2 {
-    margin-bottom: 2px;
-  }
-
-  .civic-footer__legal {
-    padding-block: 4px;
-  }
+  .source-health-grid dd { font-size: .56rem; }
+  .contact-grid a { min-height: 48px; }
+  .secondary-actions summary { min-height: 28px; padding-block: 4px; }
+  .civic-footer__main { padding-block: 10px 8px; gap: 24px; }
+  .civic-footer__main > div p { margin-block: 4px 2px; line-height: 1.25; }
+  .civic-footer nav { gap: 2px; }
+  .civic-footer nav h2 { margin-bottom: 2px; }
+  .civic-footer__legal { padding-block: 4px; }
 }
 
 @media (max-width: 1080px) {
-  .civic-header .connection-chip {
-    display: inline-flex;
-  }
+  .civic-header .connection-chip { display: inline-flex; }
 }
 
 @media (max-width: 520px) {
@@ -146,31 +51,16 @@
     white-space: nowrap;
     font-size: .58rem;
   }
+  .civic-header .alert-chip { width: 86px; }
+  .civic-header__actions { gap: 3px !important; }
+}
 
-  .civic-header .alert-chip {
-    width: 86px;
-  }
-
-  .civic-header__actions {
-    gap: 3px !important;
-  }
+@media (max-width: 430px) {
+  .dashboard { padding-left: 8px; padding-right: 8px; }
 }
 
 @media (max-width: 340px) {
-  .dashboard {
-    padding-left: 6px;
-    padding-right: 6px;
-  }
-
-  .civic-header .ui-icon-button {
-    display: none;
-  }
-
-  .civic-header .alert-chip {
-    width: 78px;
-  }
-
-  .civic-header .connection-chip {
-    max-width: 68px;
-  }
+  .civic-header .ui-icon-button { display: none; }
+  .civic-header .alert-chip { width: 78px; }
+  .civic-header .connection-chip { max-width: 68px; }
 }
