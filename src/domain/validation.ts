@@ -83,7 +83,7 @@ function source(value: unknown, index: number): Source {
   if (!['OFFICIAL_OBSERVATION', 'OFFICIAL_ALERT', 'FORECAST_MODEL', 'SATELLITE_OBSERVATION', 'COMMUNITY_REPORT', 'INTERNAL_DERIVATION', 'DEMO_FIXTURE'].includes(String(row.kind))) throw new TypeError(`snapshot.sources[${index}].kind inválido`);
   if (!['FRESH', 'STALE', 'UNAVAILABLE', 'UNKNOWN'].includes(String(row.status))) throw new TypeError(`snapshot.sources[${index}].status inválido`);
   iso(row.observedAt, `snapshot.sources[${index}].observedAt`); iso(row.validUntil, `snapshot.sources[${index}].validUntil`); text(row.contribution, `snapshot.sources[${index}].contribution`, 1000);
-  if (row.url !== undefined) httpsUrl(row.url, `snapshot.timeline[${index}].url`);
+  if (row.url !== undefined) httpsUrl(row.url, `snapshot.sources[${index}].url`);
   if (typeof row.official !== 'boolean') throw new TypeError(`snapshot.sources[${index}].official inválido`);
   if (row.connected !== undefined && typeof row.connected !== 'boolean') throw new TypeError(`snapshot.sources[${index}].connected inválido`);
   if (row.organizationId !== undefined) text(row.organizationId, `snapshot.sources[${index}].organizationId`, 160);

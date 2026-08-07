@@ -47,8 +47,15 @@ describe('snapshot validation', () => {
     expect(() => validateSnapshot(live({ river: { ...live().river, currentMetres: Number.NaN } }))).toThrow('finito');
   });
 
-  it('rejects unsafe public URLs and fabricated available rain totals', () => {
+  it('accepts source timeline events without an optional URL and rejects empty or unsafe URLs when present', () => {
+    const timeline = [{ id: 'source:degraded', at, type: 'SOURCE_DEGRADED' as const, title: 'Fuente degradada', detail: 'Sin endpoint publicable.', sourceId: source.id, official: false }];
+    expect(validateSnapshot(live({ timeline }))).toBeTruthy();
+    expect(() => validateSnapshot(live({ sources: [{ ...source, url: '' }] }))).toThrow('snapshot.sources[0].url inválido');
+    expect(() => validateSnapshot(live({ timeline: [{ ...timeline[0], url: '' }] }))).toThrow('snapshot.timeline[0].url inválido');
     expect(() => validateSnapshot(live({ sources: [{ ...source, url: 'javascript:alert(1)' }] }))).toThrow('debe usar HTTPS');
+  });
+
+  it('rejects fabricated available rain totals', () => {
     expect(() => validateSnapshot(live({ rain: { ...live().rain, available: true, accumulated1hMm: null, accumulated24hMm: null } }))).toThrow('disponible sin acumulados');
   });
 

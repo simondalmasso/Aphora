@@ -63,7 +63,16 @@ export function timelineFor(systems: readonly HydrologicalSystem[], alerts: read
   }
   for (const source of sources) {
     if (source.classification !== 'DEGRADED' && source.classification !== 'BLOCKED_CREDENTIAL' && source.classification !== 'BLOCKED_NO_MACHINE_ENDPOINT') continue;
-    events.push(Object.freeze({ id: `source:${source.id}:${source.classification}`, at: source.lastCheckedAt ?? now.toISOString(), type: 'SOURCE_DEGRADED', title: `Fuente con disponibilidad limitada: ${source.feedName ?? source.name}`, detail: source.limitations ?? source.contribution, sourceId: source.id, official: false }));
+    events.push(Object.freeze({
+      id: `source:${source.id}:${source.classification}`,
+      at: source.lastCheckedAt ?? now.toISOString(),
+      type: 'SOURCE_DEGRADED',
+      title: `Fuente con disponibilidad limitada: ${source.feedName ?? source.name}`,
+      detail: source.limitations ?? source.contribution,
+      sourceId: source.id,
+      ...(source.url ? { url: source.url } : {}),
+      official: false,
+    }));
   }
   return Object.freeze(events.sort((left, right) => Date.parse(right.at) - Date.parse(left.at)).slice(0, 30));
 }

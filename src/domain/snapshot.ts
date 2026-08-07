@@ -74,6 +74,7 @@ export interface TimelineEvent {
   readonly title: string;
   readonly detail: string;
   readonly sourceId: string;
+  readonly url?: string;
   readonly official: boolean;
 }
 

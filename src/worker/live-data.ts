@@ -89,14 +89,23 @@ function cacheApi(): Cache | null {
   return (caches as CloudflareCacheStorage).default ?? null;
 }
 
+function optionalHttpsConfigUrl(value: string | undefined, label: string): string | undefined {
+  const normalized = value?.trim();
+  if (!normalized) return undefined;
+  let parsed: URL;
+  try { parsed = new URL(normalized); } catch { throw new TypeError(`${label} debe ser una URL HTTPS válida`); }
+  if (parsed.protocol !== 'https:') throw new TypeError(`${label} debe usar HTTPS`);
+  return normalized;
+}
+
 async function configKey(env: LiveDataEnv): Promise<string> {
   const config = JSON.stringify({
     version: LIVE_DATA_CACHE_VERSION,
-    waterMlParana: env.INA_WATERML_PARANA_URL ?? null,
-    waterMlSalado: env.INA_WATERML_SALADO_URL ?? null,
-    ports: env.PORTS_HYDROMETER_JSON_URL ?? null,
-    smnObservations: env.SMN_OBSERVATIONS_JSON_URL ?? null,
-    smnAlerts: env.SMN_ALERTS_JSON_URL ?? null,
+    waterMlParana: optionalHttpsConfigUrl(env.INA_WATERML_PARANA_URL, 'INA_WATERML_PARANA_URL') ?? null,
+    waterMlSalado: optionalHttpsConfigUrl(env.INA_WATERML_SALADO_URL, 'INA_WATERML_SALADO_URL') ?? null,
+    ports: optionalHttpsConfigUrl(env.PORTS_HYDROMETER_JSON_URL, 'PORTS_HYDROMETER_JSON_URL') ?? null,
+    smnObservations: optionalHttpsConfigUrl(env.SMN_OBSERVATIONS_JSON_URL, 'SMN_OBSERVATIONS_JSON_URL') ?? null,
+    smnAlerts: optionalHttpsConfigUrl(env.SMN_ALERTS_JSON_URL, 'SMN_ALERTS_JSON_URL') ?? null,
   });
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(config)));
   return Array.from(bytes.slice(0, 12), (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -186,7 +195,7 @@ function sourceBase(input: {
   fetchedAt: string;
   validUntil: string;
   contribution: string;
-  url: string;
+  url?: string;
   connected: boolean;
   classification?: FeedClassification;
   freshness?: FreshnessState;
@@ -209,7 +218,7 @@ function sourceBase(input: {
     validUntil: input.validUntil,
     contribution: input.contribution,
     official: input.official ?? true,
-    url: input.url,
+    ...(input.url?.trim() ? { url: input.url.trim() } : {}),
     connected: input.connected,
     organizationId: input.organizationId,
     organizationName: input.organizationName,
@@ -542,14 +551,19 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
   const from = new Date(now.getTime() - 180 * 24 * 3_600_000).toISOString().slice(0, 10);
   const to = new Date(now.getTime() + 24 * 3_600_000).toISOString().slice(0, 10);
   const defaultWaterMl = (series: string) => `https://alerta.ina.gob.ar/a5/obs/puntual/series/${series}?timestart=${from}&timeend=${to}&format=waterml2`;
+  const waterMlParanaUrl = optionalHttpsConfigUrl(env.INA_WATERML_PARANA_URL, 'INA_WATERML_PARANA_URL');
+  const waterMlSaladoUrl = optionalHttpsConfigUrl(env.INA_WATERML_SALADO_URL, 'INA_WATERML_SALADO_URL');
+  const portsUrl = optionalHttpsConfigUrl(env.PORTS_HYDROMETER_JSON_URL, 'PORTS_HYDROMETER_JSON_URL');
+  const smnObservationsUrl = optionalHttpsConfigUrl(env.SMN_OBSERVATIONS_JSON_URL, 'SMN_OBSERVATIONS_JSON_URL');
+  const smnAlertsUrl = optionalHttpsConfigUrl(env.SMN_ALERTS_JSON_URL, 'SMN_ALERTS_JSON_URL');
 
   const stationPromise = Promise.all(STATIONS.map((station) => stationSystem(station, now)));
-  const smnAlertPromise = smnAlertFeed(env.SMN_ALERTS_JSON_URL ?? defaultSmnCapUrl(now), now);
+  const smnAlertPromise = smnAlertFeed(smnAlertsUrl ?? defaultSmnCapUrl(now), now);
   const optionalPromise = Promise.all([
-    waterMlSource(env.INA_WATERML_PARANA_URL ?? defaultWaterMl('30'), 'ina-waterml-parana', 'INA WaterML · Río Paraná, Santa Fe', now),
-    waterMlSource(env.INA_WATERML_SALADO_URL ?? defaultWaterMl('3044'), 'ina-waterml-salado', 'INA WaterML · Río Salado, Santo Tomé', now),
-    portsSource(env.PORTS_HYDROMETER_JSON_URL, now),
-    smnObservationSource(env.SMN_OBSERVATIONS_JSON_URL, now),
+    waterMlSource(waterMlParanaUrl ?? defaultWaterMl('30'), 'ina-waterml-parana', 'INA WaterML · Río Paraná, Santa Fe', now),
+    waterMlSource(waterMlSaladoUrl ?? defaultWaterMl('3044'), 'ina-waterml-salado', 'INA WaterML · Río Salado, Santo Tomé', now),
+    portsSource(portsUrl, now),
+    smnObservationSource(smnObservationsUrl, now),
     nasaSource(now),
   ]);
 

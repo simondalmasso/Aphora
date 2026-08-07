@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { validateSnapshot } from '../../src/domain/validation.ts';
 import { buildLiveSnapshot } from '../../src/worker/live-data.ts';
 
 const originalFetch = globalThis.fetch;
@@ -48,6 +49,33 @@ describe('live hydrological aggregation', () => {
     expect(snapshot.rain).toMatchObject({ available: false, accumulated1hMm: null, accumulated24hMm: null });
   });
 
+
+  it('normalizes blank optional endpoint bindings without invalidating usable INA hydrometry', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const id = seriesId(input);
+      if (id === '30') return json(points(Number(id), [['2026-08-03T12:00:00.000Z', 3.18], ['2026-08-03T18:00:00.000Z', 3.2]]));
+      if (id === '3044') return json(points(Number(id), [['2026-08-03T12:00:00.000Z', 4.7], ['2026-08-03T18:00:00.000Z', 4.8]]));
+      if (String(input).includes('/identify')) return json({ observedAt: '2026-08-03T17:30:00.000Z', value: 0 });
+      throw new Error(`unexpected URL ${String(input)}`);
+    }) as typeof fetch;
+    const snapshot = await buildLiveSnapshot({
+      INA_WATERML_PARANA_URL: '',
+      INA_WATERML_SALADO_URL: '   ',
+      PORTS_HYDROMETER_JSON_URL: '',
+      SMN_OBSERVATIONS_JSON_URL: ' ',
+      SMN_ALERTS_JSON_URL: '',
+    }, new Date('2026-08-03T18:00:00.000Z'));
+    expect(validateSnapshot(snapshot)).toBe(snapshot);
+    expect(snapshot.systems?.map((system) => [system.id, system.currentMetres])).toEqual([
+      ['parana-santa-fe', 3.2],
+      ['salado-santo-tome', 4.8],
+    ]);
+    expect(snapshot.sources.every((item) => item.url !== '')).toBe(true);
+    expect(snapshot.sources.find((item) => item.id === 'ina-waterml-parana')?.url).toMatch(/^https:\/\//);
+    expect(snapshot.sources.find((item) => item.id === 'ina-waterml-salado')?.url).toMatch(/^https:\/\//);
+    expect(snapshot.sources.find((item) => item.id === 'smn-alerts')?.url).toMatch(/^https:\/\//);
+    expect(snapshot.timeline?.filter((item) => item.type === 'SOURCE_DEGRADED').every((item) => item.url === undefined || item.url.startsWith('https://'))).toBe(true);
+  });
 
   it('returns UNKNOWN when a normal current system is mixed with an obsolete system', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
