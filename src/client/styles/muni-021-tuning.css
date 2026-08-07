@@ -61,10 +61,12 @@
 
   .source-transparency {
     grid-column: 1;
+    grid-row: 3;
   }
 
   .safety-actions {
     grid-column: 2;
+    grid-row: 3;
   }
 
   .source-health-grid {
@@ -106,20 +108,25 @@
   }
 
   .civic-footer__main {
-    padding-block: 16px 13px;
-    gap: 28px;
+    padding-block: 10px 8px;
+    gap: 24px;
   }
 
   .civic-footer__main > div p {
-    margin-block: 7px 3px;
+    margin-block: 4px 2px;
+    line-height: 1.25;
   }
 
   .civic-footer nav {
-    gap: 3px;
+    gap: 2px;
+  }
+
+  .civic-footer nav h2 {
+    margin-bottom: 2px;
   }
 
   .civic-footer__legal {
-    padding-block: 6px;
+    padding-block: 4px;
   }
 }
 
