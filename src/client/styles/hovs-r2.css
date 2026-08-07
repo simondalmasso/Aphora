@@ -1,0 +1,292 @@
+/* 021-HOVS-R2 — Santa Fe civic DNA × editorial hydrometric craft.
+   This layer is intentionally last: it changes composition, not product semantics. */
+:root {
+  --r2-navy: #0a2747;
+  --r2-navy-deep: #061c33;
+  --r2-green: #009b88;
+  --r2-green-bright: #20b89f;
+  --r2-bg: #f4f6f3;
+  --r2-surface: #ffffff;
+  --r2-ink: #09233f;
+  --r2-muted: #536779;
+  --r2-rule: #c7d2d8;
+  --r2-danger: #b72f3a;
+  --r2-warning: #9a5a00;
+  --r2-success: #087868;
+  --r2-display: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
+  --r2-ui: "Helvetica Neue", "Arial Nova", Arial, sans-serif;
+  --r2-gutter: clamp(20px, 4vw, 72px);
+  --r2-max: 1320px;
+}
+
+html { background: var(--r2-bg); }
+body { background: var(--r2-bg); color: var(--r2-ink); font-family: var(--r2-ui); }
+.hovs-r2 { min-height: 100vh; background: var(--r2-bg); }
+.hovs-r2 :where(h1,h2,h3,.hydro-level strong,.contact-grid strong,.civic-campaign h2) {
+  font-family: var(--r2-display);
+  letter-spacing: -.035em;
+}
+.hovs-r2 :where(a,button,input,select,textarea,summary) { font-family: var(--r2-ui); }
+.hovs-r2 :focus-visible { outline: 3px solid #0b6fdc; outline-offset: 3px; }
+
+/* Header: civic, lean, decisive. */
+.hovs-r2 .civic-header { background: rgba(255,255,255,.97); border-bottom: 1px solid var(--r2-rule); box-shadow: none; }
+.hovs-r2 .civic-header__utility { min-height: 30px; padding-inline: var(--r2-gutter); background: var(--r2-navy); color: #fff; letter-spacing: .01em; }
+.hovs-r2 .civic-header__main.header-inner { max-width: var(--r2-max); min-height: 74px; padding-inline: var(--r2-gutter); gap: 28px; }
+.hovs-r2 .sos-brand { min-height: 52px; }
+.hovs-r2 .sos-brand__mark { width: 52px; height: 52px; border-radius: 0; background: var(--r2-navy); }
+.hovs-r2 .sos-brand__mark::after { background: var(--r2-green-bright); }
+.hovs-r2 .sos-brand__wordmark strong { font-size: 1.08rem; letter-spacing: -.02em; }
+.hovs-r2 .sos-brand__wordmark small { color: var(--r2-muted); }
+.hovs-r2 .civic-nav { align-self: stretch; gap: 28px; }
+.hovs-r2 .civic-nav a { min-height: 74px; display: inline-flex; align-items: center; padding: 0; border: 0; color: var(--r2-ink); font-size: .94rem; font-weight: 650; }
+.hovs-r2 .civic-nav a[aria-current="page"] { box-shadow: inset 0 -4px var(--r2-green); }
+.hovs-r2 .civic-header__actions { gap: 10px; }
+.hovs-r2 .connection-chip,
+.hovs-r2 .alert-chip,
+.hovs-r2 .icon-button { border-radius: 0; box-shadow: none; }
+
+/* Home = continuous editorial flow, not card stack. */
+.hovs-r2 .dashboard { width: min(100%, var(--r2-max)); margin: 0 auto; padding: 0 var(--r2-gutter) 72px; display: block; }
+.hovs-r2 .dashboard > section { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.hovs-r2 .dashboard > section + section { margin-top: 72px; }
+.hovs-r2 .section-kicker { color: var(--r2-green); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.hovs-r2 .compact-section-heading,
+.hovs-r2 .civic-section-title { border: 0; padding: 0 0 18px; margin: 0; align-items: end; }
+.hovs-r2 .compact-section-heading h2,
+.hovs-r2 .civic-section-title h2 { font-size: clamp(2rem, 4vw, 3.3rem); line-height: .98; font-weight: 760; }
+
+/* Alert banner is a signal line, not another card. */
+.hovs-r2 .official-alert-banner,
+.hovs-r2 .verified-alert-banner { margin: 16px 0 0; border-radius: 0; border-inline: 0; border-top: 1px solid var(--r2-rule); border-bottom: 1px solid var(--r2-rule); box-shadow: none; }
+
+/* Signature moment: RÍO / REGLA / TIEMPO. */
+.hovs-r2 .hydrometric-section { padding-top: 22px; }
+.hovs-r2 .muni-hydrometric-hero { position: relative; overflow: visible; padding: 28px 0 0; border: 0; border-top: 6px solid var(--r2-navy); border-radius: 0; background: transparent; box-shadow: none; }
+.hovs-r2 .muni-hydrometric-hero::before { content: "SANTA FE · SISTEMA HÍDRICO"; position: absolute; top: -28px; right: 0; color: var(--r2-muted); font-size: .68rem; font-weight: 750; letter-spacing: .12em; }
+.hovs-r2 .hydrometric-hero__header { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; padding: 0 0 26px; border-bottom: 1px solid var(--r2-rule); }
+.hovs-r2 .hydrometric-hero__header h1 { margin: 2px 0 0; font-size: clamp(2.8rem, 6vw, 5.6rem); line-height: .86; font-weight: 780; }
+.hovs-r2 .hydrometric-hero__controls { align-items: center; gap: 12px; }
+.hovs-r2 .station-selector { border: 0; border-radius: 0; background: transparent; gap: 8px; }
+.hovs-r2 .station-selector button { min-width: 112px; min-height: 50px; padding-inline: 18px; border: 1px solid var(--r2-rule); border-radius: 0; background: transparent; color: var(--r2-ink); font-size: 1rem; font-weight: 700; }
+.hovs-r2 .station-selector button[aria-selected="true"] { background: var(--r2-navy); border-color: var(--r2-navy); color: #fff; }
+.hovs-r2 .hydro-refresh-button { width: 50px; height: 50px; border-radius: 0; border: 1px solid var(--r2-rule); background: transparent; color: var(--r2-navy); }
+.hovs-r2 .primary-station { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.hovs-r2 .station-identification { min-height: 92px; padding: 24px 0 18px; border-bottom: 0; align-items: start; }
+.hovs-r2 .station-identification > div > span { color: var(--r2-muted); font-size: .84rem; }
+.hovs-r2 .station-identification > div > strong { display: block; margin-top: 4px; font-size: clamp(1.35rem, 2.4vw, 2.2rem); line-height: 1; }
+.hovs-r2 .freshness-badge { border-radius: 0; border: 0; border-left: 3px solid currentColor; background: transparent; padding: 8px 0 8px 12px; }
+.hovs-r2 .hydro-signature-axis { display: grid; grid-template-columns: auto 1fr auto 1fr auto; align-items: center; gap: 12px; min-height: 32px; margin: 0 0 18px; color: var(--r2-muted); font-size: .68rem; font-weight: 800; letter-spacing: .14em; }
+.hovs-r2 .hydro-signature-axis i { height: 1px; background: var(--r2-rule); }
+.hovs-r2 .hydro-reading { padding: 0; border: 0; }
+.hovs-r2 .hydro-level { position: relative; min-width: 0; padding: 0 0 22px; border-bottom: 1px solid var(--r2-rule); }
+.hovs-r2 .hydro-level > span { color: var(--r2-green); font-size: .76rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.hovs-r2 .hydro-level strong { display: flex; align-items: flex-end; min-height: 132px; margin: 0; color: var(--r2-navy); font-size: clamp(6.4rem, 12vw, 10.8rem); font-weight: 800; line-height: .74; font-variant-numeric: tabular-nums lining-nums; letter-spacing: -.075em; }
+.hovs-r2 .hydro-level strong small { margin: 0 0 .08em .16em; font-family: var(--r2-ui); font-size: .16em; font-weight: 700; letter-spacing: 0; color: var(--r2-muted); }
+.hovs-r2 .hydro-level time { display: block; margin-top: 20px; color: var(--r2-muted); font-size: .94rem; font-variant-numeric: tabular-nums; }
+.hovs-r2 .hydro-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 18px 0 0; border: 0; }
+.hovs-r2 .hydro-metrics > div { padding: 0 18px 0 0; border: 0; }
+.hovs-r2 .hydro-metrics > div + div { padding-left: 18px; border-left: 1px solid var(--r2-rule); }
+.hovs-r2 .hydro-metrics dt { color: var(--r2-muted); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
+.hovs-r2 .hydro-metrics dd { margin-top: 5px; font-size: 1.18rem; font-weight: 760; }
+.hovs-r2 .source-strip { display: grid; gap: 7px; align-content: start; margin-top: 24px; padding: 18px 0 0; border: 0; border-top: 1px solid var(--r2-rule); border-radius: 0; background: transparent; color: var(--r2-muted); }
+.hovs-r2 .source-strip b { color: var(--r2-ink); }
+.hovs-r2 .source-strip button { justify-self: start; min-width: 108px; min-height: 48px; margin-top: 8px; border: 1px solid var(--r2-navy); border-radius: 0; background: transparent; color: var(--r2-navy); font-weight: 750; }
+.hovs-r2 .hydro-chart { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.hovs-r2 .hydro-chart__plot,
+.hovs-r2 .chart-shell { border-radius: 0; box-shadow: none; }
+.hovs-r2 .data-table-disclosure { margin-top: 14px; }
+.hovs-r2 .data-table-disclosure summary { min-height: 46px; color: var(--r2-navy); font-weight: 760; }
+
+/* Civic discovery becomes an editorial index. */
+.hovs-r2 .civic-discovery { display: grid; grid-template-columns: minmax(220px,.72fr) minmax(0,1.9fr); gap: 28px 56px; padding: 0; background: transparent; }
+.hovs-r2 .civic-discovery .civic-section-title { grid-column: 1; display: block; align-self: start; }
+.hovs-r2 .civic-discovery .civic-section-title > span { display: block; margin-top: 16px; color: var(--r2-muted); font-size: .84rem; }
+.hovs-r2 .civic-quick-grid { grid-column: 2; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 28px; counter-reset: quick; border-top: 1px solid var(--r2-rule); }
+.hovs-r2 .civic-quick-tile { counter-increment: quick; position: relative; min-height: 72px; display: grid; grid-template-columns: 32px 1fr 22px; align-items: center; gap: 12px; padding: 0; border: 0; border-bottom: 1px solid var(--r2-rule); border-radius: 0; background: transparent; color: var(--r2-ink); box-shadow: none; }
+.hovs-r2 .civic-quick-tile::before { content: counter(quick, decimal-leading-zero); color: var(--r2-green); font-size: .69rem; font-weight: 800; letter-spacing: .08em; }
+.hovs-r2 .civic-quick-tile::after { content: "↗"; justify-self: end; color: var(--r2-muted); font-size: 1.05rem; }
+.hovs-r2 .civic-quick-tile svg { width: 22px; height: 22px; color: var(--r2-green); grid-column: 3; display: none; }
+.hovs-r2 .civic-quick-tile span { font-size: 1.05rem; font-weight: 720; }
+.hovs-r2 .civic-water-summary { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,1fr); gap: 0; border-top: 1px solid var(--r2-navy); border-bottom: 1px solid var(--r2-rule); }
+.hovs-r2 .civic-water-summary article { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 6px 18px; padding: 18px 0; border: 0; border-radius: 0; background: transparent; }
+.hovs-r2 .civic-water-summary article + article { padding-left: 28px; border-left: 1px solid var(--r2-rule); }
+.hovs-r2 .civic-water-summary strong { font-size: 1.8rem; color: var(--r2-navy); }
+.hovs-r2 .civic-water-summary small { grid-column: 1 / -1; color: var(--r2-muted); }
+.hovs-r2 .civic-campaign { grid-column: 1 / -1; position: relative; min-height: 240px; margin: 16px 0 0; border-radius: 0; background: var(--r2-navy); overflow: hidden; }
+.hovs-r2 .civic-campaign__copy { position: relative; z-index: 2; width: min(760px,80%); padding: 36px 40px; }
+.hovs-r2 .civic-campaign__copy p { color: #9deadd; letter-spacing: .08em; }
+.hovs-r2 .civic-campaign__copy h2 { margin: 8px 0 3px; color: #fff; font-size: clamp(3.3rem,8vw,7rem); line-height: .78; letter-spacing: -.065em; }
+.hovs-r2 .civic-campaign__copy strong { color: var(--r2-green-bright); font-size: 1.12rem; }
+.hovs-r2 .civic-campaign__copy a { min-height: 48px; margin-top: 18px; display: inline-flex; align-items: center; border-bottom: 1px solid #fff; color: #fff; font-weight: 750; }
+.hovs-r2 .civic-campaign__motif { opacity: .62; }
+
+/* Urgency is an action field, not a service table. */
+.hovs-r2 .safety-actions { padding: 0; background: transparent; }
+.hovs-r2 .safety-actions .compact-section-heading { border-top: 6px solid var(--r2-navy); padding-top: 22px; }
+.hovs-r2 .safety-actions .button--secondary { min-height: 48px; border-radius: 0; background: transparent; }
+.hovs-r2 .contact-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 0; border-top: 1px solid var(--r2-rule); }
+.hovs-r2 .contact-grid a { min-height: 92px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 3px; padding: 14px 18px; border: 0; border-bottom: 1px solid var(--r2-rule); border-radius: 0; background: transparent; color: var(--r2-ink); }
+.hovs-r2 .contact-grid a + a { border-left: 1px solid var(--r2-rule); }
+.hovs-r2 .contact-grid a strong { font-size: 2.4rem; line-height: .86; }
+.hovs-r2 .contact-grid a span { color: var(--r2-muted); }
+.hovs-r2 .contact-grid__primary { grid-column: 1 / -1; min-height: 126px !important; display: grid !important; grid-template-columns: auto 1fr; align-content: center; column-gap: 24px !important; border-top: 5px solid var(--r2-danger) !important; border-left: 0 !important; }
+.hovs-r2 .contact-grid__primary strong { font-size: clamp(4.5rem,9vw,7rem) !important; color: var(--r2-danger); }
+.hovs-r2 .contact-grid__primary span { align-self: end; padding-bottom: 8px; font-size: 1.25rem; color: var(--r2-ink); }
+.hovs-r2 .secondary-actions { margin-top: 18px; border-top: 1px solid var(--r2-rule); }
+.hovs-r2 .secondary-actions summary { min-height: 52px; display: flex; align-items: center; font-weight: 760; }
+
+/* Evidence ledger: transparent, calm, inspectable. */
+.hovs-r2 .source-transparency { padding: 0; background: transparent; }
+.hovs-r2 .source-transparency .compact-section-heading { border-top: 1px solid var(--r2-navy); padding-top: 22px; }
+.hovs-r2 .source-health-grid { display: block; border-top: 1px solid var(--r2-rule); }
+.hovs-r2 .source-health-grid article { display: grid; grid-template-columns: minmax(150px,.6fr) minmax(260px,1.3fr) minmax(300px,1.2fr); gap: 24px; min-height: 104px; padding: 20px 0; border: 0; border-bottom: 1px solid var(--r2-rule); border-radius: 0; background: transparent; box-shadow: none; }
+.hovs-r2 .source-health-grid article > div { display: block; }
+.hovs-r2 .source-health-grid article > div > span { color: var(--r2-green); font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.hovs-r2 .source-health-grid article > div > strong { display: block; margin-top: 6px; font-size: 1.08rem; }
+.hovs-r2 .source-health-grid article > p { margin: 0; color: var(--r2-muted); }
+.hovs-r2 .source-health-grid article dl { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0; }
+.hovs-r2 .source-health-grid article dt { color: var(--r2-muted); font-size: .72rem; }
+.hovs-r2 .source-health-grid article dd { margin: 4px 0 0; font-weight: 700; }
+
+/* Editorial risk pages inherit the same continuous language. */
+.hovs-r2 .civic-page { width: min(100%, var(--r2-max)); margin: 0 auto; padding: 58px var(--r2-gutter) 90px; }
+.hovs-r2 .civic-page__intro { max-width: 920px; margin-bottom: 48px; }
+.hovs-r2 .civic-page__intro h1,
+.hovs-r2 .el-nino-page h1 { font-size: clamp(3.4rem,7vw,6.8rem); line-height: .82; }
+.hovs-r2 .civic-page-section { margin-top: 64px; padding: 28px 0 0; border: 0; border-top: 1px solid var(--r2-rule); border-radius: 0; background: transparent; box-shadow: none; }
+.hovs-r2 .civic-page-section h2 { font-size: clamp(2.2rem,4vw,4.2rem); line-height: .92; }
+.hovs-r2 .civic-news-grid { gap: 0; border-top: 1px solid var(--r2-rule); }
+.hovs-r2 .civic-news-grid article { border: 0; border-bottom: 1px solid var(--r2-rule); border-radius: 0; background: transparent; box-shadow: none; }
+.hovs-r2 .civic-faq details { border-radius: 0; border-inline: 0; border-color: var(--r2-rule); background: transparent; }
+.hovs-r2 .official-source-badge { border-radius: 0; background: transparent; border: 0; border-left: 4px solid var(--r2-green); }
+.hovs-r2 .emergency-strip { border-radius: 0; box-shadow: none; }
+
+/* Dialogs, forms and tables: one tactile language. */
+.hovs-r2 dialog::backdrop { background: rgba(6,28,51,.68); backdrop-filter: none; }
+.hovs-r2 .dialog-surface { border-radius: 0; border: 0; border-top: 6px solid var(--r2-navy); box-shadow: 0 24px 64px rgba(6,28,51,.18); }
+.hovs-r2 .dialog-head { border-bottom: 1px solid var(--r2-rule); }
+.hovs-r2 .icon-close { min-width: 48px; min-height: 48px; border-radius: 0; }
+.hovs-r2 :where(input,textarea,select) { min-height: 48px; border-radius: 0; border: 1px solid #9dafb8; background: #fff; }
+.hovs-r2 .button { min-height: 48px; border-radius: 0; box-shadow: none; }
+.hovs-r2 .button--primary { background: var(--r2-green); border-color: var(--r2-green); color: #fff; }
+.hovs-r2 .button--secondary { background: transparent; border-color: var(--r2-navy); color: var(--r2-navy); }
+.hovs-r2 table { border-radius: 0; }
+.hovs-r2 th { background: #e9eeeb; }
+.hovs-r2 th,.hovs-r2 td { border-color: var(--r2-rule); }
+
+/* Footer becomes a light civic colophon, not a second page. */
+.hovs-r2 .civic-footer { margin-top: 0; padding: 42px var(--r2-gutter) 20px; background: #edf1ee; color: var(--r2-ink); border-top: 1px solid var(--r2-navy); }
+.hovs-r2 .civic-footer__main { max-width: var(--r2-max); margin: 0 auto; grid-template-columns: minmax(280px,1.5fr) minmax(170px,.55fr) minmax(220px,.7fr); gap: 48px; }
+.hovs-r2 .civic-footer a { color: var(--r2-navy); }
+.hovs-r2 .civic-footer h2 { color: var(--r2-green); font-size: .75rem; letter-spacing: .11em; text-transform: uppercase; }
+.hovs-r2 .civic-footer__legal { max-width: var(--r2-max); margin: 28px auto 0; padding-top: 14px; border-top: 1px solid var(--r2-rule); color: var(--r2-muted); }
+
+/* State surfaces. */
+.hovs-r2 :where(.data-caveat,.error-panel,.offline-banner,.loading-panel,.empty-state) { border-radius: 0; box-shadow: none; border: 0; border-left: 4px solid var(--r2-warning); background: #fff; }
+.hovs-r2 .connection-chip--offline { color: var(--r2-warning); }
+
+/* Motion serves orientation. */
+.hovs-r2 .civic-quick-tile,
+.hovs-r2 .contact-grid a,
+.hovs-r2 .button,
+.hovs-r2 .station-selector button { transition: color 160ms ease, background-color 160ms ease, transform 160ms ease, border-color 160ms ease; }
+.hovs-r2 .civic-quick-tile:hover,
+.hovs-r2 .contact-grid a:hover { color: var(--r2-green); }
+.hovs-r2 .station-selector button:active,
+.hovs-r2 .button:active { transform: translateY(1px); }
+
+@media (min-width: 960px) {
+  .hovs-r2 .primary-station { display: grid; grid-template-columns: minmax(300px,.72fr) minmax(500px,1.28fr); grid-template-rows: auto auto auto auto; column-gap: 64px; }
+  .hovs-r2 .station-identification { grid-column: 1 / -1; grid-row: 1; }
+  .hovs-r2 .hydro-signature-axis { grid-column: 1 / -1; grid-row: 2; }
+  .hovs-r2 .hydro-reading { grid-column: 1; grid-row: 3; align-self: start; }
+  .hovs-r2 .source-strip { grid-column: 1; grid-row: 4; }
+  .hovs-r2 .hydro-chart { grid-column: 2; grid-row: 3 / span 2; align-self: stretch; padding-top: 4px; }
+  .hovs-r2 .hydro-chart svg { min-height: 380px; }
+}
+
+@media (max-width: 959px) {
+  :root { --r2-gutter: clamp(20px,5vw,40px); }
+  .hovs-r2 .dashboard > section + section { margin-top: 56px; }
+  .hovs-r2 .civic-discovery { grid-template-columns: 1fr; gap: 20px; }
+  .hovs-r2 .civic-discovery .civic-section-title,
+  .hovs-r2 .civic-quick-grid { grid-column: 1; }
+  .hovs-r2 .source-health-grid article { grid-template-columns: 1fr 1fr; }
+  .hovs-r2 .source-health-grid article dl { grid-column: 1 / -1; }
+}
+
+@media (max-width: 820px) {
+  :root { --r2-gutter: 20px; }
+  .hovs-r2 .civic-header__utility { display: none; }
+  .hovs-r2 .civic-header__main.header-inner { min-height: 68px; padding-inline: 14px; gap: 10px; }
+  .hovs-r2 .civic-header__main .sos-brand { min-width: 52px; min-height: 52px; }
+  .hovs-r2 .civic-header__main .sos-brand__wordmark,
+  .hovs-r2 .connection-chip,
+  .hovs-r2 .header-refresh-button,
+  .hovs-r2 .header-messages-button { display: none; }
+  .hovs-r2 .civic-header__actions { margin-left: auto; }
+  .hovs-r2 .header-trust-action { min-width: 118px; max-width: 140px; min-height: 48px; padding: 7px 10px; font-size: .9rem; white-space: normal; }
+  .hovs-r2 .civic-menu-toggle { width: 48px; height: 48px; border-radius: 0; }
+  .hovs-r2 .dashboard { padding: 0 14px 56px; }
+  .hovs-r2 .dashboard > section + section { margin-top: 48px; }
+  .hovs-r2 .muni-hydrometric-hero { padding-top: 18px; border-top-width: 5px; }
+  .hovs-r2 .muni-hydrometric-hero::before { display: none; }
+  .hovs-r2 .hydrometric-hero__header { grid-template-columns: 1fr; gap: 18px; padding-bottom: 18px; }
+  .hovs-r2 .hydrometric-hero__header h1 { font-size: clamp(2.55rem,12vw,4.2rem); }
+  .hovs-r2 .hydrometric-hero__controls { display: grid; grid-template-columns: 1fr 48px; width: 100%; }
+  .hovs-r2 .station-selector { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  .hovs-r2 .station-selector button { min-width: 0; min-height: 50px; }
+  .hovs-r2 .hydro-refresh-button { width: 48px; height: 48px; }
+  .hovs-r2 .station-identification { display: grid; grid-template-columns: 1fr; gap: 12px; min-height: 0; padding: 18px 0 10px; }
+  .hovs-r2 .freshness-badge { justify-self: start; max-width: 100%; }
+  .hovs-r2 .hydro-signature-axis { margin: 3px 0 22px; gap: 8px; font-size: .61rem; }
+  .hovs-r2 .hydro-level strong { min-height: 98px; font-size: clamp(5.4rem,28vw,7.3rem); line-height: .75; }
+  .hovs-r2 .hydro-level time { margin-top: 16px; font-size: .92rem; }
+  .hovs-r2 .hydro-metrics { margin-top: 16px; }
+  .hovs-r2 .source-strip { margin-top: 18px; }
+  .hovs-r2 .hydro-chart { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--r2-rule); }
+  .hovs-r2 .hydro-chart svg { max-height: 260px; }
+  .hovs-r2 .compact-section-heading h2,
+  .hovs-r2 .civic-section-title h2 { font-size: clamp(2rem,9vw,3rem); }
+  .hovs-r2 .civic-quick-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 16px; }
+  .hovs-r2 .civic-quick-tile { min-height: 66px; grid-template-columns: 26px 1fr 18px; gap: 8px; }
+  .hovs-r2 .civic-quick-tile span { font-size: .96rem; }
+  .hovs-r2 .civic-water-summary { grid-template-columns: 1fr; }
+  .hovs-r2 .civic-water-summary article + article { padding-left: 0; border-left: 0; border-top: 1px solid var(--r2-rule); }
+  .hovs-r2 .civic-campaign { min-height: 228px; margin-top: 4px; }
+  .hovs-r2 .civic-campaign__copy { width: 90%; padding: 26px 20px; }
+  .hovs-r2 .civic-campaign__copy h2 { font-size: clamp(3.25rem,17vw,5.2rem); }
+  .hovs-r2 .safety-actions .compact-section-heading,
+  .hovs-r2 .source-transparency .compact-section-heading { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+  .hovs-r2 .safety-actions .compact-section-heading .button,
+  .hovs-r2 .source-transparency .compact-section-heading .button { justify-self: start; }
+  .hovs-r2 .contact-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .hovs-r2 .contact-grid a { min-height: 82px; padding: 12px 10px; }
+  .hovs-r2 .contact-grid a + a { border-left: 0; }
+  .hovs-r2 .contact-grid a:nth-child(even):not(.contact-grid__primary) { border-left: 1px solid var(--r2-rule); }
+  .hovs-r2 .contact-grid a strong { font-size: 2rem; }
+  .hovs-r2 .contact-grid__primary { grid-template-columns: auto 1fr; min-height: 112px !important; }
+  .hovs-r2 .contact-grid__primary strong { font-size: 4.7rem !important; }
+  .hovs-r2 .source-health-grid article { grid-template-columns: 1fr; gap: 10px; padding: 18px 0; }
+  .hovs-r2 .source-health-grid article dl { grid-column: 1; gap: 12px; }
+  .hovs-r2 .civic-page { padding: 38px 20px 72px; }
+  .hovs-r2 .civic-page__intro h1,
+  .hovs-r2 .el-nino-page h1 { font-size: clamp(3rem,14vw,4.8rem); }
+  .hovs-r2 .civic-footer { padding: 34px 20px 18px; }
+  .hovs-r2 .civic-footer__main { grid-template-columns: 1fr; gap: 24px; }
+  .hovs-r2 .civic-footer__main nav { padding-top: 18px; border-top: 1px solid var(--r2-rule); }
+}
+
+@media (max-width: 360px) {
+  .hovs-r2 .dashboard { padding-inline: 12px; }
+  .hovs-r2 .hydro-level strong { font-size: clamp(5rem,27vw,6.4rem); }
+  .hovs-r2 .civic-quick-grid { grid-template-columns: 1fr; }
+  .hovs-r2 .civic-quick-tile { min-height: 60px; }
+  .hovs-r2 .contact-grid__primary { grid-template-columns: 1fr; row-gap: 4px; }
+  .hovs-r2 .contact-grid__primary span { padding-bottom: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hovs-r2 *, .hovs-r2 *::before, .hovs-r2 *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
