@@ -1,0 +1,57 @@
+/* HOVS R2 terminal mobile density + ergonomics correction. */
+@media (max-width: 820px) {
+  .hovs-r2 .dashboard > section + section { margin-top: 14px !important; }
+
+  .hovs-r2 .hydrometric-hero__controls,
+  .hovs-r2 .station-selector { gap: 10px; }
+
+  .hovs-r2 .header-trust-action,
+  .hovs-r2 .source-strip button,
+  .hovs-r2 .civic-campaign__copy a,
+  .hovs-r2 .contact-grid a span,
+  .hovs-r2 .secondary-actions summary,
+  .hovs-r2 .button { font-size: .94rem; }
+
+  .hovs-r2 .civic-quick-grid { gap: 10px; border-top: 0; }
+  .hovs-r2 .civic-quick-tile { min-height: 48px; border: 1px solid var(--r2-rule); padding-inline: 8px; }
+
+  .hovs-r2 .civic-campaign { min-height: 104px; }
+  .hovs-r2 .civic-campaign__copy { padding: 8px 12px; }
+  .hovs-r2 .civic-campaign__copy h2 { font-size: clamp(2.25rem,11vw,3.2rem); }
+  .hovs-r2 .civic-campaign__copy a { min-height: 44px; }
+
+  .hovs-r2 .contact-grid { gap: 10px; border-top: 0; }
+  .hovs-r2 .contact-grid a,
+  .hovs-r2 .contact-grid a + a,
+  .hovs-r2 .contact-grid a:nth-child(even):not(.contact-grid__primary) { min-height: 48px; border: 1px solid var(--r2-rule); }
+  .hovs-r2 .contact-grid__primary { min-height: 72px !important; border-top: 5px solid var(--r2-danger) !important; border-right: 1px solid var(--r2-rule) !important; border-bottom: 1px solid var(--r2-rule) !important; border-left: 1px solid var(--r2-rule) !important; }
+  .hovs-r2 .contact-grid a span { line-height: 1.15; }
+
+  /* Keep source truth visible but collapse secondary prose and per-row metadata.
+     Full interface/grade/limitations remain one gesture away in the existing traceability dialog. */
+  .hovs-r2 .source-health-grid article { min-height: 0; padding: 5px 0; }
+  .hovs-r2 .source-health-grid article > p,
+  .hovs-r2 .source-health-grid article dl { display: none; }
+  .hovs-r2 .source-health-grid article > div { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: baseline; gap: 8px; }
+  .hovs-r2 .source-health-grid article > div > span { grid-column: 1 / -1; }
+  .hovs-r2 .source-health-grid article > div > strong { margin: 0; }
+
+  .hovs-r2 .civic-footer__main nav { display: grid; align-content: start; gap: 10px; }
+  .hovs-r2 .civic-footer__main nav h2 { margin-bottom: -4px; }
+  .hovs-r2 .civic-footer__main nav a { min-height: 44px; }
+}
+
+@media (max-width: 430px) {
+  .hovs-r2 .source-transparency .compact-section-heading { grid-template-columns: minmax(0,1fr) auto; align-items: center; }
+  .hovs-r2 .source-transparency .compact-section-heading > div p { display: none; }
+  .hovs-r2 .source-transparency .compact-section-heading .button { min-width: 122px; }
+
+  .hovs-r2 .civic-footer__main { grid-template-columns: 1fr 1fr; }
+  .hovs-r2 .civic-footer__main nav { gap: 10px; }
+}
+
+@media (max-width: 360px) {
+  .hovs-r2 .civic-quick-grid { gap: 10px; }
+  .hovs-r2 .civic-quick-tile { padding-inline: 6px; }
+  .hovs-r2 .civic-campaign { min-height: 100px; }
+}
