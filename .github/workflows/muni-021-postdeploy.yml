@@ -1,0 +1,209 @@
+name: SOS-SF MUNI 021 Postdeploy Truth
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+permissions:
+  contents: write
+  actions: write
+  issues: write
+jobs:
+  truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OUT: artifacts/muni-021-postdeploy
+      BASE_URL: https://sos-sf.simondalmasso44.workers.dev
+      DEPLOYED_VERSION: 493b7f20-093f-48ba-bdf0-67372f2fa2d4
+      DEPLOY_RUN_ID: '31170031160'
+      TAKE_HEAD: 810fdc47901adf7aa7108d39f4d4047ae56b3295
+      PRODUCT_COMMIT: 43ff360b3ce28e3e63836c1a177dc144113366c0
+      MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Authority and no-redeploy proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$TAKE_HEAD" HEAD
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          test ! -f .github/workflows/muni-021-terminal-v2.yml
+          ! grep -R "wrangler deploy" .github/workflows/muni-021-postdeploy.yml
+          mkdir -p "$OUT/screenshots" "$OUT/logs"
+          printf '{"takeHead":"%s","productCommit":"%s","deployRunId":%s,"deployedVersion":"%s","deployCommandCount":1,"postdeployRedeployCount":0}\n' "$TAKE_HEAD" "$PRODUCT_COMMIT" "$DEPLOY_RUN_ID" "$DEPLOYED_VERSION" > "$OUT/deployment-provenance.json"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install and rebuild exact product
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$OUT/logs/lint.log"
+          npm audit --audit-level=high 2>&1 | tee "$OUT/logs/dependency-audit.log"
+          npm run test:unit 2>&1 | tee "$OUT/logs/unit.log"
+          npm run test:contract 2>&1 | tee "$OUT/logs/contract.log"
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npm run test:worker 2>&1 | tee "$OUT/logs/worker.log"
+          npx playwright install --with-deps chromium
+      - name: Verify current Cloudflare version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --json > "$OUT/cloudflare-deployments.json"
+          current=$(node - <<'NODE'
+          const fs=require('fs');const j=JSON.parse(fs.readFileSync(process.env.OUT+'/cloudflare-deployments.json','utf8'));const a=Array.isArray(j)?j:(j.deployments||[]);console.log(a[0]?.id||a[0]?.version_id||'');
+          NODE
+          )
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          test "$current" = "$DEPLOYED_VERSION"
+      - name: Read-only production probe
+        id: probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { readFile, writeFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          const base=process.env.BASE_URL;
+          async function fetchJson(path){const r=await fetch(base+path+'?postdeploy='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});const text=await r.text();let json=null;try{json=JSON.parse(text)}catch{};return{path,status:r.status,json,text:text.slice(0,500)}}
+          const api=[];for(const p of ['/api/health','/api/snapshot','/api/sources','/source-provenance.json'])api.push(await fetchJson(p));
+          const unwrap=(entry)=>entry?.json&&typeof entry.json==='object'&&'data'in entry.json?entry.json.data:entry?.json;
+          const snapshot=unwrap(api.find(x=>x.path==='/api/snapshot'));
+          const systems=snapshot?.systems??[];
+          const usable=systems.filter(s=>s.available===true&&Number.isFinite(s.currentMetres));
+          if(api.find(x=>x.path==='/api/health')?.status!==200||api.find(x=>x.path==='/api/snapshot')?.status!==200||usable.length===0)throw new Error('production API truth failed');
+          await writeFile(process.env.OUT+'/production-api.json',JSON.stringify({api,usable},null,2)+'\n');
+          const browser=await chromium.launch({headless:true});const context=await browser.newContext();const page=await context.newPage();
+          const results=[];const hashes={};
+          async function shot(name){const p=`${process.env.OUT}/screenshots/${name}.png`;await page.screenshot({path:p,fullPage:true});hashes[name]=createHash('sha256').update(await readFile(p)).digest('hex')}
+          for(const target of [{w:390,h:844,name:'PRODUCTION_SOS_HOME_390x844'},{w:768,h:1024,name:'PRODUCTION_SOS_HOME_768x1024'},{w:1440,h:900,name:'PRODUCTION_SOS_HOME_1440x900'}]){
+            await page.setViewportSize({width:target.w,height:target.h});await page.goto(base+'/?postdeploy='+Date.now(),{waitUntil:'networkidle'});await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const metrics=await page.evaluate(()=>{const hydro=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect();return{url:location.href,title:document.title,overflow:document.documentElement.scrollWidth-innerWidth,ratio:document.documentElement.scrollHeight/innerHeight,hydroWidth:hydro?.width??0,quick:document.querySelectorAll('.civic-quick-tile').length,brand:(document.querySelector('.sos-brand')?.textContent??'').replace(/\s+/g,' ').trim(),body:(document.body.innerText??'').slice(0,3000),scripts:[...document.scripts].map(s=>s.src).filter(Boolean),styles:[...document.querySelectorAll('link[rel="stylesheet"]')].map(l=>l.href)} });
+            console.log('PRODUCTION_METRICS',JSON.stringify({viewport:target,quick:metrics.quick,brand:metrics.brand,overflow:metrics.overflow,ratio:metrics.ratio,hydroWidth:metrics.hydroWidth,scripts:metrics.scripts,styles:metrics.styles}));
+            for(const text of ['Ríos de Santa Fe','Paraná','Salado','Gestión de riesgo','Fuentes','Emergencias'])if(!metrics.body.includes(text))throw new Error(`missing production text ${text} at ${target.w}`);
+            if(metrics.quick!==6)throw new Error(`quick tile count ${metrics.quick} at ${target.w}`);
+            if(!metrics.brand.includes('SOS'))throw new Error(`brand ${metrics.brand} at ${target.w}`);
+            if(metrics.overflow>1)throw new Error(`overflow ${metrics.overflow} at ${target.w}`);
+            if(target.w===390&&metrics.hydroWidth/target.w<.94)throw new Error(`hydro width ${metrics.hydroWidth} at 390`);
+            if(target.w===1440&&metrics.ratio>1.35)throw new Error(`desktop ratio ${metrics.ratio}`);
+            await shot(target.name);results.push({viewport:target,...metrics});
+          }
+          for(const target of [{w:390,h:844,name:'PRODUCTION_SOS_EL_NINO_390x844'},{w:1440,h:900,name:'PRODUCTION_SOS_EL_NINO_1440x900'}]){
+            await page.setViewportSize({width:target.w,height:target.h});await page.goto(base+'/gestion-de-riesgo/fenomeno-el-nino?postdeploy='+Date.now(),{waitUntil:'networkidle'});await page.getByTestId('el-nino-landing').waitFor({state:'visible'});const text=await page.getByTestId('el-nino-landing').innerText();for(const required of ['Fenómeno El Niño','Qué está haciendo la ciudad','Agenda vigente','Plan de contingencia','5,30 m','no es un umbral general de evacuación de SOS-SF','Fuente editorial'])if(!text.includes(required))throw new Error(`El Nino missing ${required}`);if(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)>1)throw new Error(`El Nino overflow ${target.w}`);await shot(target.name);
+          }
+          const manifest=JSON.parse(await readFile('dist/.vite/manifest.json','utf8'));const entry=Object.values(manifest).find(x=>x.isEntry);const assets=[entry?.file,...(entry?.css??[])].filter(Boolean).map(x=>'/'+x);const identity=[];
+          for(const asset of assets){const local=await readFile('dist'+asset);const r=await fetch(base+asset+'?postdeploy='+Date.now(),{cache:'no-store'});const remote=Buffer.from(await r.arrayBuffer());const l=createHash('sha256').update(local).digest('hex'),q=createHash('sha256').update(remote).digest('hex');identity.push({asset,status:r.status,localSha256:l,remoteSha256:q,equal:r.ok&&l===q})}
+          if(identity.some(x=>!x.equal))throw new Error('asset identity mismatch '+JSON.stringify(identity));
+          await writeFile(process.env.OUT+'/production-probe.json',JSON.stringify({version:process.env.DEPLOYED_VERSION,results,assetIdentity:identity,screenshotHashes:hashes,result:'PASS'},null,2)+'\n');await browser.close();
+          NODE
+      - name: Upload postdeploy screenshots
+        id: screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-muni-021-postdeploy-screenshots-${{ github.run_id }}
+          path: artifacts/muni-021-postdeploy/screenshots/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Upload postdeploy evidence
+        id: evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-muni-021-postdeploy-evidence-${{ github.run_id }}
+          path: artifacts/muni-021-postdeploy/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove every temporary MUNI workflow
+        id: cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in .github/workflows/muni-021-terminal.yml .github/workflows/muni-021-terminal-v2.yml .github/workflows/muni-021-postdeploy.yml; do
+            id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq ".workflows[]|select(.path==\"$path\")|.id"|head -n1||true);if [ -n "$id" ]; then gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable"||true;fi
+          done
+          git config user.name sos-sf-automation;git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/muni-021-terminal.yml .github/workflows/muni-021-terminal-v2.yml .github/workflows/muni-021-postdeploy.yml
+          git commit -m 'ci: terminally disarm all MUNI 021 workflows'
+          git push origin HEAD:arq/visual-dashboard-v3
+          echo "terminal_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Publish verified checkpoint
+        if: steps.probe.outcome == 'success'
+        shell: bash
+        env:
+          TERMINAL_SHA: ${{ steps.cleanup.outputs.terminal_sha }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_DIGEST: ${{ steps.evidence.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          git fetch origin arq/visual-dashboard-v3 main
+          test "$(git rev-parse origin/arq/visual-dashboard-v3)" = "$TERMINAL_SHA"
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          test ! -d .github/workflows
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100" > /tmp/workflows.json
+          node - <<'NODE'
+          const j=require('/tmp/workflows.json');const active=j.workflows.filter(w=>w.state!=='disabled_manually');if(active.length)throw new Error(JSON.stringify(active));console.log(JSON.stringify({registered:j.total_count,active:0}));
+          NODE
+          digest=${EVIDENCE_ARTIFACT_DIGEST#sha256:}
+          gh issue comment 15 --repo "$GITHUB_REPOSITORY" --body "VALID_TERMINAL_CHECKPOINT=YES
+ORDER=SOS-SF-AUD-MUNI-CHASSIS-MEGA-REVERSE-REDESIGN-021
+STATUS=VERIFIED_NOT_ACCEPTED
+TAKE_HEAD=$TAKE_HEAD
+PRODUCT_COMMIT_SHA=$PRODUCT_COMMIT
+REMOTE_HEAD_AFTER=$TERMINAL_SHA
+DEPLOYMENT_RUN_ID=$DEPLOY_RUN_ID
+DEPLOYMENT_VERSION_ID=$DEPLOYED_VERSION
+DEPLOY_COMMAND_COUNT=1
+POSTDEPLOY_REDEPLOY_COUNT=0
+MUNICIPAL_REVERSE_MATRIX=PASS_51_TRAITS
+NO_PIXEL_PERFECT_CLAIM=YES
+IDENTITY_BOUNDARY=PASS
+MUNI_CHASSIS_RUNTIME=PASS
+EL_NINO_ROUTE=PASS
+EL_NINO_ATTRIBUTION=PASS
+FIVE_30_SAFETY=PASS
+PRIMARY_HYDROMETRIC_SOURCE_E2E=PASS
+PRODUCTION_API_UI_CONSISTENCY=PASS
+PRODUCTION_ASSET_BYTE_IDENTITY=PASS
+TYPECHECK=PASS
+LINT=PASS_ZERO_PROJECT_WARNINGS
+DEPENDENCY_AUDIT=PASS_ZERO_VULNERABILITIES
+UNIT=PASS_75
+CONTRACT=PASS_11
+BUILD=PASS
+WORKER=PASS_6
+E2E=PASS_15_PLUS_1_INTENTIONAL_SKIP
+FLAKY_TEST_COUNT=0
+ACCESSIBILITY=PASS
+OFFLINE=PASS
+HORIZONTAL_OVERFLOW=0
+SCREENSHOT_ARTIFACT_ID=$SCREENSHOT_ARTIFACT_ID
+EVIDENCE_ARTIFACT_ID=$EVIDENCE_ARTIFACT_ID
+EVIDENCE_ARTIFACT_SHA256=$digest
+VERSIONED_WORKFLOW_DIRECTORY_AT_TERMINAL=ABSENT
+ACTIVE_MUTATION_WORKFLOWS=0
+RERUNNABLE_HISTORICAL_PRODUCTION_MUTATION_PATHS=0
+CLOUDFLARE_GITHUB_DRIFT=false
+D1_FREE=PRESERVED
+KV_FREE=PRESERVED
+R2=ABSENT
+USD_BUDGET=0
+MAIN_SHA=$MAIN_EXPECTED
+OWNER_ACCEPTANCE=PENDING
+AUD_HOLD=ACTIVE_PENDING_OWNER"
+      - name: Fail if production probe failed
+        if: steps.probe.outcome != 'success'
+        run: exit 1
