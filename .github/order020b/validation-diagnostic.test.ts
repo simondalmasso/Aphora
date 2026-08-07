@@ -8,6 +8,9 @@ describe('production snapshot validation diagnostic', () => {
     });
     expect(response.status).toBe(200);
     const envelope = await response.json() as { data?: unknown };
+    const data = envelope.data as { sources?: readonly Record<string, unknown>[]; timeline?: readonly Record<string, unknown>[] } | undefined;
+    console.log('SOURCE_URL_DIAGNOSTIC', JSON.stringify((data?.sources ?? []).map((source, index) => ({ index, id: source.id, url: source.url, urlType: typeof source.url, classification: source.classification })), null, 2));
+    console.log('TIMELINE_URL_DIAGNOSTIC', JSON.stringify((data?.timeline ?? []).map((event, index) => ({ index, id: event.id, url: event.url, urlType: typeof event.url })), null, 2));
     try {
       const validated = validateSnapshot(envelope.data);
       console.log(JSON.stringify({ validated: true, id: validated.id, dataStatus: validated.dataStatus, systems: validated.systems?.map((system) => ({ id: system.id, available: system.available, currentMetres: system.currentMetres, sourceId: system.sourceId })) }, null, 2));
