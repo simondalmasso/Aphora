@@ -1,0 +1,77 @@
+name: SOS-SF MUNI 021 Corrected Preflight
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      OUT: artifacts/muni-021-preflight4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Authority
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 810fdc47901adf7aa7108d39f4d4047ae56b3295 HEAD
+          mkdir -p "$OUT/screenshots" "$OUT/logs"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Gates
+        run: |
+          set -euo pipefail
+          npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$OUT/logs/lint.log"
+          npm audit --audit-level=high 2>&1 | tee "$OUT/logs/audit.log"
+          npm run test:unit 2>&1 | tee "$OUT/logs/unit.log"
+          npm run test:contract 2>&1 | tee "$OUT/logs/contract.log"
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npm run test:worker 2>&1 | tee "$OUT/logs/worker.log"
+          EVIDENCE_DIR="$OUT/e2e" npm run test:e2e 2>&1 | tee "$OUT/logs/e2e.log"
+      - name: Required local screenshots and route gates
+        run: |
+          set -euo pipefail
+          npm run preview > "$OUT/logs/preview.log" 2>&1 &
+          pid=$!; trap 'kill $pid 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:8787/ >/dev/null && break; sleep 1; done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';import { writeFile } from 'node:fs/promises';
+          const b=await chromium.launch({headless:true}),p=await b.newPage(),base='http://127.0.0.1:8787';
+          const sizes=[{w:320,h:700},{w:360,h:800},{w:390,h:844},{w:768,h:1024},{w:1024,h:768},{w:1366,h:768},{w:1440,h:900},{w:1920,h:1080}],out=[];
+          for(const s of sizes){await p.setViewportSize({width:s.w,height:s.h});await p.goto(base+'/',{waitUntil:'networkidle'});await p.getByTestId('hydrometric-situation').waitFor();const m=await p.evaluate(()=>{const h=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect(),c=document.querySelector('[data-testid="main-hydro-chart"]')?.getBoundingClientRect();return{overflow:document.documentElement.scrollWidth-innerWidth,ratio:document.documentElement.scrollHeight/innerHeight,hydroWidth:h?.width??0,hydroY:h?.y??9999,chart:c?{y:c.y,height:c.height}:null,sections:document.querySelectorAll('main.dashboard > section').length,quick:document.querySelectorAll('.civic-quick-tile').length,connection:getComputedStyle(document.querySelector('.connection-chip')).display}});if(m.overflow>1)throw Error(`overflow ${s.w}`);if(s.w<=430&&m.hydroWidth/s.w<.94)throw Error(`hydro width ${s.w}`);if(s.w===390&&m.hydroY>120)throw Error(`hydro y ${m.hydroY}`);if(m.sections!==4||m.quick!==6)throw Error(`chassis ${s.w}`);if(m.connection==='none')throw Error(`connection hidden ${s.w}`);if([390,768,1440].includes(s.w))await p.screenshot({path:`${process.env.OUT}/screenshots/SOS_HOME_${s.w}x${s.h}.png`,fullPage:true});out.push({...s,...m})}
+          for(const s of [{w:390,h:844},{w:1440,h:900}]){await p.setViewportSize({width:s.w,height:s.h});await p.goto(base+'/gestion-de-riesgo/fenomeno-el-nino',{waitUntil:'networkidle'});await p.getByTestId('el-nino-landing').waitFor();const t=await p.getByTestId('el-nino-landing').innerText();for(const q of ['Fenómeno El Niño','Qué está haciendo la ciudad','Agenda vigente','Plan de contingencia','5,30 m','no es un umbral general de evacuación de SOS-SF'])if(!t.includes(q))throw Error(`missing ${q}`);if(await p.evaluate(()=>document.documentElement.scrollWidth-innerWidth)>1)throw Error(`El Nino overflow ${s.w}`);await p.screenshot({path:`${process.env.OUT}/screenshots/SOS_EL_NINO_${s.w}x${s.h}.png`,fullPage:true})}
+          await p.setViewportSize({width:390,height:844});await p.goto(base+'/',{waitUntil:'networkidle'});await p.getByRole('button',{name:'Abrir menú'}).click();await p.getByRole('navigation',{name:'Navegación móvil'}).waitFor();await p.screenshot({path:`${process.env.OUT}/screenshots/SOS_NAV_OPEN_MOBILE.png`,fullPage:true});await writeFile(process.env.OUT+'/geometry.json',JSON.stringify(out,null,2)+'\n');await b.close();
+          NODE
+          cp "$OUT/e2e/screenshots/state-active-alert.png" "$OUT/screenshots/SOS_ALERT_ACTIVE.png"
+          cp "$OUT/e2e/screenshots/state-alerts-unverified.png" "$OUT/screenshots/SOS_ALERT_UNVERIFIED.png"
+          cp "$OUT/e2e/screenshots/state-offline.png" "$OUT/screenshots/SOS_OFFLINE.png"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-muni-021-preflight4-${{ github.run_id }}
+          path: artifacts/muni-021-preflight4/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Disarm
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[]|select(.path==".github/workflows/muni-021-preflight4.yml")|.id'|head -n1||true); [ -z "$id" ] || gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable" || true
+          git config user.name sos-sf-automation; git config user.email sos-sf-automation@users.noreply.github.com
+          git rm .github/workflows/muni-021-preflight4.yml; git commit -m 'ci: disarm corrected MUNI 021 preflight'; git push origin HEAD:arq/visual-dashboard-v3
