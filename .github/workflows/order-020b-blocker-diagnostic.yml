@@ -30,6 +30,7 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/gates" "$EVIDENCE_DIR/screenshots"
+          npm run build
       - name: Controlled screenshot prerequisite
         run: npx playwright test -g "captures required visual states with unique hashes and verified semantics"
       - name: Preserve expected production validator rejection
@@ -39,7 +40,9 @@ jobs:
           npx vitest run .github/order020b/validation-diagnostic.test.ts --reporter=verbose >"$EVIDENCE_DIR/production-validator.log" 2>&1
           code=$?
           set -e
+          cat "$EVIDENCE_DIR/production-validator.log"
           test "$code" -ne 0
+          grep -F 'VALIDATION_ERROR snapshot.timeline[2].url inválido' "$EVIDENCE_DIR/production-validator.log" >/dev/null
       - name: Derive predecessor deployment history
         env:
           GH_TOKEN: ${{ github.token }}
@@ -59,7 +62,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sos-sf-order-020b-blocker-stage-diagnostic
+          name: sos-sf-order-020b-blocker-stage-diagnostic-v2
           path: artifacts/order-020b-blocker-diagnostic
           if-no-files-found: error
           retention-days: 30
