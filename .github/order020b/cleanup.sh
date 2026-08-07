@@ -6,19 +6,16 @@ BRANCH="arq/visual-dashboard-v3"
 MAIN_SHA="45047d1c1e16941ea37967d67307d0ab17e85fad"
 CURRENT_RUN="${GITHUB_RUN_ID:?}"
 EVIDENCE_DIR="${EVIDENCE_DIR:-artifacts/order-020b-terminal}"
+TEMP_WORKFLOW_PATH="${TEMP_WORKFLOW_PATH:-order-020b-terminal.yml}"
 mkdir -p "$EVIDENCE_DIR"
 
-# Resolve this workflow before removing its file.
-temp_workflow_id="$(gh api "repos/$REPO/actions/workflows/order-020b-terminal.yml" --jq '.id')"
+temp_workflow_id="$(gh api "repos/$REPO/actions/workflows/$TEMP_WORKFLOW_PATH" --jq '.id')"
 
-# Disable every registered workflow. This is stronger than only filtering known mutation names.
 mapfile -t active_workflow_ids < <(gh api --paginate "repos/$REPO/actions/workflows?per_page=100" --jq '.workflows[] | select(.state == "active") | .id')
 for workflow_id in "${active_workflow_ids[@]}"; do
   gh api -X PUT "repos/$REPO/actions/workflows/$workflow_id/disable" >/dev/null || true
 done
 
-# Remove completed historical runs by ID. The current run remains in-progress and is protected
-# by the remote-head guard at the start of the workflow, so a later rerun cannot reach deploy.
 mapfile -t completed_run_ids < <(gh api --paginate "repos/$REPO/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status == "completed") | .id')
 deleted_runs=0
 for run_id in "${completed_run_ids[@]}"; do
@@ -30,9 +27,8 @@ for run_id in "${completed_run_ids[@]}"; do
   fi
 done
 
-# Remove all temporary workflow/trigger/scripts from the canonical branch.
 rm -rf .github/workflows .github/order020b
-rm -f .github/order-020b-terminal-trigger .github/order-020b-truth-trigger
+rm -f .github/order-020b-terminal-trigger .github/order-020b-truth-trigger .github/order-020b-postdeploy-trigger
 find .github -maxdepth 1 -type f \( -name '*020b*trigger*' -o -name '*020-b*trigger*' \) -delete
 
 git add -A .github
@@ -46,19 +42,17 @@ fi
 terminal_sha="$(git rev-parse HEAD)"
 [[ "$(git rev-parse origin/main)" == "$MAIN_SHA" ]]
 
-# Final registry is preserved in the artifact, with no active workflows.
 gh api --paginate "repos/$REPO/actions/workflows?per_page=100" --slurp > "$EVIDENCE_DIR/workflow-registry-raw.json"
 node --input-type=module <<'NODE'
 import { readFile, writeFile } from 'node:fs/promises';
 const pages = JSON.parse(await readFile(process.env.EVIDENCE_DIR + '/workflow-registry-raw.json', 'utf8'));
 const workflows = pages.flatMap((page) => page.workflows || []);
 const active = workflows.filter((workflow) => workflow.state === 'active');
-const payload = {
+await writeFile(process.env.EVIDENCE_DIR + '/workflow-registry-final.partial.json', JSON.stringify({
   capturedAt: new Date().toISOString(),
   workflows: workflows.map(({ id, name, path, state }) => ({ id, name, path, state })),
   activeWorkflowCount: active.length,
-};
-await writeFile(process.env.EVIDENCE_DIR + '/workflow-registry-final.partial.json', JSON.stringify(payload, null, 2) + '\n');
+}, null, 2) + '\n');
 NODE
 
 active_count="$(node -e "const p=require('./$EVIDENCE_DIR/workflow-registry-final.partial.json'); console.log(p.activeWorkflowCount)")"
@@ -74,7 +68,7 @@ TEMP_WORKFLOW_ID="$temp_workflow_id" TEMP_STATE="$temp_state" TERMINAL_SHA="$ter
 import { readFile, writeFile } from 'node:fs/promises';
 const dir = process.env.EVIDENCE_DIR;
 const partial = JSON.parse(await readFile(dir + '/workflow-registry-final.partial.json', 'utf8'));
-const payload = {
+await writeFile(dir + '/workflow-registry-final.json', JSON.stringify({
   ...partial,
   terminalSha: process.env.TERMINAL_SHA,
   tempWorkflowId: Number(process.env.TEMP_WORKFLOW_ID),
@@ -87,8 +81,7 @@ const payload = {
   currentRunStateAtCapture: 'in_progress',
   currentRunRemoteHeadGuard: true,
   versionedWorkflowFilesRemaining: 0,
-};
-await writeFile(dir + '/workflow-registry-final.json', JSON.stringify(payload, null, 2) + '\n');
+}, null, 2) + '\n');
 NODE
 rm -f "$EVIDENCE_DIR/workflow-registry-final.partial.json"
 printf 'terminal_sha=%s\n' "$terminal_sha" >> "$GITHUB_OUTPUT"
