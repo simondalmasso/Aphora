@@ -9,6 +9,7 @@ import { ReportDialog } from './features/reports/ReportDialog.tsx';
 import { useSnapshot } from './pwa/useSnapshot.ts';
 import './styles/app.css';
 import './styles/roast-019-density.css';
+import './styles/design-021.css';
 
 export default function App() {
   const { snapshot, online, refresh, refreshing } = useSnapshot();
