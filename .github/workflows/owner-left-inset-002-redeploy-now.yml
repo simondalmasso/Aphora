@@ -1,0 +1,226 @@
+name: SOS-SF Owner Left Inset 002 Deploy Now
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: ['.github/workflows/owner-left-inset-002-redeploy-now.yml']
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  SOURCE_HEAD: ce3d5c29294f7cb1a3255a065b840518f0f3957f
+  PRODUCT_COMMIT: c930635823ef65848f2d9f8291326ac88e2985dc
+  MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+  PRODUCTION_URL: https://sos-sf.simondalmasso44.workers.dev
+  OUT: artifacts/owner-left-inset-002-deploy-now
+
+jobs:
+  deploy-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Authority and immutable-source gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main arq/visual-dashboard-v3
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          git diff --quiet "$SOURCE_HEAD" HEAD -- . ':(exclude).github/workflows/owner-left-inset-002-redeploy-now.yml'
+          ! grep -q 'r2_buckets' wrangler.jsonc
+          mkdir -p "$OUT/logs" "$OUT/screenshots"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npm run deploy:dry 2>&1 | tee "$OUT/logs/deploy-dry.log"
+
+      - name: Capture Cloudflare baseline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler deployments list --json > "$OUT/cloudflare-before.json"
+
+      - name: Exactly one authorized production deploy
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 1 > "$OUT/deploy-command-count.txt"
+          npx wrangler deploy 2>&1 | tee "$OUT/logs/wrangler-deploy.log"
+          version_id=$(grep -Eo 'Current Version ID: [0-9a-f-]+' "$OUT/logs/wrangler-deploy.log" | awk '{print $4}' | tail -n1)
+          test -n "$version_id"
+          echo "$version_id" > "$OUT/deployment-version-id.txt"
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Cloudflare deployment provenance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 5
+          npx wrangler deployments list --json > "$OUT/cloudflare-after.json"
+          node --input-type=module <<'NODE'
+          import {readFile,writeFile} from 'node:fs/promises';
+          const beforeRaw=JSON.parse(await readFile(process.env.OUT+'/cloudflare-before.json','utf8'));
+          const afterRaw=JSON.parse(await readFile(process.env.OUT+'/cloudflare-after.json','utf8'));
+          const arr=x=>Array.isArray(x)?x:(x.deployments||[]);
+          const before=arr(beforeRaw), after=arr(afterRaw);
+          const latest=[...after].sort((a,b)=>Date.parse(a.created_on||a.createdAt||0)-Date.parse(b.created_on||b.createdAt||0)).at(-1);
+          if(!latest) throw new Error('no latest deployment');
+          const versions=latest.versions||[];
+          const version=versions.find(v=>(v.version_id||v.id)===process.env.VERSION_ID);
+          const percentage=Number(version?.percentage ?? version?.traffic_percentage ?? 0);
+          const beforeIds=new Set(before.map(x=>x.id));
+          const isNew=!beforeIds.has(latest.id);
+          const pass=Boolean(version)&&percentage===100&&isNew;
+          const result={versionId:process.env.VERSION_ID,deploymentId:latest.id||null,createdOn:latest.created_on||latest.createdAt||null,percentage,isNewDeployment:isNew,deployCommandCount:1,postdeployRedeployCount:0,pass};
+          await writeFile(process.env.OUT+'/deployment-provenance.json',JSON.stringify(result,null,2)+'\n');
+          if(!pass) throw new Error('provenance mismatch '+JSON.stringify(result));
+          NODE
+
+      - name: Verify production terminal truth
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {chromium} from 'playwright';
+          import {createHash} from 'node:crypto';
+          import {readFile,readdir,writeFile} from 'node:fs/promises';
+          import path from 'node:path';
+          const base=process.env.PRODUCTION_URL.replace(/\/$/,'');
+          const out=process.env.OUT;
+          const sha=b=>createHash('sha256').update(b).digest('hex');
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          const assets=await readdir('dist/assets');
+          const localJs=assets.find(x=>x.endsWith('.js')&&!x.endsWith('.js.map'));
+          const localCss=assets.find(x=>x.endsWith('.css'));
+          if(!localJs||!localCss) throw new Error('local assets missing');
+          let remoteHtml=''; let remotePaths=[]; let converged=false;
+          for(let attempt=1;attempt<=12;attempt++){
+            remoteHtml=await (await fetch(`${base}/?deploy_now=${Date.now()}`,{cache:'no-store',headers:{'cache-control':'no-cache'}})).text();
+            remotePaths=[...remoteHtml.matchAll(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/g)].map(m=>m[1]);
+            if(remotePaths.some(x=>x.endsWith(localJs))&&remotePaths.some(x=>x.endsWith(localCss))){converged=true;break;}
+            await sleep(5000);
+          }
+          if(!converged) throw new Error('production assets did not converge');
+          const identity=[];
+          for(const localName of [localJs,localCss]){
+            const remotePath=remotePaths.find(x=>x.endsWith(localName));
+            const lb=await readFile(path.join('dist/assets',localName));
+            const rb=Buffer.from(await (await fetch(base+remotePath+'?b='+Date.now(),{cache:'no-store'})).arrayBuffer());
+            const row={path:remotePath,localSha256:sha(lb),remoteSha256:sha(rb),pass:sha(lb)===sha(rb)};
+            identity.push(row); if(!row.pass) throw new Error('asset byte identity '+localName);
+          }
+          async function fetchJson(route){const r=await fetch(base+route+(route.includes('?')?'&':'?')+'t='+Date.now(),{cache:'no-store'});const text=await r.text();let json=null;try{json=JSON.parse(text)}catch{};return {route,status:r.status,json};}
+          const api=[]; for(const route of ['/api/health','/api/snapshot','/api/sources','/source-provenance.json']) api.push(await fetchJson(route));
+          if(api.some(x=>x.status!==200)) throw new Error('API status '+JSON.stringify(api.map(x=>[x.route,x.status])));
+          const unwrap=x=>x?.json&&typeof x.json==='object'&&'data' in x.json?x.json.data:x?.json;
+          const snapshot=unwrap(api.find(x=>x.route==='/api/snapshot'));
+          const systems=snapshot?.systems||[];
+          const parana=systems.find(x=>x.id==='parana-santa-fe');
+          const salado=systems.find(x=>x.id==='salado-santo-tome');
+          if(!parana?.available||!salado?.available) throw new Error('hydrometry missing');
+          const sources=snapshot?.sources||[];
+          if(!sources.some(x=>(x.organizationName||x.name||'').toLowerCase().includes('instituto nacional del agua'))) throw new Error('INA missing');
+          const browser=await chromium.launch({headless:true});
+          const context=await browser.newContext({serviceWorkers:'block'});
+          const page=await context.newPage();
+          const cases=[[320,568,'320x568'],[360,800,'360x800'],[390,844,'390x844'],[430,932,'430x932'],[195,422,'390x844@200%']];
+          const rows=[]; let minInset=Infinity,minRuleGap=Infinity,minBorderGap=Infinity,edgeCollisionCount=0,textBorderTouchCount=0,maxOverflow=0;
+          for(const [width,height,label] of cases){
+            await page.setViewportSize({width,height});
+            await page.goto(`${base}/?geom=${Date.now()}`,{waitUntil:'networkidle'});
+            await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            await page.getByTestId('main-hydro-chart').waitFor({state:'visible'});
+            const m=await page.evaluate(()=>{
+              const card=document.querySelector('.hydrometric-section'), hero=document.querySelector('.muni-hydrometric-hero');
+              if(!card||!hero) throw new Error('geometry nodes missing');
+              const cr=card.getBoundingClientRect(),hr=hero.getBoundingClientRect(),ps=getComputedStyle(hero,'::after');
+              const ruleLeft=hr.left+(parseFloat(ps.left)||0),ruleWidth=parseFloat(ps.width)||0,ruleRight=ruleLeft+ruleWidth;
+              const selectors=['.hydrometric-hero__header .section-kicker','#hydrometric-title','.station-identification > div > span','.station-identification > div > strong','.hydro-signature-axis','.hydro-level > span','[data-testid="hydro-current-level"]','.hydro-level time','[data-testid="hydro-source-strip"] > span:first-child','[data-testid="main-hydro-chart"]'];
+              const elements=selectors.map(selector=>{const n=document.querySelector(selector);if(!n)throw new Error('missing '+selector);const r=n.getBoundingClientRect();return {selector,contentInset:r.left-cr.left,ruleToTextGap:r.left-ruleRight,textToVisibleBorderGap:cr.right-r.right};});
+              return {overflow:document.documentElement.scrollWidth-innerWidth,ruleWidth,elements};
+            });
+            maxOverflow=Math.max(maxOverflow,m.overflow);
+            if(m.overflow>1||m.ruleWidth<3.5) throw new Error('viewport geometry '+label+' '+JSON.stringify(m));
+            for(const e of m.elements){minInset=Math.min(minInset,e.contentInset);minRuleGap=Math.min(minRuleGap,e.ruleToTextGap);minBorderGap=Math.min(minBorderGap,e.textToVisibleBorderGap);if(e.contentInset<19.5||e.ruleToTextGap<15.5)edgeCollisionCount++;if(e.contentInset<15.5||e.textToVisibleBorderGap<15.5)textBorderTouchCount++;}
+            rows.push({label,...m});
+            if(label==='390x844') await page.locator('.hydrometric-section').screenshot({path:`${out}/screenshots/production-owner-left-inset-390.png`});
+          }
+          if(minInset<19.5||minRuleGap<15.5||minBorderGap<15.5||edgeCollisionCount!==0||textBorderTouchCount!==0) throw new Error('OWNER geometry gate failed '+JSON.stringify({minInset,minRuleGap,minBorderGap,edgeCollisionCount,textBorderTouchCount}));
+          await page.setViewportSize({width:390,height:844});
+          await page.goto(`${base}/?apiui=${Date.now()}`,{waitUntil:'networkidle'});
+          await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+          const uiParana=parseFloat((await page.getByTestId('hydro-current-level').innerText()).replace(',','.'));
+          if(Math.abs(uiParana-parana.currentMetres)>.005) throw new Error('Parana API/UI mismatch');
+          await page.getByRole('tab',{name:/Salado/i}).click();
+          const uiSalado=parseFloat((await page.getByTestId('hydro-current-level').innerText()).replace(',','.'));
+          if(Math.abs(uiSalado-salado.currentMetres)>.005) throw new Error('Salado API/UI mismatch');
+          await page.goto(`${base}/gestion-de-riesgo/fenomeno-el-nino?terminal=${Date.now()}`,{waitUntil:'networkidle'});
+          const el=await page.getByTestId('el-nino-landing').innerText();
+          for(const s of ['Fenómeno El Niño','5,30 m','no es un umbral general de evacuación de SOS-SF']) if(!el.includes(s)) throw new Error('El Nino preservation '+s);
+          await browser.close();
+          const result={status:'POSTDEPLOY_TERMINAL_VERIFIED',deploymentVersionId:process.env.VERSION_ID,deployCommandCount:1,postdeployRedeployCount:0,apiStatus:api.map(x=>({route:x.route,status:x.status})),assetIdentity:identity,apiUiConsistency:true,inaPrimarySource:true,elNinoPreserved:true,heroInnerContentInsetMinimumPx:minInset,decorativeRuleToTextGapMinimumPx:minRuleGap,textToVisibleBorderGapMinimumPx:minBorderGap,edgeCollisionCount,textBorderTouchCount,horizontalOverflow:maxOverflow,viewports:rows};
+          await writeFile(out+'/terminal-summary.json',JSON.stringify(result,null,2)+'\n');
+          NODE
+
+      - name: Terminal invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          ! grep -q 'r2_buckets' wrangler.jsonc
+          echo 0 > "$OUT/postdeploy-redeploy-count.txt"
+
+      - name: Upload terminal evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-owner-left-inset-002-deploy-now-${{ github.run_id }}
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Terminally disarm deployment workflow
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          gh workflow disable owner-left-inset-002-redeploy-now.yml
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm -f .github/workflows/owner-left-inset-002-redeploy-now.yml
+          git commit -m "ci: terminally disarm authorized immediate deploy"
+          git push origin HEAD:arq/visual-dashboard-v3
