@@ -26,7 +26,7 @@ export function SafetyActions({
   readonly onAlerts: (opener?: HTMLButtonElement | null) => void;
   readonly onReport: (opener?: HTMLButtonElement | null) => void;
 }) {
-  return <section className="safety-actions" aria-labelledby="actions-title">
+  return <section id="alertas" className="safety-actions" aria-labelledby="actions-title">
     <header className="compact-section-heading">
       <div><p className="section-kicker">Alertas y acciones</p><h2 id="actions-title">Canales esenciales</h2></div>
       <button type="button" className="button button--secondary" onClick={(event) => onAlerts(event.currentTarget)}>
