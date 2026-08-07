@@ -1,0 +1,102 @@
+name: SOS-SF Order 020 Review
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths:
+      - .github/order-020-trigger
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: sos-sf-order-020-review
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/order-020-preliminary
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify take point and apply deterministic patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = arq/visual-dashboard-v3
+          git merge-base --is-ancestor 234bc1ce853c7c1acad93fc6c0bc1202f8cd11c8 HEAD
+          test "$(git rev-parse origin/main)" = 45047d1c1e16941ea37967d67307d0ab17e85fad
+          git log -1 --pretty=%B | sed -n '/ORDER020_PATCH_XZ_B64_BEGIN/,/ORDER020_PATCH_XZ_B64_END/p' | sed '1d;$d' | tr -d '\n' > /tmp/order020.patch.xz.b64
+          test -s /tmp/order020.patch.xz.b64
+          base64 -d /tmp/order020.patch.xz.b64 > /tmp/order020.patch.xz
+          echo '607a7896c279a88be9d8482161f8ce1a71b835c1212182f5683913197de3ffe4  /tmp/order020.patch.xz' | sha256sum -c -
+          xz -dc /tmp/order020.patch.xz > /tmp/order020.patch
+          echo 'e741fa314d7593ebd730b6e27e6359647d76bc0fa32ae5c0e3c739bb57f10d53  /tmp/order020.patch' | sha256sum -c -
+          git apply --index --binary /tmp/order020.patch
+          git diff --cached --check
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git commit -m 'fix: close material findings from order 020 review'
+          git push origin HEAD:arq/visual-dashboard-v3
+          mkdir -p "$EVIDENCE_DIR"
+          git rev-parse HEAD > "$EVIDENCE_DIR/product-commit.txt"
+          git ls-files | sort > "$EVIDENCE_DIR/repository-inventory.txt"
+          git status --short > "$EVIDENCE_DIR/post-commit-status.txt"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Dependency security audit
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --json | tee "$EVIDENCE_DIR/npm-audit.json"
+          npm audit --audit-level=high
+
+      - name: Full deterministic test matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/typecheck.log"
+          npm run lint 2>&1 | tee "$EVIDENCE_DIR/lint.log"
+          npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/unit.log"
+          npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/contract.log"
+          npm run build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+          npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/worker.log"
+          npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/e2e.log"
+
+      - name: Revalidate public sources and repository safety surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/revalidate-public-sources.mjs 2>&1 | tee "$EVIDENCE_DIR/source-revalidation.log"
+          grep -RInE 'dangerouslySetInnerHTML|eval\(|new Function\(|@ts-ignore|\bany\b' src tests scripts > "$EVIDENCE_DIR/static-risk-search.txt" || true
+          find .github/workflows -maxdepth 1 -type f -print | sort > "$EVIDENCE_DIR/versioned-workflows.txt"
+          sha256sum "$EVIDENCE_DIR"/screenshots/*.png > "$EVIDENCE_DIR/screenshot-sha256.txt"
+          tar -czf /tmp/sos-sf-order-020-preliminary.tar.gz "$EVIDENCE_DIR"
+          sha256sum /tmp/sos-sf-order-020-preliminary.tar.gz > "$EVIDENCE_DIR/preliminary-archive-sha256.txt"
+
+      - name: Upload preliminary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020-preliminary
+          path: artifacts/order-020-preliminary
+          if-no-files-found: warn
+          retention-days: 14
