@@ -1,0 +1,18 @@
+{
+  "base": "829e9434f2c2838aa1941f1619a6eb02b9cd55e7",
+  "preservation": [
+    {"trait":"navy civic palette","status":"PRESERVED","evidence":"--muni-navy-* remains source of header, tiles, campaign and metric roles"},
+    {"trait":"green/turquoise accent","status":"PRESERVED","evidence":"--muni-accent-* remains active in metric rule, icons and campaign"},
+    {"trait":"municipal-compatible type family","status":"PRESERVED","evidence":"Arial/Helvetica/system stack unchanged"},
+    {"trait":"civic header/navigation","status":"PRESERVED","evidence":"Civic nav architecture and SOS mark retained; only mobile visible clusters reduced"},
+    {"trait":"MUNI grid/gutters","status":"PRESERVED_EVOLVED","evidence":"1240px container retained; mobile gutter normalized to 14px"},
+    {"trait":"quick-access pattern","status":"PRESERVED_EVOLVED","evidence":"all six capabilities retained; mobile changes from cramped 3 columns to 2"},
+    {"trait":"campaign banner","status":"PRESERVED","evidence":"navy/teal El Niño banner and original line motif retained"},
+    {"trait":"editorial hierarchy","status":"PRESERVED_EVOLVED","evidence":"more whitespace and larger type reinforce rather than replace civic hierarchy"},
+    {"trait":"civic footer","status":"PRESERVED","evidence":"structure, attribution and independent identity remain"},
+    {"trait":"El Niño landing","status":"PRESERVED","evidence":"route, sections, attribution and 5.30m safety language unchanged"},
+    {"trait":"hydrometry first","status":"PRESERVED","evidence":"HydrometricMonitoring remains first operational module after alert banner"},
+    {"trait":"independent SOS identity","status":"PRESERVED","evidence":"no municipal logo, no government impersonation, independent disclaimer retained"}
+  ],
+  "literalReferenceCopy": false
+}
