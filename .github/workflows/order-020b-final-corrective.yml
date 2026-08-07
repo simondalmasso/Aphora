@@ -1,0 +1,178 @@
+name: SOS-SF 020-B Final Corrective Deploy
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/order-020b-final-corrective-trigger]
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: sos-sf-order-020b-final-corrective
+  cancel-in-progress: false
+
+env:
+  EVIDENCE_DIR: artifacts/order-020b-final-corrective
+  DEPLOYMENT_URL: https://sos-sf.simondalmasso44.workers.dev
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+  REPORT_RETENTION_DAYS: ${{ vars.REPORT_RETENTION_DAYS }}
+  INA_WATERML_PARANA_URL: ${{ vars.INA_WATERML_PARANA_URL }}
+  INA_WATERML_SALADO_URL: ${{ vars.INA_WATERML_SALADO_URL }}
+  PORTS_HYDROMETER_JSON_URL: ${{ vars.PORTS_HYDROMETER_JSON_URL }}
+  SMN_OBSERVATIONS_JSON_URL: ${{ vars.SMN_OBSERVATIONS_JSON_URL }}
+  SMN_ALERTS_JSON_URL: ${{ vars.SMN_ALERTS_JSON_URL }}
+
+jobs:
+  corrective:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify amendment take point and product baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 2014a0b634da4df3f13e186969a494dbd3e88c83 HEAD
+          test -z "$(git diff --name-only 2014a0b634da4df3f13e186969a494dbd3e88c83 HEAD -- . ':(exclude).github/**')"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deterministic dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/gates" "$EVIDENCE_DIR/screenshots" node_modules/.tmp
+          cp .github/order020b-amend/finalize.mjs node_modules/.tmp/order020b-finalize.mjs
+
+      - name: Apply final source URL contract correction
+        run: |
+          python .github/order020b-amend/fix.py
+          git diff --check
+
+      - name: Dependency audit
+        run: bash .github/order020b-amend/run-gate.sh dependency-audit npm audit --audit-level=high
+      - name: Typecheck
+        run: bash .github/order020b-amend/run-gate.sh typecheck npm run typecheck
+      - name: Lint
+        run: bash .github/order020b-amend/run-gate.sh lint npx eslint . --max-warnings=0 --ignore-pattern '.github/**'
+      - name: Unit
+        run: bash .github/order020b-amend/run-gate.sh unit npm run test:unit
+      - name: Contract
+        run: bash .github/order020b-amend/run-gate.sh contract npm run test:contract
+      - name: Build
+        run: bash .github/order020b-amend/run-gate.sh build npm run build
+      - name: Worker
+        run: bash .github/order020b-amend/run-gate.sh worker npm run test:worker
+      - name: E2E
+        run: bash .github/order020b-amend/run-gate.sh e2e npm run test:e2e
+      - name: Accessibility
+        run: bash .github/order020b-amend/run-gate.sh accessibility npx playwright test -g "chart supports keyboard reading|skip link is hidden|alert feed failure"
+      - name: Offline
+        run: bash .github/order020b-amend/run-gate.sh offline npx playwright test -g "offline keeps the cached hydrometric surface"
+      - name: Source runtime
+        run: bash .github/order020b-amend/run-gate.sh source-runtime node scripts/revalidate-public-sources.mjs
+      - name: Predeploy production-contract expectation
+        shell: bash
+        run: bash .github/order020b-amend/run-gate.sh predeploy-consistency bash -lc "npx vitest run tests/unit/live-data.test.ts tests/unit/snapshot-validation.test.ts && echo PRODUCTION_API_UI_CONSISTENCY_EXPECTED=PASS"
+
+      - name: Commit corrective product bytes
+        id: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git add src/domain/snapshot.ts src/domain/validation.ts src/domain/public-safety.ts src/worker/live-data.ts tests/unit/live-data.test.ts tests/unit/snapshot-validation.test.ts
+          git diff --cached --check
+          git commit -m 'fix: normalize optional public source URLs end to end'
+          sha="$(git rev-parse HEAD)"
+          git push origin HEAD:arq/visual-dashboard-v3
+          echo "corrective_product_commit_sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Bind deployed provenance to corrective product tree
+        id: provenance
+        shell: bash
+        env:
+          PRODUCT_SHA: ${{ steps.product.outputs.corrective_product_commit_sha }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFile, writeFile } from 'node:fs/promises';
+          const paths=execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean).sort();
+          const h=createHash('sha256'); let count=0;
+          for(const p of paths){if(p==='public/source-provenance.json'||p.startsWith('.github/')||p.startsWith('artifacts/')||p.startsWith('dist/'))continue;const b=await readFile(p);h.update(p);h.update('\0');const l=Buffer.alloc(8);l.writeBigUInt64BE(BigInt(b.length));h.update(l);h.update(b);count++;}
+          const productTreeSha256=h.digest('hex');
+          await writeFile('public/source-provenance.json',JSON.stringify({schemaVersion:3,orderId:'SOS-SF-AUD-FULL-CODEBASE-REVIEW-AND-END-TO-END-CLOSE-020',suborder:'020-B-MASTER-TERMINAL-EXECUTION',amendment:'020-B-FINAL-CORRECTIVE-DEPLOY-AUTHORITY',productTreeSha256,includedFileCount:count,sourceHeadSha:process.env.PRODUCT_SHA,preparedAt:new Date().toISOString()},null,2)+'\n');
+          await writeFile(process.env.GITHUB_OUTPUT,`product_tree_sha256=${productTreeSha256}\n`,{flag:'a'});
+          NODE
+          git add public/source-provenance.json
+          git commit -m 'chore: bind 020-B corrective deployment provenance'
+          git push origin HEAD:arq/visual-dashboard-v3
+
+      - name: Rebuild exact served assets after provenance
+        run: npm run build
+
+      - name: Execute the one authorized additional Cloudflare deploy
+        id: deploy
+        run: node .github/order020b-amend/deploy-once.mjs
+
+      - name: Validate real production snapshot contract
+        run: bash .github/order020b-amend/run-gate.sh production-validation npx vitest run .github/order020b-amend/production-validation.test.ts --reporter=verbose
+
+      - name: Verify real production UI, sources, resources and provenance
+        env:
+          CORRECTIVE_DEPLOYMENT_VERSION_ID: ${{ steps.deploy.outputs.deployment_version_id }}
+        run: node .github/order020b-amend/postdeploy.mjs
+
+      - name: Terminally disarm amendment and all historical mutation paths
+        id: cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/order020b-amend/cleanup.sh
+
+      - name: Upload final corrective screenshots
+        id: screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-final-corrective-screenshots
+          path: artifacts/order-020b-final-corrective/screenshots
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload final corrective evidence
+        id: evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-final-corrective-evidence
+          path: artifacts/order-020b-final-corrective
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish unique final ARQ checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORRECTIVE_PRODUCT_COMMIT_SHA: ${{ steps.product.outputs.corrective_product_commit_sha }}
+          SCREENSHOT_ARTIFACT_ID: ${{ steps.screenshots.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_SHA256: ${{ steps.evidence.outputs.artifact-digest }}
+        run: node node_modules/.tmp/order020b-finalize.mjs
+
+      - name: Remove temporary local finalizer copy
+        if: always()
+        run: rm -f node_modules/.tmp/order020b-finalize.mjs .wrangler.corrective.jsonc
