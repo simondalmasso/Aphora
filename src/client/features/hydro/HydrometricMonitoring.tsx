@@ -122,7 +122,7 @@ export function HydrometricMonitoring({
         <SourceLine buttonRef={sourcesButtonRef} onOpen={onSources}>
           <span><b>{selectedSource?.organizationName ?? selected.sourceName}</b> · {sourceFamily(selectedSource, selected)}</span>
           <span>{formatLocalDateTime(selected.fetchedAt)}</span>
-          <span>{corroboratingTransport ? `Mismo organismo · segundo transporte: ${corroboratingTransport.feedName ?? corroboratingTransport.name}` : 'Sin corroboración'}</span>
+          <span>{corroboratingTransport ? `Mismo organismo · transporte: ${corroboratingTransport.feedName ?? corroboratingTransport.name}` : 'Sin corroboración'}</span>
           {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
         </SourceLine>
 
