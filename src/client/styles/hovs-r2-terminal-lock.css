@@ -1,4 +1,4 @@
-/* 021-HOVS-R2 terminal lock: alert order + immutable desktop density. */
+/* 021-HOVS-R2 terminal lock: alert order + immutable density + mobile legibility. */
 @media (min-width: 960px) {
   .hovs-r2 .dashboard {
     grid-template-rows: auto auto auto auto;
@@ -37,4 +37,13 @@
   .hovs-r2 .civic-footer { padding-block: 6px; }
   .hovs-r2 .civic-footer__main nav a { min-height: 22px; }
   .hovs-r2 .civic-footer__legal { margin-top: 2px; padding-top: 3px; }
+}
+
+@media (max-width: 820px) {
+  .hovs-r2 .data-table-disclosure summary {
+    min-height: 44px;
+    font-size: .94rem;
+    line-height: 1.15;
+  }
+  .hovs-r2 .civic-quick-tile span { font-size: .94rem; line-height: 1.12; }
 }
