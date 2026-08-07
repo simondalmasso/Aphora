@@ -38,11 +38,15 @@ function sourceError(source: Source | undefined): string | null {
 
 export function HydrometricMonitoring({
   snapshot,
+  refreshing,
   sourcesButtonRef,
+  onRefresh,
   onSources,
 }: {
   readonly snapshot: Snapshot;
+  readonly refreshing: boolean;
   readonly sourcesButtonRef: RefObject<HTMLButtonElement | null>;
+  readonly onRefresh: () => void;
   readonly onSources: (opener?: HTMLButtonElement | null) => void;
 }) {
   const systems = snapshot.systems ?? EMPTY_SYSTEMS;
@@ -76,7 +80,12 @@ export function HydrometricMonitoring({
           <p className="section-kicker">Situación hidrométrica</p>
           <h1 id="hydrometric-title">Ríos de Santa Fe</h1>
         </div>
-        <StationSwitcher systems={systems} selectedId={selected?.id} onSelect={setSelectedId}/>
+        <div className="hydrometric-hero__controls">
+          <StationSwitcher systems={systems} selectedId={selected?.id} onSelect={setSelectedId}/>
+          <button className="hydro-refresh-button" type="button" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing || undefined}>
+            {refreshing ? 'Actualizando…' : 'Actualizar'}
+          </button>
+        </div>
       </header>
 
       {selected ? <article className="primary-station">
