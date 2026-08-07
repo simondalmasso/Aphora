@@ -157,6 +157,11 @@
 }
 
 @media (max-width: 340px) {
+  .dashboard {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
   .civic-header .ui-icon-button {
     display: none;
   }
