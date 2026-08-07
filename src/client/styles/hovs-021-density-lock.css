@@ -45,4 +45,32 @@
   .civic-header__main .sos-brand__wordmark { display: none; }
   .civic-header__main .sos-brand__mark { width: 48px; height: 48px; }
   .civic-menu-toggle { width: 48px; height: 48px; }
+
+  .compact-section-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compact-section-heading .button {
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+  }
+  .data-table-disclosure,
+  .table-scroll {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .table-scroll { overflow-x: auto; overscroll-behavior-inline: contain; }
+  .table-scroll table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+  .table-scroll th,
+  .table-scroll td,
+  .table-scroll caption {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
 }
