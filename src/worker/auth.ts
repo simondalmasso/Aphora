@@ -54,7 +54,7 @@ async function googleSigningKeys(nowMs: number): Promise<readonly GoogleJwk[]> {
       googleJwksCache = Object.freeze({ expiresAt: nowMs + GOOGLE_JWKS_CACHE_MS, keys });
       return keys;
     } catch (error) {
-      if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT');
+      if (controller.signal.aborted) throw new Error('GOOGLE_JWKS_TIMEOUT', { cause: error });
       throw error;
     } finally {
       clearTimeout(timer);
