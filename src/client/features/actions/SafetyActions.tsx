@@ -2,11 +2,11 @@ import type { RefObject } from 'react';
 import type { Snapshot } from '../../../domain/snapshot.ts';
 
 const CONTACTS = Object.freeze([
-  { number: '911', label: 'Emergencias', href: 'tel:911' },
-  { number: '103', label: 'COBEM', href: 'tel:103' },
-  { number: '107', label: 'Emergencias médicas', href: 'tel:107' },
-  { number: '100', label: 'Bomberos', href: 'tel:100' },
-  { number: '106', label: 'Náutica', href: 'tel:106' },
+  { number: '911', label: 'Emergencias', href: 'tel:911', primary: true },
+  { number: '103', label: 'COBEM', href: 'tel:103', primary: false },
+  { number: '107', label: 'Emergencias médicas', href: 'tel:107', primary: false },
+  { number: '100', label: 'Bomberos', href: 'tel:100', primary: false },
+  { number: '106', label: 'Náutica', href: 'tel:106', primary: false },
 ]);
 
 function alertSummary(snapshot: Snapshot): string {
@@ -34,7 +34,7 @@ export function SafetyActions({
       </button>
     </header>
     <div className="contact-grid">
-      {CONTACTS.map((contact) => <a href={contact.href} key={contact.number}>
+      {CONTACTS.map((contact) => <a className={contact.primary ? 'contact-grid__primary' : undefined} href={contact.href} key={contact.number}>
         <strong>{contact.number}</strong><span>{contact.label}</span>
       </a>)}
     </div>
