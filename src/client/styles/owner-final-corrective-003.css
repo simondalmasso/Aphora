@@ -1,0 +1,63 @@
+/* OWNER final corrective 003: restore communications reachability + editorial hydrometric title. */
+.hovs-r2 .civic-mobile-communications {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--r2-rule);
+  border-radius: 0;
+  background: #fff;
+  color: var(--r2-ink);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.hovs-r2 .civic-mobile-communications:hover { background: var(--r2-bg); }
+
+.hovs-r2 .civic-mobile-communications__badge {
+  flex: none;
+  min-width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding-inline: 6px;
+  background: var(--r2-green);
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+@media (min-width: 1281px) {
+  .hovs-r2 .civic-mobile-communications { display: none; }
+}
+
+@media (max-width: 820px) {
+  .hovs-r2 .hydrometric-hero__header h1 {
+    max-width: 12ch;
+    font-size: clamp(2.4rem, 11vw, 3.4rem);
+    line-height: .9;
+    letter-spacing: -.045em;
+    text-wrap: balance;
+  }
+}
+
+@media (max-width: 220px) {
+  .hovs-r2 .hydrometric-hero__header h1 {
+    max-width: 100%;
+    font-size: 2.05rem;
+    line-height: .92;
+  }
+
+  .hovs-r2 .civic-mobile-communications {
+    min-height: 48px;
+    padding-inline: 12px;
+    font-size: .94rem;
+  }
+}
