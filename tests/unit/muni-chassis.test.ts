@@ -44,9 +44,11 @@ describe('MUNI 021 civic chassis contract', () => {
 
   it('attributes El Nino and refuses municipal impersonation', async () => {
     const page = await read('src/client/components/civic/MuniPages.tsx');
+    const civic = await read('src/client/components/civic/CivicSystem.tsx');
     expect(page).toContain('Según la Dirección de Gestión de Riesgo');
     expect(page).toContain('no son acciones ejecutadas por SOS-SF');
-    expect(page).toContain('Fuente editorial');
+    expect(civic).toContain('Fuente editorial:');
+    expect(civic).toContain('SOS-SF no es un servicio municipal');
     expect(page).not.toMatch(/\b(hacemos|invertimos|capacitamos)\b/i);
   });
 
