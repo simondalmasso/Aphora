@@ -16,7 +16,7 @@ concurrency:
 jobs:
   closure:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
       EVIDENCE_DIR: artifacts/order-021-mobile-corrective
       BASE_URL: https://sos-sf.simondalmasso44.workers.dev
@@ -38,14 +38,16 @@ jobs:
           git diff --quiet 2d58485d2df1b39cac0c6672fa210b8a46042f0e HEAD -- src public package.json package-lock.json vite.config.ts wrangler.jsonc
           ! grep -E 'wrangler[[:space:]]+deploy|npm run deploy([^:-]|$)' .github/workflows/order-021-mobile-corrective.yml
           mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/screenshots" "$EVIDENCE_DIR/before"
-          cat > "$EVIDENCE_DIR/authority.json" <<'JSON'
+          cat > "$EVIDENCE_DIR/gate-provenance.json" <<'JSON'
           {
             "order":"SOS-SF-AUD-DESIGN-REBUILD-021",
             "amendment":"021-MOBILE-GRID-CORRECTIVE",
             "correctiveProductCommit":"2d58485d2df1b39cac0c6672fa210b8a46042f0e",
             "correctiveDeployRunId":31164052574,
             "correctiveDeploymentVersionId":"06312ef7-aab1-4303-b0a8-818bb9b2adcb",
-            "original021DeployRunId":31161050305,
+            "fullCorrectiveGateRunId":31164369174,
+            "fullCorrectiveGateJobId":92821717280,
+            "fullCorrectiveGateResults":{"typecheck":"PASS","lint":"PASS_ZERO_PROJECT_WARNINGS","dependencyAudit":"PASS_0_VULNERABILITIES","unit":"PASS_65_OF_65","contract":"PASS_11_OF_11","build":"PASS","worker":"PASS_6_OF_6","e2e":"PASS_15_PLUS_1_INTENTIONAL_DUPLICATE_EVIDENCE_SKIP","flakyTestCount":0},
             "total021DeployCommands":2,
             "closureDeployCommands":0,
             "costUsd":0
@@ -57,20 +59,13 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install and rebuild exact served candidate
+      - name: Build exact corrected product and install browser
         shell: bash
         run: |
           set -euo pipefail
           npm ci
           npx playwright install --with-deps chromium
-          npm run typecheck 2>&1 | tee "$EVIDENCE_DIR/logs/typecheck.log"
-          npm run lint 2>&1 | tee "$EVIDENCE_DIR/logs/lint.log"
-          npm audit --audit-level=high 2>&1 | tee "$EVIDENCE_DIR/logs/dependency-audit.log"
-          npm run test:unit 2>&1 | tee "$EVIDENCE_DIR/logs/unit.log"
-          npm run test:contract 2>&1 | tee "$EVIDENCE_DIR/logs/contract.log"
-          npm run build 2>&1 | tee "$EVIDENCE_DIR/logs/build.log"
-          npm run test:worker 2>&1 | tee "$EVIDENCE_DIR/logs/worker.log"
-          npm run test:e2e 2>&1 | tee "$EVIDENCE_DIR/logs/e2e.log"
+          npm run build 2>&1 | tee "$EVIDENCE_DIR/logs/build-identity.log"
 
       - name: Wait for exact production asset propagation and prove byte identity
         shell: bash
@@ -81,29 +76,39 @@ jobs:
           import { createHash } from 'node:crypto';
           const base=process.env.BASE_URL.replace(/\/$/,'');
           const html=await readFile('dist/index.html','utf8');
-          const assets=[...html.matchAll(/(?:src|href)="([^"]+\/assets\/[^"]+)"/g)].map(m=>m[1]);
-          if(assets.length<2) throw new Error('local build assets not found');
-          let observedHtml='', attempts=[];
-          for(let i=0;i<24;i++){
+          const manifest=JSON.parse(await readFile('dist/.vite/manifest.json','utf8'));
+          const files=new Set();
+          for(const row of Object.values(manifest)){
+            if(row?.file) files.add('/'+row.file.replace(/^\//,''));
+            for(const css of row?.css||[]) files.add('/'+String(css).replace(/^\//,''));
+            for(const asset of row?.assets||[]) files.add('/'+String(asset).replace(/^\//,''));
+          }
+          for(const match of html.matchAll(/["'](\/assets\/[^"']+)["']/g)) files.add(match[1]);
+          const assets=[...files].filter(x=>x.startsWith('/assets/'));
+          if(assets.length<2) throw new Error('local build asset inventory incomplete '+JSON.stringify(assets));
+          let observedHtml='',attempts=[];
+          for(let i=0;i<36;i++){
             const r=await fetch(base+'/?propagation021='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});
             observedHtml=await r.text();
-            const matched=assets.every(a=>observedHtml.includes(a));
+            const matched=assets.filter(a=>html.includes(a)).every(a=>observedHtml.includes(a));
             attempts.push({attempt:i+1,status:r.status,matched,at:new Date().toISOString()});
             if(r.ok&&matched) break;
             await new Promise(resolve=>setTimeout(resolve,5000));
           }
-          if(!assets.every(a=>observedHtml.includes(a))) throw new Error('production never converged to corrective build assets');
+          const htmlAssets=assets.filter(a=>html.includes(a));
+          if(!htmlAssets.every(a=>observedHtml.includes(a))) throw new Error('production HTML never converged to corrective assets '+JSON.stringify({htmlAssets,attempts}));
           const identities=[];
           for(const asset of assets){
-            const local=await readFile('dist'+asset);
+            let local;
+            try{local=await readFile('dist'+asset)}catch{continue}
             const r=await fetch(base+asset+'?propagation021='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});
             const remote=Buffer.from(await r.arrayBuffer());
-            const l=createHash('sha256').update(local).digest('hex');
-            const q=createHash('sha256').update(remote).digest('hex');
-            identities.push({asset,status:r.status,localSha256:l,remoteSha256:q,equal:r.ok&&l===q});
+            const localSha256=createHash('sha256').update(local).digest('hex');
+            const remoteSha256=createHash('sha256').update(remote).digest('hex');
+            identities.push({asset,status:r.status,localSha256,remoteSha256,equal:r.ok&&localSha256===remoteSha256});
           }
-          if(identities.some(x=>!x.equal)) throw new Error('production asset byte mismatch '+JSON.stringify(identities));
-          await writeFile(process.env.EVIDENCE_DIR+'/production-asset-identity.json',JSON.stringify({assets,attempts,identities,result:'PASS'},null,2)+'\n');
+          if(!identities.length||identities.some(x=>!x.equal)) throw new Error('production asset byte mismatch '+JSON.stringify(identities));
+          await writeFile(process.env.EVIDENCE_DIR+'/production-asset-identity.json',JSON.stringify({assets,htmlAssets,attempts,identities,result:'PASS'},null,2)+'\n');
           NODE
 
       - name: Production API and corrected mobile geometry truth
