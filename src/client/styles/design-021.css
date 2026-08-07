@@ -1,0 +1,467 @@
+/* SOS-SF 021 — owner-authorized visual rebuild.
+   This layer intentionally changes presentation only: public data contracts,
+   source semantics, alerts, accessibility and offline behavior remain upstream. */
+
+:root {
+  --d21-bg: #071116;
+  --d21-panel: #0b171d;
+  --d21-panel-2: #101f26;
+  --d21-ink: #f4f7f5;
+  --d21-muted: #9aabb0;
+  --d21-line: rgba(218, 235, 236, .14);
+  --d21-river: #72d7e7;
+  --d21-river-strong: #2aa7be;
+  --d21-fresh: #73d8a6;
+  --d21-warn: #e8bf69;
+  --d21-stale: #e49866;
+  --d21-danger: #ef7e86;
+  --d21-paper: #edf1ed;
+  --d21-paper-ink: #122026;
+  --d21-paper-muted: #5e6c70;
+  --d21-radius-xl: 26px;
+  --d21-radius: 16px;
+  --d21-max: 1360px;
+}
+
+html { background: var(--d21-bg); }
+body {
+  background: var(--d21-bg);
+  color: var(--d21-ink);
+  letter-spacing: -.006em;
+}
+
+.site-shell { min-height: 100svh; }
+
+.app-header {
+  background: rgba(7, 17, 22, .97);
+  border-bottom-color: var(--d21-line);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+.header-inner {
+  max-width: var(--d21-max);
+  min-height: 62px;
+  padding: 8px 22px;
+}
+.brand { gap: 11px; }
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--d21-river);
+  color: #07171d;
+  font-size: .82rem;
+  letter-spacing: .02em;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 8px 28px rgba(41,167,190,.14);
+}
+.brand strong { font-size: .96rem; font-weight: 820; letter-spacing: -.025em; }
+.brand small { color: #80949b; font-size: .67rem; letter-spacing: .015em; }
+.header-actions { gap: 6px; }
+.connection-chip,
+.alert-chip,
+.ui-icon-button {
+  border-color: var(--d21-line);
+  background: #0d1b21;
+  box-shadow: none;
+}
+.connection-chip,
+.alert-chip { min-height: 36px; font-size: .72rem; }
+.ui-icon-button { width: 38px; height: 38px; border-radius: 11px; }
+.alert-chip--unverified { color: #eed99a; border-color: rgba(232,191,105,.35); }
+.alert-chip--verified { color: #c7ecda; border-color: rgba(115,216,166,.26); }
+.alert-chip--active { background: #35191d; border-color: rgba(239,126,134,.52); }
+
+.dashboard {
+  max-width: var(--d21-max);
+  margin: 0 auto;
+  padding: 12px 22px 24px;
+  grid-template-columns: minmax(0, 1.52fr) minmax(310px, .68fr);
+  gap: 12px;
+}
+.dashboard > section { border-color: var(--d21-line); }
+.section-kicker {
+  color: var(--d21-river);
+  font-size: .64rem;
+  letter-spacing: .13em;
+}
+
+.verified-alert-banner {
+  padding: 10px 14px;
+  border-radius: 14px;
+  border-color: rgba(239,126,134,.4);
+  border-left-width: 3px;
+  background: #261419;
+}
+.verified-alert-banner span { color: #efabb0; }
+.verified-alert-banner small { color: #c8aeb2; }
+
+/* Hero: one instrument, not a dashboard card stack. */
+.hydrometric-section {
+  position: relative;
+  overflow: hidden;
+  padding: 18px 20px 19px;
+  border-radius: var(--d21-radius-xl) !important;
+  background: #09171d;
+  box-shadow: 0 24px 70px rgba(0,0,0,.24);
+}
+.hydrometric-section::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--d21-river-strong);
+}
+.hydrometric-hero__header {
+  align-items: flex-end;
+  margin-bottom: 13px;
+}
+.hydrometric-hero__header h1 {
+  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+  line-height: .96;
+  letter-spacing: -.055em;
+  font-weight: 770;
+}
+.station-selector {
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: #0e2027;
+  border-color: var(--d21-line);
+}
+.station-selector button {
+  min-width: 92px;
+  min-height: 36px;
+  border-radius: 9px;
+  color: #a8bbc1;
+  font-size: .76rem;
+  font-weight: 760;
+}
+.station-selector button[aria-selected="true"] {
+  background: var(--d21-paper);
+  color: #10232a;
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+}
+
+.primary-station {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.station-identification {
+  align-items: center;
+  padding: 0 1px 9px;
+  border-bottom: 1px solid var(--d21-line);
+}
+.station-identification > div span {
+  color: #82969d;
+  font-size: .68rem;
+  letter-spacing: .025em;
+}
+.station-identification > div strong {
+  margin-top: 1px;
+  font-size: 1.02rem;
+  letter-spacing: -.022em;
+}
+.freshness-badge {
+  min-height: 28px;
+  padding: 4px 8px;
+  background: transparent;
+  border-color: var(--d21-line);
+  font-size: .66rem;
+}
+.freshness-badge--actualizado { color: #bfead5; border-color: rgba(115,216,166,.34); }
+.freshness-badge--actualizado i { background: var(--d21-fresh); }
+.freshness-badge--actualizacion_demorada { color: #ead7a5; border-color: rgba(232,191,105,.4); }
+.freshness-badge--actualizacion_demorada i { background: var(--d21-warn); }
+.freshness-badge--desactualizado { color: #eec3a8; border-color: rgba(228,152,102,.42); }
+.freshness-badge--desactualizado i { background: var(--d21-stale); }
+
+.hydro-reading {
+  grid-template-columns: minmax(230px, .9fr) minmax(300px, 1.1fr);
+  gap: 0;
+  margin: 0;
+  border-bottom: 1px solid var(--d21-line);
+}
+.hydro-level {
+  min-height: 134px;
+  padding: 15px 16px 14px 0;
+  border-radius: 0;
+  background: transparent;
+  border-right: 1px solid var(--d21-line);
+}
+.hydro-level > span,
+.hydro-metrics dt {
+  color: #7f949b;
+  font-size: .62rem;
+  letter-spacing: .11em;
+}
+.hydro-level strong {
+  margin-top: 2px;
+  font-size: clamp(4.6rem, 7.4vw, 6.7rem);
+  line-height: .82;
+  font-weight: 760;
+  letter-spacing: -.085em;
+  color: #f8faf7;
+}
+.hydro-level strong small {
+  margin-left: 9px;
+  color: var(--d21-river);
+  font-size: .24em;
+  font-weight: 700;
+}
+.hydro-level time { margin-top: 9px; color: #9db0b6; font-size: .68rem; }
+.hydro-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+.hydro-metrics div {
+  min-height: 134px;
+  padding: 18px 18px;
+  border-radius: 0;
+  background: transparent;
+  align-content: end;
+}
+.hydro-metrics div + div { border-left: 1px solid var(--d21-line); }
+.hydro-metrics dd {
+  margin-top: 7px;
+  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  line-height: 1.02;
+  letter-spacing: -.045em;
+}
+
+.source-strip {
+  min-height: 42px;
+  margin: 0;
+  padding: 7px 0;
+  gap: 3px 15px;
+  border: 0;
+  border-bottom: 1px solid var(--d21-line);
+  border-radius: 0;
+  color: #8fa3aa;
+  font-size: .63rem;
+}
+.source-strip b { color: #d9e5e6; font-weight: 700; }
+.source-strip button {
+  min-height: 30px;
+  padding: 4px 9px;
+  border-color: rgba(114,215,231,.36);
+  border-radius: 8px;
+  color: #b9e7ed;
+  font-size: .65rem;
+}
+
+.hydro-chart {
+  margin-top: 10px;
+  padding: 5px 6px 2px;
+  border: 0;
+  border-radius: 14px;
+  background: #071217;
+}
+.hydro-chart__meta {
+  min-height: 28px;
+  padding: 1px 5px 5px;
+  color: #8499a0;
+  font-size: .61rem;
+}
+.hydro-chart__meta strong { color: #cddadc; font-weight: 700; }
+.hydro-chart svg { max-height: 300px; }
+.hydro-chart__plot { fill: #0a181e; stroke: rgba(218,235,236,.08); }
+.hydro-chart__grid { stroke: rgba(218,235,236,.1); }
+.hydro-chart__axis-label,
+.hydro-chart__unit { fill: #7f939a; }
+.hydro-chart__line {
+  stroke: var(--d21-river);
+  stroke-width: 4.5;
+  filter: none;
+}
+.hydro-chart__point { fill: #dff8f6; stroke: #167c90; }
+.hydro-chart__threshold-label-bg { fill: #0b171d; }
+.hydro-chart__readout { color: #aebfc3; font-size: .67rem; }
+.data-table-disclosure summary { color: #9fd9e2; font-size: .7rem; }
+
+/* Secondary surfaces behave like editorial modules, not white cards. */
+.territory-section,
+.safety-actions,
+.source-transparency {
+  border-radius: var(--d21-radius) !important;
+  border-color: var(--d21-line) !important;
+  background: #e9eeea;
+  color: var(--d21-paper-ink);
+  box-shadow: none;
+}
+.compact-section-heading { margin-bottom: 9px; }
+.compact-section-heading h2 {
+  font-size: 1.02rem;
+  font-weight: 780;
+  letter-spacing: -.035em;
+}
+.compact-section-heading .section-kicker { color: #24758a; }
+.compact-section-heading > span { color: #607075; font-size: .68rem; }
+.territory-schematic {
+  min-height: 142px;
+  border-radius: 12px;
+  background: #dfe8e4;
+}
+.territory-schematic path { stroke: #358ea0; opacity: .34; }
+.territory-schematic circle { fill: #126c7f; }
+.territory-stations article {
+  border-color: rgba(18,32,38,.1);
+  background: rgba(244,247,244,.94);
+}
+.contact-grid { gap: 5px; }
+.contact-grid a {
+  min-height: 62px;
+  border-color: rgba(18,32,38,.14);
+  border-radius: 10px;
+  background: #f4f7f4;
+  color: #10242b;
+}
+.contact-grid a:hover { background: #fff; border-color: #4e929f; }
+.contact-grid strong { font-size: 1.15rem; letter-spacing: -.035em; }
+.source-health-grid { gap: 6px; }
+.source-health-grid article {
+  border-color: rgba(18,32,38,.12);
+  background: #f4f7f4;
+  border-radius: 10px;
+}
+.source-health-grid article > div span { color: #28768a; }
+.source-health-grid p,
+.source-health-grid dt { color: var(--d21-paper-muted); }
+
+.button { border-radius: 9px; }
+.button--primary { background: #176f84; }
+.button--primary:hover { background: #125d70; }
+.safety-actions .button--secondary,
+.source-transparency .button--secondary { color: #176b7c; border-color: #7ea3aa; }
+
+.app-footer {
+  max-width: var(--d21-max);
+  color: #788c93;
+  border-top-color: var(--d21-line);
+}
+
+@media (min-width: 1100px) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, .8fr);
+    gap: 10px;
+    padding-top: 10px;
+  }
+  .verified-alert-banner,
+  .hydrometric-section { grid-column: 1 / -1; }
+  .territory-section { grid-column: 1; }
+  .safety-actions { grid-column: 2; }
+  .source-transparency { grid-column: 3; }
+  .hydrometric-section { padding: 15px 18px 14px; }
+  .hydrometric-hero__header { margin-bottom: 8px; }
+  .hydro-reading { grid-template-columns: minmax(260px, .82fr) minmax(360px, 1.18fr); }
+  .hydro-level,
+  .hydro-metrics div { min-height: 102px; }
+  .hydro-level { padding-top: 10px; padding-bottom: 9px; }
+  .hydro-level strong { font-size: clamp(4.2rem, 5.2vw, 5.4rem); }
+  .hydro-metrics div { padding: 12px 16px; }
+  .source-strip { min-height: 34px; padding: 4px 0; }
+  .hydro-chart { margin-top: 6px; }
+  .hydro-chart svg { height: 215px; max-height: 215px; }
+  .territory-section,
+  .safety-actions,
+  .source-transparency { padding: 11px; }
+  .territory-schematic { min-height: 120px; }
+  .territory-schematic svg { height: 66px; }
+  .source-health-grid { grid-template-columns: 1fr; }
+  .source-health-grid article:nth-child(3) { display: none; }
+}
+
+@media (max-width: 700px) {
+  .header-inner { min-height: 54px; padding: 6px 9px; }
+  .brand { gap: 8px; }
+  .brand-mark { width: 33px; height: 33px; }
+  .brand strong { font-size: .88rem; }
+  .alert-chip { max-width: 132px; min-height: 33px; padding: 5px 8px; }
+  .ui-icon-button { width: 34px; height: 34px; }
+
+  .dashboard { padding: 7px 7px 14px; gap: 8px; }
+  .hydrometric-section { padding: 10px 10px 9px; border-radius: 16px !important; }
+  .hydrometric-section::before { width: 3px; }
+  .hydrometric-hero__header { margin-bottom: 6px; align-items: flex-end; }
+  .section-kicker { font-size: .56rem; }
+  .hydrometric-hero__header h1 { font-size: 1.16rem; }
+  .station-selector { padding: 2px; border-radius: 10px; }
+  .station-selector button {
+    min-width: 68px;
+    min-height: 31px;
+    padding: 4px 7px;
+    border-radius: 8px;
+    font-size: .67rem;
+  }
+  .station-identification { padding-bottom: 5px; }
+  .station-identification > div span { font-size: .57rem; }
+  .station-identification > div strong { font-size: .84rem; }
+  .freshness-badge { max-width: 56%; min-height: 25px; padding: 3px 6px; font-size: .55rem; }
+
+  .hydro-reading { grid-template-columns: minmax(0, 1.18fr) minmax(0, .82fr); }
+  .hydro-level {
+    min-height: 86px;
+    padding: 7px 7px 5px 0;
+  }
+  .hydro-level > span { font-size: .52rem; }
+  .hydro-level strong { font-size: clamp(3.85rem, 18vw, 4.75rem); }
+  .hydro-level strong small { margin-left: 5px; }
+  .hydro-level time { margin-top: 4px; font-size: .54rem; }
+  .hydro-metrics { grid-template-columns: 1fr; }
+  .hydro-metrics div {
+    min-height: 43px;
+    padding: 6px 7px;
+    align-content: center;
+  }
+  .hydro-metrics div + div { border-left: 0; border-top: 1px solid var(--d21-line); }
+  .hydro-metrics dt { font-size: .49rem; }
+  .hydro-metrics dd { margin-top: 1px; font-size: .78rem; }
+
+  .source-strip {
+    min-height: 28px;
+    padding: 3px 0;
+    gap: 2px 7px;
+    font-size: .52rem;
+  }
+  .source-strip span:nth-of-type(2),
+  .source-strip span:nth-of-type(3),
+  .source-strip__error { display: none; }
+  .source-strip button { min-height: 24px; padding: 2px 6px; font-size: .55rem; }
+
+  .hydro-chart { margin-top: 4px; padding: 2px 3px 0; border-radius: 9px; }
+  .hydro-chart__meta { min-height: 17px; padding: 0 3px 1px; font-size: .49rem; }
+  .hydro-chart__meta span:nth-child(2) { display: none; }
+  .hydro-chart svg { height: 235px; max-height: 235px; }
+  .hydro-chart__readout { min-height: 15px; margin-top: 0; font-size: .55rem; }
+  .data-table-disclosure summary { min-height: 26px; font-size: .6rem; }
+
+  .territory-section,
+  .safety-actions,
+  .source-transparency { padding: 10px; border-radius: 12px !important; }
+  .compact-section-heading { margin-bottom: 6px; }
+  .compact-section-heading h2 { font-size: .92rem; }
+  .territory-schematic { min-height: 110px; }
+  .territory-schematic svg { height: 62px; }
+  .territory-stations { inset: auto 6px 6px; gap: 4px; }
+  .territory-stations article { padding: 5px 6px; }
+  .contact-grid a { min-height: 54px; }
+  .source-health-grid article { padding: 7px 8px; }
+}
+
+@media (max-width: 360px) {
+  .alert-chip { max-width: 104px; }
+  .station-selector button { min-width: 62px; }
+  .hydro-level strong { font-size: clamp(3.45rem, 19vw, 4.2rem); }
+  .hydro-chart svg { height: 218px; }
+}
+
+@media (min-width: 1440px) {
+  .hydrometric-section { padding-inline: 22px; }
+  .hydro-chart svg { height: 230px; max-height: 230px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-mark { box-shadow: none; }
+}
