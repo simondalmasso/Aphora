@@ -25,6 +25,7 @@ import './styles/hovs-r2-density-final.css';
 import './styles/hovs-r2-desktop-final.css';
 import './styles/hovs-r2-terminal-lock.css';
 import './styles/owner-left-inset-002.css';
+import './styles/owner-final-corrective-003.css';
 
 function canonicalPath(): string {
   const path = window.location.pathname.replace(/\/+$/, '');
@@ -66,7 +67,8 @@ export default function App() {
     if (opener) reportOpenerRef.current = opener;
     setReportOpen(true);
   };
-  const openMessages = () => {
+  const openMessages = (opener?: HTMLButtonElement | null) => {
+    if (opener) messagesButtonRef.current = opener;
     setMessagesSeen(true);
     setMessagesOpen(true);
   };
