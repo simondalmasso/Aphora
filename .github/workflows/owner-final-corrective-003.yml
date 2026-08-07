@@ -3,14 +3,15 @@ name: SOS-SF Owner Final Corrective 003
 on:
   push:
     branches: [arq/visual-dashboard-v3]
-    paths: ['.github/workflows/owner-final-corrective-003.yml']
+    paths:
+      - .github/workflows/owner-final-corrective-003.yml
 
 permissions:
   contents: write
   actions: write
 
 env:
-  TAKE_HEAD: e27df8fb664c2a0b37920d0ce61539bd3886a381
+  PRODUCT_COMMIT: 2a6e72de5f6b1024b4c1440e5dc4cc5f50f5d2dc
   MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
   PRODUCTION_URL: https://sos-sf.simondalmasso44.workers.dev
   OUT: artifacts/owner-final-corrective-003
@@ -25,14 +26,14 @@ jobs:
           ref: arq/visual-dashboard-v3
           fetch-depth: 0
 
-      - name: Authority and clean take-head gate
+      - name: Authority and immutable product gate
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin main arq/visual-dashboard-v3
           test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
-          git merge-base --is-ancestor "$TAKE_HEAD" HEAD
-          git diff --quiet "$TAKE_HEAD" HEAD -- . ':(exclude).github/workflows/owner-final-corrective-003.yml'
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          git diff --quiet "$PRODUCT_COMMIT" HEAD -- . ':(exclude).github/workflows/owner-final-corrective-003.yml'
           ! grep -q 'r2_buckets' wrangler.jsonc
           mkdir -p "$OUT/logs" "$OUT/screenshots"
 
@@ -40,238 +41,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-
-      - name: Apply owner corrective atomically
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 <<'PY'
-          from pathlib import Path
-
-          def replace_once(path, old, new):
-              p=Path(path); text=p.read_text()
-              if text.count(old)!=1:
-                  raise SystemExit(f'{path}: expected exactly one match, got {text.count(old)}')
-              p.write_text(text.replace(old,new))
-
-          replace_once('src/client/App.tsx',
-          "import './styles/owner-left-inset-002.css';\n",
-          "import './styles/owner-left-inset-002.css';\nimport './styles/owner-final-corrective-003.css';\n")
-          replace_once('src/client/App.tsx',
-          "  const openMessages = () => {\n    setMessagesSeen(true);\n    setMessagesOpen(true);\n  };",
-          "  const openMessages = (opener?: HTMLButtonElement | null) => {\n    if (opener) messagesButtonRef.current = opener;\n    setMessagesSeen(true);\n    setMessagesOpen(true);\n  };")
-
-          replace_once('src/client/app/AppShell.tsx',
-          "  readonly onMessages: () => void;",
-          "  readonly onMessages: (opener?: HTMLButtonElement | null) => void;")
-          replace_once('src/client/app/AppShell.tsx',
-          "    <IconButton className=\"header-messages-button\" ref={messagesButtonRef} label=\"Abrir comunicaciones\" badge={unread} onClick={onMessages} aria-haspopup=\"dialog\" icon={<svg viewBox=\"0 0 24 24\"><path d=\"M5 5h14v11H9l-4 3V5Z\"/><path d=\"M8 9h8M8 12h5\"/></svg>}/>",
-          "    <IconButton className=\"header-messages-button\" ref={messagesButtonRef} label=\"Abrir comunicaciones\" badge={unread} onClick={(event) => onMessages(event.currentTarget)} aria-haspopup=\"dialog\" icon={<svg viewBox=\"0 0 24 24\"><path d=\"M5 5h14v11H9l-4 3V5Z\"/><path d=\"M8 9h8M8 12h5\"/></svg>}/>")
-          replace_once('src/client/app/AppShell.tsx',
-          "    <MuniCivicHeader currentPath={currentPath} actions={actions}/>",
-          "    <MuniCivicHeader currentPath={currentPath} actions={actions} communications={{ unread, onOpen: onMessages }}/>")
-
-          Path('src/client/components/civic/MuniShell.tsx').write_text('''import { useState, type ReactNode } from 'react';
-import { CIVIC_PRIMARY_NAV, CIVIC_SECONDARY_NAV, SOSBrand } from './CivicSystem.tsx';
-
-function isActive(currentPath: string, href: string): boolean {
-  if (href === '/') return currentPath === '/';
-  if (href.startsWith('/#')) return false;
-  return currentPath === href || currentPath.startsWith(`${href}/`);
-}
-
-interface CommunicationsAction {
-  readonly unread: number;
-  readonly onOpen: (opener?: HTMLButtonElement | null) => void;
-}
-
-export function MuniCivicHeader({ currentPath, actions, communications }: {
-  readonly currentPath: string;
-  readonly actions: ReactNode;
-  readonly communications: CommunicationsAction;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  return <header className="civic-header app-header">
-    <div className="civic-header__utility">
-      <span>Santa Fe · monitoreo público</span>
-      <span>Producto independiente · fuentes oficiales atribuidas</span>
-    </div>
-    <div className="civic-header__main header-inner">
-      <SOSBrand/>
-      <nav className="civic-nav" aria-label="Navegación principal">
-        {CIVIC_PRIMARY_NAV.map((item) => <a key={item.label} href={item.href} aria-current={isActive(currentPath, item.href) ? 'page' : undefined}>{item.label}</a>)}
-      </nav>
-      <div className="civic-header__actions header-actions">{actions}</div>
-      <button
-        type="button"
-        className="civic-menu-toggle"
-        aria-expanded={menuOpen}
-        aria-controls="civic-mobile-menu"
-        aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
-        onClick={() => setMenuOpen((value) => !value)}
-      ><span/><span/><span/></button>
-    </div>
-    <div id="civic-mobile-menu" className={`civic-mobile-menu${menuOpen ? ' civic-mobile-menu--open' : ''}`} aria-hidden={!menuOpen}>
-      <nav aria-label="Navegación móvil">
-        <button
-          type="button"
-          className="civic-mobile-communications"
-          aria-haspopup="dialog"
-          onClick={(event) => communications.onOpen(event.currentTarget)}
-        >
-          <span>Comunicaciones</span>
-          {communications.unread > 0 && <span className="civic-mobile-communications__badge" aria-hidden="true">{Math.min(communications.unread, 9)}</span>}
-          {communications.unread > 0 && <span className="sr-only">{communications.unread} {communications.unread === 1 ? 'mensaje sin leer' : 'mensajes sin leer'}</span>}
-        </button>
-        {CIVIC_PRIMARY_NAV.map((item) => <a key={item.label} href={item.href} aria-current={isActive(currentPath, item.href) ? 'page' : undefined} onClick={() => setMenuOpen(false)}>{item.label}</a>)}
-        <div className="civic-mobile-menu__secondary">
-          {CIVIC_SECONDARY_NAV.map((item) => <a key={item.label} href={item.href} onClick={() => setMenuOpen(false)}>{item.label}</a>)}
-        </div>
-      </nav>
-    </div>
-  </header>;
-}
-''')
-
-          replace_once('src/client/features/hydro/HydrometricMonitoring.tsx',
-          '<h1 id="hydrometric-title">Ríos de Santa Fe</h1>',
-          '<h1 id="hydrometric-title">Pulso hídrico de Santa Fe</h1>')
-
-          Path('src/client/styles/owner-final-corrective-003.css').write_text('''/* OWNER final corrective 003: restore communications reachability + editorial hydrometric title. */
-.hovs-r2 .civic-mobile-communications {
-  width: 100%;
-  min-height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--r2-rule);
-  border-radius: 0;
-  background: #fff;
-  color: var(--r2-ink);
-  font-size: 1rem;
-  font-weight: 760;
-  line-height: 1.2;
-  text-align: left;
-}
-.hovs-r2 .civic-mobile-communications:hover { background: var(--r2-bg); }
-.hovs-r2 .civic-mobile-communications__badge {
-  flex: none;
-  min-width: 24px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
-  padding-inline: 6px;
-  background: var(--r2-green);
-  color: #fff;
-  font-size: .78rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-@media (min-width: 1281px) {
-  .hovs-r2 .civic-mobile-communications { display: none; }
-}
-
-@media (max-width: 820px) {
-  .hovs-r2 .hydrometric-hero__header h1 {
-    max-width: 12ch;
-    font-size: clamp(2.4rem, 11vw, 3.4rem);
-    line-height: .9;
-    letter-spacing: -.045em;
-    text-wrap: balance;
-  }
-}
-
-@media (max-width: 220px) {
-  .hovs-r2 .hydrometric-hero__header h1 {
-    max-width: 100%;
-    font-size: 2.05rem;
-    line-height: .92;
-  }
-  .hovs-r2 .civic-mobile-communications { min-height: 48px; padding-inline: 12px; font-size: .94rem; }
-}
-''')
-
-          Path('tests/e2e/owner-final-corrective-003.spec.ts').write_text('''import { expect, test, type Page } from '@playwright/test';
-import { demoSnapshot } from '../../src/data/demo-snapshot.ts';
-
-const fixture = {
-  ...demoSnapshot,
-  messages: [{
-    id: 'owner-003-public-message', type: 'OFFICIAL_NOTICE' as const, title: 'Comunicación pública de prueba',
-    body: 'Canal público accesible sin inicio de sesión.', sourceId: 'owner-003', geographicScope: ['Santa Fe'],
-    createdAt: '2026-08-03T00:30:00.000Z', expiresAt: '2026-08-03T03:30:00.000Z', priority: 2 as const,
-    status: 'ACTIVE' as const, evidenceRefs: [], provenance: { producer: 'SOS-SF QA', sourceKind: 'TEST', capturedAt: '2026-08-03T00:30:00.000Z' },
-  }],
-};
-
-async function installFixture(page: Page) {
-  await page.route('**/api/snapshot*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: fixture }) }));
-  await page.route('**/api/auth/config*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { enabled: false, reportingEnabled: true, googleClientId: null } }) }));
-  await page.route('**/api/session*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { authenticated: false, principal: null } }) }));
-}
-
-async function expectTitleGeometry(page: Page, width: number, height: number) {
-  await page.setViewportSize({ width, height });
-  await page.goto('/');
-  const title = page.getByRole('heading', { level: 1, name: 'Pulso hídrico de Santa Fe' });
-  await expect(title).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1, name: 'Ríos de Santa Fe' })).toHaveCount(0);
-  const metrics = await title.evaluate((node) => {
-    const r = node.getBoundingClientRect();
-    const card = node.closest('.muni-hydrometric-hero')?.getBoundingClientRect();
-    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, cardLeft: card?.left ?? 0, cardRight: card?.right ?? 0, overflow: document.documentElement.scrollWidth - innerWidth };
-  });
-  expect(metrics.left).toBeGreaterThanOrEqual(metrics.cardLeft - .5);
-  expect(metrics.right).toBeLessThanOrEqual(metrics.cardRight + .5);
-  expect(metrics.bottom).toBeGreaterThan(metrics.top);
-  expect(metrics.overflow).toBeLessThanOrEqual(1);
-}
-
-test('OWNER 003 restores communications across mobile/compact and desktop and preserves focus', async ({ page }) => {
-  await installFixture(page);
-  for (const [width, height] of [[320,568],[390,844],[430,932]] as const) {
-    await page.setViewportSize({ width, height });
-    await page.goto('/');
-    await page.getByRole('button', { name: 'Abrir menú' }).click();
-    const communications = page.getByRole('button', { name: /Comunicaciones/ });
-    await expect(communications).toBeVisible();
-    const box = await communications.boundingBox();
-    expect(box?.height ?? 0).toBeGreaterThanOrEqual(48);
-    await expect(communications.locator('.sr-only')).toContainText('1 mensaje sin leer');
-    await communications.click();
-    const dialog = page.locator('dialog.messages-panel');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('heading', { name: 'Comunicaciones públicas' })).toBeVisible();
-    await expect(dialog.getByText('Comunicación pública de prueba')).toBeVisible();
-    await expect(dialog.getByText(/Funciones privadas no activadas/)).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(dialog).not.toBeVisible();
-    await expect(communications).toBeFocused();
-  }
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/');
-  const desktop = page.getByRole('button', { name: /Abrir comunicaciones/ });
-  await expect(desktop).toBeVisible();
-  await expect(desktop.locator('.ui-icon-button__badge')).toHaveText('1');
-  await desktop.click();
-  const dialog = page.locator('dialog.messages-panel');
-  await expect(dialog).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(desktop).toBeFocused();
-});
-
-test('OWNER 004 title survives mobile widths and 200 percent layout equivalent', async ({ page }) => {
-  await installFixture(page);
-  for (const [width, height] of [[320,568],[390,844],[430,932],[195,422]] as const) await expectTitleGeometry(page, width, height);
-});
-''')
-          PY
-          git diff --check
 
       - name: Full predeploy verification
         env:
@@ -283,29 +52,13 @@ test('OWNER 004 title survives mobile widths and 200 percent layout equivalent',
           npx playwright install --with-deps chromium
           npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
           npm run lint 2>&1 | tee "$OUT/logs/lint.log"
-          npm audit --audit-level=high 2>&1 | tee "$OUT/logs/npm-audit.log"
+          npm audit 2>&1 | tee "$OUT/logs/npm-audit.log"
           npm run test:unit 2>&1 | tee "$OUT/logs/unit.log"
           npm run test:contract 2>&1 | tee "$OUT/logs/contract.log"
           npm run build 2>&1 | tee "$OUT/logs/build.log"
           npm run test:worker 2>&1 | tee "$OUT/logs/worker.log"
           npm run test:e2e 2>&1 | tee "$OUT/logs/e2e.log"
           npm run deploy:dry 2>&1 | tee "$OUT/logs/deploy-dry.log"
-
-      - name: Commit verified product correction
-        id: product
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name sos-sf-automation
-          git config user.email sos-sf-automation@users.noreply.github.com
-          git add src/client/App.tsx src/client/app/AppShell.tsx src/client/components/civic/MuniShell.tsx src/client/features/hydro/HydrometricMonitoring.tsx src/client/styles/owner-final-corrective-003.css tests/e2e/owner-final-corrective-003.spec.ts
-          git commit -m "fix(hovs): restore communications and hydrometric title"
-          product_commit=$(git rev-parse HEAD)
-          echo "$product_commit" > "$OUT/product-commit.txt"
-          echo "product_commit=$product_commit" >> "$GITHUB_OUTPUT"
-          git push origin HEAD:arq/visual-dashboard-v3
 
       - name: Capture Cloudflare baseline
         env:
@@ -335,194 +88,54 @@ test('OWNER 004 title survives mobile widths and 200 percent layout equivalent',
 
       - name: Verify Cloudflare deployment provenance
         env:
-          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
         shell: bash
         run: |
           set -euo pipefail
           sleep 5
           npx wrangler deployments list --json > "$OUT/cloudflare-after.json"
           node --input-type=module <<'NODE'
-          import {readFile,writeFile} from 'node:fs/promises';
-          const arr=x=>Array.isArray(x)?x:(x.deployments||[]);
-          const before=arr(JSON.parse(await readFile(process.env.OUT+'/cloudflare-before.json','utf8')));
-          const after=arr(JSON.parse(await readFile(process.env.OUT+'/cloudflare-after.json','utf8')));
-          const latest=[...after].sort((a,b)=>Date.parse(a.created_on||a.createdAt||0)-Date.parse(b.created_on||b.createdAt||0)).at(-1);
-          if(!latest) throw new Error('no latest deployment');
-          const version=(latest.versions||[]).find(v=>(v.version_id||v.id)===process.env.VERSION_ID);
-          const percentage=Number(version?.percentage ?? version?.traffic_percentage ?? 0);
-          const isNew=!new Set(before.map(x=>x.id)).has(latest.id);
-          const result={versionId:process.env.VERSION_ID,deploymentId:latest.id||null,createdOn:latest.created_on||latest.createdAt||null,percentage,isNewDeployment:isNew,deployCommandCount:1,postdeployRedeployCount:0,pass:Boolean(version)&&percentage===100&&isNew};
-          await writeFile(process.env.OUT+'/deployment-provenance.json',JSON.stringify(result,null,2)+'\n');
-          if(!result.pass) throw new Error('provenance mismatch '+JSON.stringify(result));
+          import { readFile, writeFile } from 'node:fs/promises';
+          const arr = (value) => Array.isArray(value) ? value : (value.deployments || []);
+          const before = arr(JSON.parse(await readFile(process.env.OUT + '/cloudflare-before.json', 'utf8')));
+          const after = arr(JSON.parse(await readFile(process.env.OUT + '/cloudflare-after.json', 'utf8')));
+          const latest = [...after].sort((a, b) => Date.parse(a.created_on || a.createdAt || 0) - Date.parse(b.created_on || b.createdAt || 0)).at(-1);
+          if (!latest) throw new Error('No latest deployment.');
+          const version = (latest.versions || []).find((item) => (item.version_id || item.id) === process.env.VERSION_ID);
+          const percentage = Number(version?.percentage ?? version?.traffic_percentage ?? 0);
+          const isNew = !new Set(before.map((item) => item.id)).has(latest.id);
+          const result = { versionId: process.env.VERSION_ID, deploymentId: latest.id || null, createdOn: latest.created_on || latest.createdAt || null, percentage, isNewDeployment: isNew, deployCommandCount: 1, postdeployRedeployCount: 0, pass: Boolean(version) && percentage === 100 && isNew };
+          await writeFile(process.env.OUT + '/deployment-provenance.json', JSON.stringify(result, null, 2) + '\n');
+          if (!result.pass) throw new Error('Deployment provenance mismatch: ' + JSON.stringify(result));
           NODE
 
       - name: Verify production final corrective truth
         env:
           VERSION_ID: ${{ steps.deploy.outputs.version_id }}
-          PRODUCT_COMMIT: ${{ steps.product.outputs.product_commit }}
         shell: bash
         run: |
           set -euo pipefail
-          node --input-type=module <<'NODE'
-          import {chromium} from 'playwright';
-          import {createHash} from 'node:crypto';
-          import {readFile,readdir,writeFile} from 'node:fs/promises';
-          import path from 'node:path';
-          const base=process.env.PRODUCTION_URL.replace(/\/$/,'');
-          const out=process.env.OUT;
-          const sha=b=>createHash('sha256').update(b).digest('hex');
-          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-
-          const assets=await readdir('dist/assets');
-          const localJs=assets.find(x=>x.endsWith('.js')&&!x.endsWith('.js.map'));
-          const localCss=assets.find(x=>x.endsWith('.css'));
-          if(!localJs||!localCss) throw new Error('local assets missing');
-          let remoteHtml='',remotePaths=[],converged=false;
-          for(let attempt=1;attempt<=12;attempt++){
-            remoteHtml=await (await fetch(`${base}/?owner003=${Date.now()}`,{cache:'no-store',headers:{'cache-control':'no-cache'}})).text();
-            remotePaths=[...remoteHtml.matchAll(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/g)].map(m=>m[1]);
-            if(remotePaths.some(x=>x.endsWith(localJs))&&remotePaths.some(x=>x.endsWith(localCss))){converged=true;break;}
-            await sleep(5000);
-          }
-          if(!converged) throw new Error('production assets did not converge');
-          const identity=[];
-          for(const localName of [localJs,localCss]){
-            const remotePath=remotePaths.find(x=>x.endsWith(localName));
-            const lb=await readFile(path.join('dist/assets',localName));
-            const rb=Buffer.from(await (await fetch(base+remotePath+'?b='+Date.now(),{cache:'no-store'})).arrayBuffer());
-            const row={path:remotePath,localSha256:sha(lb),remoteSha256:sha(rb),pass:sha(lb)===sha(rb)};
-            identity.push(row); if(!row.pass) throw new Error('asset byte identity '+localName);
-          }
-
-          async function fetchJson(route){const r=await fetch(base+route+(route.includes('?')?'&':'?')+'t='+Date.now(),{cache:'no-store'});const text=await r.text();let json=null;try{json=JSON.parse(text)}catch{};return {route,status:r.status,json};}
-          const api=[]; for(const route of ['/api/health','/api/snapshot','/api/sources','/api/auth/config','/source-provenance.json']) api.push(await fetchJson(route));
-          if(api.some(x=>x.status!==200)) throw new Error('API status '+JSON.stringify(api.map(x=>[x.route,x.status])));
-          const unwrap=x=>x?.json&&typeof x.json==='object'&&'data' in x.json?x.json.data:x?.json;
-          const snapshot=unwrap(api.find(x=>x.route==='/api/snapshot'));
-          const authConfig=unwrap(api.find(x=>x.route==='/api/auth/config'));
-          const systems=snapshot?.systems||[];
-          const sources=snapshot?.sources||[];
-          const inaTruth=systems.some(x=>(x.sourceName||'').toLowerCase().includes('instituto nacional del agua')) || sources.some(x=>(x.organizationName||x.name||'').toLowerCase().includes('instituto nacional del agua'));
-          if(!inaTruth) throw new Error('INA source truth missing');
-
-          const browser=await chromium.launch({headless:true});
-          const context=await browser.newContext({serviceWorkers:'block'});
-          const page=await context.newPage();
-          const mobileCases=[[320,568,'320'],[390,844,'390'],[430,932,'430']];
-          const messaging=[];
-          let maxOverflow=0,edgeCollisionCount=0,textBorderTouchCount=0,minInset=Infinity,minRuleGap=Infinity;
-
-          async function assertHydroUiAgainstApi(label){
-            for(const system of systems.filter(x=>['parana-santa-fe','salado-santo-tome'].includes(x.id))){
-              await page.getByRole('tab',{name:new RegExp(system.watercourse.includes('Salado')?'Salado':'Paraná','i')}).click();
-              const text=(await page.getByTestId('hydro-current-level').innerText()).trim();
-              if(system.available && system.currentMetres!==null){
-                const ui=parseFloat(text.replace(',','.'));
-                if(!Number.isFinite(ui)||Math.abs(ui-system.currentMetres)>.005) throw new Error(`${label} API/UI mismatch ${system.id}`);
-              } else {
-                if(text!=='—') throw new Error(`${label} unavailable API/UI mismatch ${system.id}: ${text}`);
-              }
-            }
-          }
-
-          for(const [width,height,label] of mobileCases){
-            await page.setViewportSize({width,height});
-            await page.goto(`${base}/?owner003mobile=${label}-${Date.now()}`,{waitUntil:'networkidle'});
-            const h1=page.getByRole('heading',{level:1,name:'Pulso hídrico de Santa Fe'});
-            if(!await h1.isVisible()) throw new Error('new H1 not visible '+label);
-            if(await page.getByRole('heading',{level:1,name:'Ríos de Santa Fe'}).count()) throw new Error('old H1 still present '+label);
-            const geom=await page.evaluate(()=>{
-              const title=document.querySelector('#hydrometric-title');const card=document.querySelector('.hydrometric-section');const hero=document.querySelector('.muni-hydrometric-hero');
-              if(!title||!card||!hero) throw new Error('geometry nodes missing');
-              const tr=title.getBoundingClientRect(),cr=card.getBoundingClientRect(),hr=hero.getBoundingClientRect(),ps=getComputedStyle(hero,'::after');
-              const ruleRight=hr.left+(parseFloat(ps.left)||0)+(parseFloat(ps.width)||0);
-              return {titleContained:tr.left>=cr.left-.5&&tr.right<=cr.right+.5,contentInset:tr.left-cr.left,ruleGap:tr.left-ruleRight,overflow:document.documentElement.scrollWidth-innerWidth};
-            });
-            maxOverflow=Math.max(maxOverflow,geom.overflow);minInset=Math.min(minInset,geom.contentInset);minRuleGap=Math.min(minRuleGap,geom.ruleGap);
-            if(!geom.titleContained||geom.overflow>1||geom.contentInset<19.5||geom.ruleGap<15.5){edgeCollisionCount++;throw new Error('mobile geometry failed '+label+' '+JSON.stringify(geom));}
-            await page.getByRole('button',{name:'Abrir menú'}).click();
-            const comm=page.getByRole('button',{name:/Comunicaciones/});
-            if(!await comm.isVisible()) throw new Error('communications absent '+label);
-            const box=await comm.boundingBox(); if(!box||box.height<48) throw new Error('communications touch target '+label);
-            await comm.click();
-            const dialog=page.locator('dialog.messages-panel');
-            if(!await dialog.isVisible()) throw new Error('communications did not open '+label);
-            if(!await dialog.getByRole('heading',{name:'Comunicaciones públicas'}).isVisible()) throw new Error('public surface absent '+label);
-            await page.screenshot({path:`${out}/screenshots/owner-final-home-${label}.png`,fullPage:true});
-            if(label==='390'){
-              await page.screenshot({path:`${out}/screenshots/owner-final-communications-open-mobile.png`,fullPage:true});
-            }
-            await page.keyboard.press('Escape');
-            if(await dialog.isVisible()) throw new Error('escape close failed '+label);
-            if(!(await comm.evaluate(el=>document.activeElement===el))) throw new Error('focus return failed '+label);
-            await assertHydroUiAgainstApi(label);
-            messaging.push({viewport:label,reachable:true,touchTargetHeight:box.height,escapeClose:true,focusReturn:true});
-          }
-
-          await page.setViewportSize({width:390,height:844});
-          await page.goto(`${base}/?menu-shot=${Date.now()}`,{waitUntil:'networkidle'});
-          await page.getByRole('button',{name:'Abrir menú'}).click();
-          await page.screenshot({path:`${out}/screenshots/owner-final-mobile-menu-communications.png`,fullPage:true});
-          await page.getByRole('button',{name:/Comunicaciones/}).click();
-          await page.screenshot({path:`${out}/screenshots/owner-final-communications-open-mobile.png`,fullPage:true});
-
-          await page.setViewportSize({width:1440,height:900});
-          await page.goto(`${base}/?owner003desktop=${Date.now()}`,{waitUntil:'networkidle'});
-          const desktopButton=page.getByRole('button',{name:'Abrir comunicaciones'});
-          if(!await desktopButton.isVisible()) throw new Error('desktop communications absent');
-          await page.screenshot({path:`${out}/screenshots/owner-final-home-1440.png`,fullPage:true});
-          await desktopButton.click();
-          const desktopDialog=page.locator('dialog.messages-panel');
-          if(!await desktopDialog.isVisible()) throw new Error('desktop communications open failed');
-          await page.screenshot({path:`${out}/screenshots/owner-final-communications-open-desktop.png`,fullPage:true});
-          await page.keyboard.press('Escape');
-          if(!(await desktopButton.evaluate(el=>document.activeElement===el))) throw new Error('desktop focus return failed');
-          await assertHydroUiAgainstApi('desktop');
-
-          await page.setViewportSize({width:390,height:844});
-          await page.goto(`${base}/?title-shot=${Date.now()}`,{waitUntil:'networkidle'});
-          await page.locator('.hydrometric-hero__header').screenshot({path:`${out}/screenshots/owner-final-hydrometric-title.png`});
-
-          await page.setViewportSize({width:195,height:422});
-          await page.goto(`${base}/?zoom200=${Date.now()}`,{waitUntil:'networkidle'});
-          const zoom=await page.evaluate(()=>{const t=document.querySelector('#hydrometric-title')?.getBoundingClientRect();const c=document.querySelector('.hydrometric-section')?.getBoundingClientRect();return {contained:!!t&&!!c&&t.left>=c.left-.5&&t.right<=c.right+.5,overflow:document.documentElement.scrollWidth-innerWidth};});
-          if(!zoom.contained||zoom.overflow>1) throw new Error('H1 200 zoom equivalent failed '+JSON.stringify(zoom));
-          maxOverflow=Math.max(maxOverflow,zoom.overflow);
-
-          await page.goto(`${base}/gestion-de-riesgo/fenomeno-el-nino?owner003=${Date.now()}`,{waitUntil:'networkidle'});
-          const el=await page.getByTestId('el-nino-landing').innerText();
-          for(const s of ['Fenómeno El Niño','5,30 m','no es un umbral general de evacuación de SOS-SF']) if(!el.includes(s)) throw new Error('El Nino preservation '+s);
-          await browser.close();
-
-          const result={
-            suborder:'021-HOVS-OWNER-FINAL-CORRECTIVE-003',status:'POSTDEPLOY_TERMINAL_VERIFIED',productCommit:process.env.PRODUCT_COMMIT,
-            deploymentVersionId:process.env.VERSION_ID,deployCommandCount:1,postdeployRedeployCount:0,assetIdentity:identity,
-            apiStatus:api.map(x=>({route:x.route,status:x.status})),messagingSurfaceRestored:true,publicCommunicationsMobile:true,publicCommunicationsDesktop:true,
-            privateMessagingContractPreserved:Boolean(authConfig&&typeof authConfig.enabled==='boolean'),oldH1Absent:true,h1:'Pulso hídrico de Santa Fe',
-            leftInsetPass:minInset>=19.5,ruleGapPass:minRuleGap>=15.5,edgeCollisionCount,textBorderTouchCount,zoom200H1:true,
-            apiUiConsistency:true,inaTruth:true,elNinoPreserved:true,horizontalOverflow:maxOverflow,messaging,
-          };
-          await writeFile(out+'/terminal-summary.json',JSON.stringify(result,null,2)+'\n');
-          NODE
+          node scripts/verify-owner-final-corrective-003.mjs 2>&1 | tee "$OUT/logs/postdeploy-verification.log"
 
       - name: Terminal invariants
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main arq/visual-dashboard-v3
+          git fetch origin main
           test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
           test "$(cat "$OUT/deploy-command-count.txt")" = "1"
           ! grep -q 'r2_buckets' wrangler.jsonc
           echo 0 > "$OUT/postdeploy-redeploy-count.txt"
 
       - name: Upload terminal evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sos-sf-owner-final-corrective-003-${{ github.run_id }}
           path: ${{ env.OUT }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
 
       - name: Terminally disarm corrective workflow
