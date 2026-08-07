@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "sos-sf-app"
+  },
+  "targets": {
+    "sos-sf-app": {
+      "hosting": {
+        "sos-sf": [
+          "sos-sf"
+        ]
+      }
+    }
+  }
+}
