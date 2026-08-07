@@ -53,12 +53,27 @@
 }
 
 @media (min-width: 821px) {
-  .hydrometric-section { padding-top: 9px; padding-bottom: 10px; }
-  .hydro-level { min-height: 94px; }
-  .hydro-level strong { font-size: clamp(3.8rem, 5.4vw, 5.2rem); }
-  .hydro-chart svg { max-height: 142px; }
-  .civic-quick-tile { min-height: 52px; }
-  .civic-campaign--compact { min-height: 88px; }
-  .contact-grid a { min-height: 46px; }
-  .source-health-grid article { padding-block: 5px; }
+  .dashboard { gap: 8px; padding-bottom: 14px; }
+  .hydrometric-section { padding-top: 8px; padding-bottom: 8px; }
+  .hydrometric-hero__header { margin-bottom: 7px; }
+  .primary-station { padding-top: 7px; }
+  .hydro-reading { margin-block: 7px 8px; }
+  .hydro-level { min-height: 88px; padding-block: 9px; }
+  .hydro-level strong { font-size: clamp(3.7rem, 5.1vw, 5rem); }
+  .hydro-level time { margin-top: 5px; }
+  .hydro-metrics div { padding-block: 7px; }
+  .source-strip { min-height: 38px; margin-bottom: 5px; padding-block: 3px; }
+  .hydro-chart { padding-top: 4px; }
+  .hydro-chart svg { max-height: 118px; }
+  .civic-discovery,
+  .safety-actions,
+  .source-transparency { padding-top: 7px; }
+  .civic-section-title,
+  .compact-section-heading { margin-bottom: 5px; }
+  .civic-quick-tile { min-height: 48px; padding-block: 6px; }
+  .civic-campaign--compact { min-height: 70px; }
+  .civic-campaign--compact .civic-campaign__copy { padding-block: 6px; }
+  .contact-grid a { min-height: 44px; padding-block: 5px; }
+  .source-health-grid article { padding-block: 4px; }
+  .secondary-actions { margin-top: 5px; }
 }
