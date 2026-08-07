@@ -1,0 +1,118 @@
+/* 021 density correction: keep primary hydrometry explicit while moving secondary detail behind existing affordances. */
+
+@media (max-width: 700px) {
+  .dashboard { padding: 5px 6px 10px; gap: 6px; }
+  .hydrometric-section { padding: 8px 9px 7px; }
+  .hydrometric-hero__header { margin-bottom: 3px; }
+  .hydrometric-hero__header h1 { font-size: 1.06rem; }
+  .station-selector button { min-height: 29px; min-width: 62px; padding: 3px 6px; }
+  .station-identification { padding-bottom: 3px; }
+  .freshness-badge { min-height: 23px; }
+
+  .hydro-level { min-height: 74px; padding: 4px 6px 3px 0; }
+  .hydro-level strong { font-size: clamp(3.5rem, 17vw, 4.25rem); }
+  .hydro-level time { margin-top: 2px; }
+  .hydro-metrics div { min-height: 37px; padding: 4px 6px; }
+  .source-strip { min-height: 24px; padding: 2px 0; }
+  .source-strip button { min-height: 22px; }
+
+  .hydro-chart { margin-top: 3px; padding: 1px 2px 0; }
+  .hydro-chart__meta { min-height: 14px; padding-bottom: 0; }
+  .hydro-chart svg { height: 186px; max-height: 186px; }
+  .hydro-chart__readout {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .data-table-disclosure { margin-top: 0; }
+  .data-table-disclosure summary { min-height: 22px; font-size: .56rem; }
+
+  .territory-section,
+  .safety-actions,
+  .source-transparency { padding: 7px 8px; }
+  .compact-section-heading { margin-bottom: 4px; }
+  .compact-section-heading h2 { font-size: .82rem; }
+  .compact-section-heading .section-kicker { margin-bottom: 0; font-size: .5rem; }
+  .compact-section-heading > span { font-size: .56rem; }
+
+  .territory-schematic { min-height: 82px; }
+  .territory-schematic svg { inset-top: 2px; height: 42px; }
+  .territory-stations { inset: auto 4px 4px; gap: 3px; }
+  .territory-stations article { padding: 3px 5px; }
+  .territory-stations span,
+  .territory-stations small { font-size: .55rem; }
+  .territory-stations strong { font-size: .84rem; }
+
+  .contact-grid { gap: 3px; }
+  .contact-grid a { min-height: 43px; padding: 2px; }
+  .contact-grid strong { font-size: .92rem; }
+  .contact-grid span { margin-top: 1px; font-size: .47rem; line-height: 1.05; }
+  .secondary-actions { margin-top: 3px; }
+  .secondary-actions summary { min-height: 25px; font-size: .62rem; }
+
+  .source-health-grid { gap: 3px; }
+  .source-health-grid article { padding: 5px 6px; }
+  .source-health-grid article:nth-child(n+2) { display: none; }
+  .source-health-grid article > div span { font-size: .52rem; }
+  .source-health-grid article > div strong { font-size: .72rem; }
+  .source-health-grid p,
+  .source-health-grid small { display: none; }
+  .source-health-grid dl { grid-template-columns: .7fr 1.3fr; gap: 2px; }
+  .source-health-grid dt { font-size: .5rem; }
+  .source-health-grid dd { font-size: .56rem; }
+
+  .app-footer { padding: 6px 8px 10px; gap: 5px; font-size: .58rem; }
+  .app-footer p { max-width: none; line-height: 1.25; }
+  .app-footer nav { gap: 8px; }
+}
+
+@media (max-width: 360px) {
+  .hydro-chart svg { height: 172px; max-height: 172px; }
+  .contact-grid a { min-height: 41px; }
+}
+
+@media (min-width: 701px) and (max-width: 1099px) {
+  .dashboard { padding-top: 8px; gap: 8px; }
+  .hydrometric-section { padding: 12px 14px; }
+  .hydro-level,
+  .hydro-metrics div { min-height: 94px; }
+  .hydro-chart svg { max-height: 235px; }
+  .territory-section,
+  .safety-actions,
+  .source-transparency { padding: 10px; }
+  .territory-schematic { min-height: 112px; }
+  .contact-grid a { min-height: 52px; }
+  .source-health-grid article { padding: 7px 8px; }
+}
+
+@media (min-width: 1100px) {
+  .dashboard { gap: 8px; padding-top: 7px; padding-bottom: 8px; }
+  .hydrometric-section { padding-top: 11px; padding-bottom: 9px; }
+  .hydrometric-hero__header { margin-bottom: 4px; }
+  .station-identification { padding-bottom: 5px; }
+  .hydro-level,
+  .hydro-metrics div { min-height: 82px; }
+  .hydro-level strong { font-size: clamp(3.8rem, 4.8vw, 4.9rem); }
+  .source-strip { min-height: 30px; padding-block: 2px; }
+  .hydro-chart { margin-top: 4px; }
+  .hydro-chart svg { height: 188px; max-height: 188px; }
+  .hydro-chart__meta { min-height: 20px; }
+  .data-table-disclosure summary { min-height: 23px; }
+  .territory-section,
+  .safety-actions,
+  .source-transparency { padding: 8px; }
+  .compact-section-heading { margin-bottom: 3px; }
+  .territory-schematic { min-height: 100px; }
+  .territory-schematic svg { height: 54px; }
+  .contact-grid a { min-height: 44px; }
+  .secondary-actions summary { min-height: 25px; }
+  .source-health-grid article { padding: 5px 6px; }
+  .source-health-grid p { margin: 1px 0 2px; }
+  .app-footer { padding-top: 5px; padding-bottom: 7px; }
+}
