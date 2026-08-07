@@ -77,7 +77,7 @@ export function HydrometricMonitoring({
     <HydrometricHero>
       <header className="hydrometric-hero__header">
         <div>
-          <p className="section-kicker">Situación hidrométrica</p>
+          <p className="section-kicker">Hidrometría</p>
           <h1 id="hydrometric-title">Ríos de Santa Fe</h1>
         </div>
         <div className="hydrometric-hero__controls">
