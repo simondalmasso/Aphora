@@ -1,0 +1,65 @@
+name: SOS-SF 020-B Blocker Stage Diagnostic
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/order-020b-blocker-diagnostic-trigger]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  EVIDENCE_DIR: artifacts/order-020b-blocker-diagnostic
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          mkdir -p "$EVIDENCE_DIR/logs" "$EVIDENCE_DIR/gates" "$EVIDENCE_DIR/screenshots"
+      - name: Controlled screenshot prerequisite
+        run: npx playwright test -g "captures required visual states with unique hashes and verified semantics"
+      - name: Preserve expected production validator rejection
+        shell: bash
+        run: |
+          set +e
+          npx vitest run .github/order020b/validation-diagnostic.test.ts --reporter=verbose >"$EVIDENCE_DIR/production-validator.log" 2>&1
+          code=$?
+          set -e
+          test "$code" -ne 0
+      - name: Derive predecessor deployment history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/order020b/deployment-history.sh
+      - name: Run blocker verifier with full diagnostic log
+        id: blocker
+        shell: bash
+        run: |
+          set +e
+          node .github/order020b-blocked/final-blocked.mjs >"$EVIDENCE_DIR/final-blocked.log" 2>&1
+          code=$?
+          set -e
+          cat "$EVIDENCE_DIR/final-blocked.log"
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-order-020b-blocker-stage-diagnostic
+          path: artifacts/order-020b-blocker-diagnostic
+          if-no-files-found: error
+          retention-days: 30
