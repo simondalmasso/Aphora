@@ -82,8 +82,8 @@ export function HydrometricMonitoring({
         </div>
         <div className="hydrometric-hero__controls">
           <StationSwitcher systems={systems} selectedId={selected?.id} onSelect={setSelectedId}/>
-          <button className="hydro-refresh-button" type="button" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing || undefined}>
-            {refreshing ? 'Actualizando…' : 'Actualizar'}
+          <button className="hydro-refresh-button" type="button" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing || undefined} aria-label="Actualizar información">
+            <span aria-hidden="true">{refreshing ? '…' : '↻'}</span>
           </button>
         </div>
       </header>
@@ -102,7 +102,7 @@ export function HydrometricMonitoring({
 
         <div className="hydro-reading">
           <div className="hydro-level">
-            <span>Nivel observado</span>
+            <span>Nivel</span>
             <strong data-testid="hydro-current-level">
               {selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}
               {selected.currentMetres !== null && <small>m</small>}
