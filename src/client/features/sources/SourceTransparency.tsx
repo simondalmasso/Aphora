@@ -38,7 +38,8 @@ export function SourceTransparency({
   const alerts = snapshot.sources.find((source) => source.id === 'smn-alerts' || source.kind === 'OFFICIAL_ALERT');
   const province = snapshot.sources.find((source) => source.organizationId === 'province' || source.name.toLowerCase().includes('protección civil'));
 
-  return <section className="source-transparency" aria-labelledby="sources-title">
+  return <section id="transparencia" className="source-transparency" aria-labelledby="sources-title">
+    <span id="fuentes" className="anchor-offset" aria-hidden="true"/>
     <header className="compact-section-heading">
       <div><p className="section-kicker">Fuentes y transparencia</p><h2 id="sources-title">Salud de los datos</h2></div>
       <button ref={sourcesButtonRef} type="button" className="button button--secondary" onClick={(event) => onSources(event.currentTarget)}>
