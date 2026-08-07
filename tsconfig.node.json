@@ -9,6 +9,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
     "noEmit": true
   },
   "include": ["vite.config.ts", "playwright.config.ts", "eslint.config.js", "tests/**/*.ts", "tests/**/*.tsx"]
