@@ -1,6 +1,7 @@
 import type { ReactNode, RefObject } from 'react';
 import type { AlertVerificationState } from '../../domain/snapshot.ts';
-import { CivicFooter, CivicHeader } from '../components/civic/CivicSystem.tsx';
+import { CivicFooter } from '../components/civic/CivicSystem.tsx';
+import { MuniCivicHeader } from '../components/civic/MuniShell.tsx';
 import { IconButton } from '../components/ui/IconButton.tsx';
 
 interface AppShellProps {
@@ -58,7 +59,7 @@ export function AppShell({
 
   return <div className="site-shell">
     <a className="skip-link" href="#main">Saltar al contenido principal</a>
-    <CivicHeader currentPath={currentPath} actions={actions}/>
+    <MuniCivicHeader currentPath={currentPath} actions={actions}/>
     {children}
     <CivicFooter disclaimer={disclaimer}/>
   </div>;
