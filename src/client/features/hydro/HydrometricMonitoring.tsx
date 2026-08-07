@@ -77,7 +77,7 @@ export function HydrometricMonitoring({
     <HydrometricHero>
       <header className="hydrometric-hero__header">
         <div>
-          <p className="section-kicker">Hidrometría</p>
+          <p className="section-kicker">Situación hidrométrica</p>
           <h1 id="hydrometric-title">Ríos de Santa Fe</h1>
         </div>
         <div className="hydrometric-hero__controls">
@@ -111,7 +111,7 @@ export function HydrometricMonitoring({
           </div>
           <dl className="hydro-metrics">
             <div><dt>Tendencia</dt><dd>{trendLabel(selected)}</dd></div>
-            <div><dt>Cambio 24 h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
+            <div><dt>Cambio 24h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
           </dl>
         </div>
 
