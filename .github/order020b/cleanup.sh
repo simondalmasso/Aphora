@@ -11,11 +11,13 @@ mkdir -p "$EVIDENCE_DIR"
 
 temp_workflow_id="$(gh api "repos/$REPO/actions/workflows/$TEMP_WORKFLOW_PATH" --jq '.id')"
 
+# Terminal freeze: disable every registered active workflow, including this running workflow.
 mapfile -t active_workflow_ids < <(gh api --paginate "repos/$REPO/actions/workflows?per_page=100" --jq '.workflows[] | select(.state == "active") | .id')
 for workflow_id in "${active_workflow_ids[@]}"; do
   gh api -X PUT "repos/$REPO/actions/workflows/$workflow_id/disable" >/dev/null || true
 done
 
+# Remove completed historical runs. The current run remains in-progress and is excluded.
 mapfile -t completed_run_ids < <(gh api --paginate "repos/$REPO/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status == "completed") | .id')
 deleted_runs=0
 for run_id in "${completed_run_ids[@]}"; do
@@ -27,8 +29,9 @@ for run_id in "${completed_run_ids[@]}"; do
   fi
 done
 
-rm -rf .github/workflows .github/order020b
-rm -f .github/order-020b-terminal-trigger .github/order-020b-truth-trigger .github/order-020b-postdeploy-trigger
+# Remove all temporary workflows, triggers and order-020B runtimes from the canonical branch.
+rm -rf .github/workflows .github/order020b .github/order020b-blocked
+rm -f .github/order-020b-terminal-trigger .github/order-020b-truth-trigger .github/order-020b-postdeploy-trigger .github/order-020b-ui-diagnostic-trigger .github/order-020b-blocked-final-trigger
 find .github -maxdepth 1 -type f \( -name '*020b*trigger*' -o -name '*020-b*trigger*' \) -delete
 
 git add -A .github
