@@ -38,3 +38,11 @@
   .civic-footer__main > div .sos-brand { margin-bottom: 0; }
   .civic-footer__main > div p { max-width: none; }
 }
+
+@media (max-width: 260px) {
+  .civic-header__main.header-inner { padding-inline: 8px; gap: 8px; }
+  .civic-header__main .sos-brand { min-width: 48px; width: 48px; }
+  .civic-header__main .sos-brand__wordmark { display: none; }
+  .civic-header__main .sos-brand__mark { width: 48px; height: 48px; }
+  .civic-menu-toggle { width: 48px; height: 48px; }
+}
