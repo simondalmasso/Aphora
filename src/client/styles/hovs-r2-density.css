@@ -1,0 +1,161 @@
+/* HOVS R2 density correction — preserve material hierarchy while meeting immutable product budgets. */
+.hovs-r2 .dashboard { display: grid; grid-template-columns: minmax(0,1.08fr) minmax(0,.92fr); gap: 26px 46px; padding-bottom: 26px; }
+.hovs-r2 .dashboard > section { margin: 0 !important; min-width: 0; }
+.hovs-r2 .hydrometric-section { grid-column: 1 / -1; padding-top: 12px; }
+.hovs-r2 .civic-discovery { grid-column: 1; }
+.hovs-r2 .safety-actions { grid-column: 2; }
+.hovs-r2 .source-transparency { grid-column: 1 / -1; }
+.hovs-r2 .civic-water-summary { display: none; }
+.hovs-r2 .civic-section-title,
+.hovs-r2 .compact-section-heading { padding-bottom: 10px; }
+.hovs-r2 .compact-section-heading h2,
+.hovs-r2 .civic-section-title h2 { font-size: clamp(1.85rem,3vw,2.7rem); }
+
+.hovs-r2 .muni-hydrometric-hero { padding-top: 16px; }
+.hovs-r2 .hydrometric-hero__header { padding-bottom: 14px; gap: 18px; }
+.hovs-r2 .hydrometric-hero__header h1 { font-size: clamp(2.6rem,5vw,4.4rem); }
+.hovs-r2 .station-identification { min-height: 60px; padding: 12px 0 8px; }
+.hovs-r2 .station-identification > div > strong { font-size: clamp(1.2rem,2vw,1.75rem); }
+.hovs-r2 .hydro-signature-axis { min-height: 22px; margin: 0 0 8px; }
+.hovs-r2 .hydro-level { padding-bottom: 10px; }
+.hovs-r2 .hydro-level strong { min-height: 92px; font-size: clamp(5rem,9vw,8rem); }
+.hovs-r2 .hydro-level time { margin-top: 10px; }
+.hovs-r2 .hydro-metrics { margin-top: 10px; }
+.hovs-r2 .source-strip { margin-top: 10px; padding-top: 10px; gap: 4px; }
+.hovs-r2 .source-strip button { min-height: 44px; margin-top: 4px; }
+.hovs-r2 .hydro-chart__meta { min-height: 22px; }
+.hovs-r2 .hydro-chart__readout { min-height: 18px; }
+.hovs-r2 .data-table-disclosure { margin-top: 5px; }
+.hovs-r2 .data-table-disclosure summary { min-height: 36px; }
+
+@media (min-width: 960px) {
+  .hovs-r2 .primary-station { column-gap: 46px; }
+  .hovs-r2 .hydro-chart { padding-top: 0; }
+  .hovs-r2 .hydro-chart svg { min-height: 0; max-height: 260px; }
+  .hovs-r2 .civic-discovery { grid-template-columns: minmax(160px,.62fr) minmax(0,1.38fr); gap: 16px 28px; }
+  .hovs-r2 .civic-quick-tile { min-height: 52px; }
+  .hovs-r2 .civic-campaign { min-height: 126px; margin-top: 0; }
+  .hovs-r2 .civic-campaign__copy { padding: 18px 22px; }
+  .hovs-r2 .civic-campaign__copy h2 { font-size: clamp(2.7rem,4.8vw,4.2rem); }
+  .hovs-r2 .civic-campaign__copy p { margin-bottom: 2px; }
+  .hovs-r2 .civic-campaign__copy a { min-height: 42px; margin-top: 7px; }
+  .hovs-r2 .safety-actions .compact-section-heading { padding-top: 10px; border-top-width: 4px; }
+  .hovs-r2 .contact-grid a { min-height: 58px; padding: 8px 12px; }
+  .hovs-r2 .contact-grid a strong { font-size: 1.7rem; }
+  .hovs-r2 .contact-grid__primary { min-height: 78px !important; }
+  .hovs-r2 .contact-grid__primary strong { font-size: 3.8rem !important; }
+  .hovs-r2 .secondary-actions { margin-top: 8px; }
+  .hovs-r2 .secondary-actions summary { min-height: 44px; }
+  .hovs-r2 .source-transparency .compact-section-heading { padding-top: 10px; }
+  .hovs-r2 .source-health-grid article { grid-template-columns: minmax(140px,.55fr) minmax(220px,1.25fr) minmax(260px,1.1fr); min-height: 0; padding: 9px 0; gap: 18px; }
+  .hovs-r2 .source-health-grid article > p { font-size: .82rem; line-height: 1.3; }
+  .hovs-r2 .source-health-grid article dl { gap: 10px; font-size: .8rem; }
+  .hovs-r2 .civic-footer { padding-top: 20px; padding-bottom: 12px; }
+  .hovs-r2 .civic-footer__main { gap: 28px; }
+  .hovs-r2 .civic-footer__main > div p { margin: 5px 0; font-size: .8rem; line-height: 1.25; }
+  .hovs-r2 .civic-footer__main nav a { min-height: 28px; display: flex; align-items: center; font-size: .82rem; }
+  .hovs-r2 .civic-footer__legal { margin-top: 10px; padding-top: 8px; font-size: .76rem; }
+}
+
+@media (max-width: 959px) {
+  .hovs-r2 .dashboard { display: block; padding-bottom: 22px; }
+  .hovs-r2 .dashboard > section + section { margin-top: 20px !important; }
+}
+
+@media (max-width: 820px) {
+  .hovs-r2 .dashboard { padding: 0 14px 20px; }
+  .hovs-r2 .hydrometric-section { padding-top: 6px; }
+  .hovs-r2 .muni-hydrometric-hero { padding-top: 8px; }
+  .hovs-r2 .hydrometric-hero__header { gap: 7px; padding-bottom: 7px; }
+  .hovs-r2 .hydrometric-hero__header h1 { font-size: clamp(2.25rem,10vw,3.25rem); line-height: .88; }
+  .hovs-r2 .hydrometric-hero__controls { gap: 8px; }
+  .hovs-r2 .station-selector { gap: 8px; }
+  .hovs-r2 .station-selector button { min-height: 48px; padding-inline: 10px; }
+  .hovs-r2 .hydro-refresh-button { min-width: 48px; min-height: 48px; }
+  .hovs-r2 .station-identification { grid-template-columns: minmax(0,1fr) auto; align-items: end; min-height: 0; padding: 7px 0 4px; gap: 8px; }
+  .hovs-r2 .station-identification > div > span { font-size: .74rem; }
+  .hovs-r2 .station-identification > div > strong { font-size: 1.08rem; }
+  .hovs-r2 .freshness-badge { min-height: 32px; padding: 4px 0 4px 8px; font-size: .74rem; line-height: 1.15; }
+  .hovs-r2 .hydro-signature-axis { min-height: 18px; margin: 0 0 5px; font-size: .57rem; gap: 6px; }
+  .hovs-r2 .hydro-reading { display: grid; grid-template-columns: minmax(155px,1.25fr) minmax(105px,.75fr); align-items: start; gap: 10px; }
+  .hovs-r2 .hydro-level { padding-bottom: 6px; border-bottom: 0; }
+  .hovs-r2 .hydro-level > span { font-size: .66rem; }
+  .hovs-r2 .hydro-level strong { min-height: 68px; font-size: clamp(4.6rem,23vw,6.1rem); line-height: .72; }
+  .hovs-r2 .hydro-level time { margin-top: 8px; font-size: .82rem; line-height: 1.15; }
+  .hovs-r2 .hydro-metrics { display: block; margin: 13px 0 0; padding-left: 10px; border-left: 1px solid var(--r2-rule); }
+  .hovs-r2 .hydro-metrics > div { padding: 0 0 7px; }
+  .hovs-r2 .hydro-metrics > div + div { padding: 7px 0 0; border-left: 0; border-top: 1px solid var(--r2-rule); }
+  .hovs-r2 .hydro-metrics dt { font-size: .62rem; }
+  .hovs-r2 .hydro-metrics dd { margin-top: 2px; font-size: .92rem; line-height: 1.15; }
+  .hovs-r2 .source-strip { grid-template-columns: minmax(0,1fr) auto; align-items: center; margin-top: 4px; padding-top: 7px; gap: 6px; font-size: .75rem; line-height: 1.2; }
+  .hovs-r2 .source-strip > span:first-child { min-width: 0; }
+  .hovs-r2 .source-strip > span:nth-of-type(2),
+  .hovs-r2 .source-strip > span:nth-of-type(3) { display: none; }
+  .hovs-r2 .source-strip button { grid-column: 2; grid-row: 1; min-width: 72px; min-height: 44px; margin: 0; }
+  .hovs-r2 .source-strip__error { grid-column: 1 / -1; }
+  .hovs-r2 .hydro-chart { margin-top: 5px; padding-top: 5px; }
+  .hovs-r2 .hydro-chart__meta { min-height: 14px; font-size: .56rem; padding-bottom: 0; }
+  .hovs-r2 .hydro-chart svg { max-height: 142px; }
+  .hovs-r2 .hydro-chart__readout { min-height: 14px; margin-top: 0; font-size: .59rem; }
+  .hovs-r2 .data-table-disclosure { margin-top: 0; }
+  .hovs-r2 .data-table-disclosure summary { min-height: 30px; font-size: .72rem; }
+
+  .hovs-r2 .dashboard > section + section { margin-top: 17px !important; }
+  .hovs-r2 .compact-section-heading,
+  .hovs-r2 .civic-section-title { padding-bottom: 7px; }
+  .hovs-r2 .compact-section-heading h2,
+  .hovs-r2 .civic-section-title h2 { font-size: clamp(1.6rem,7.6vw,2.15rem); line-height: .94; }
+  .hovs-r2 .civic-section-title > span { display: none !important; }
+  .hovs-r2 .civic-discovery { gap: 7px; }
+  .hovs-r2 .civic-quick-grid { gap: 0 12px; }
+  .hovs-r2 .civic-quick-tile { min-height: 48px; grid-template-columns: 24px 1fr 14px; gap: 6px; }
+  .hovs-r2 .civic-quick-tile span { font-size: .94rem; }
+  .hovs-r2 .civic-campaign { min-height: 118px; margin-top: 4px; }
+  .hovs-r2 .civic-campaign__copy { width: 92%; padding: 12px 14px; }
+  .hovs-r2 .civic-campaign__copy p { display: none; }
+  .hovs-r2 .civic-campaign__copy h2 { margin: 0; font-size: clamp(2.5rem,12vw,3.5rem); line-height: .82; }
+  .hovs-r2 .civic-campaign__copy strong { font-size: .9rem; line-height: 1.15; }
+  .hovs-r2 .civic-campaign__copy a { min-height: 44px; margin-top: 3px; font-size: .86rem; }
+
+  .hovs-r2 .safety-actions .compact-section-heading,
+  .hovs-r2 .source-transparency .compact-section-heading { gap: 6px; padding-top: 7px; }
+  .hovs-r2 .safety-actions .compact-section-heading .button,
+  .hovs-r2 .source-transparency .compact-section-heading .button { min-height: 44px; }
+  .hovs-r2 .contact-grid a { min-height: 54px; padding: 6px 8px; }
+  .hovs-r2 .contact-grid a strong { font-size: 1.55rem; }
+  .hovs-r2 .contact-grid a span { font-size: .8rem; line-height: 1.1; }
+  .hovs-r2 .contact-grid__primary { min-height: 74px !important; column-gap: 12px !important; }
+  .hovs-r2 .contact-grid__primary strong { font-size: 3.6rem !important; }
+  .hovs-r2 .contact-grid__primary span { padding-bottom: 4px; font-size: .96rem; }
+  .hovs-r2 .secondary-actions { margin-top: 5px; }
+  .hovs-r2 .secondary-actions summary { min-height: 44px; font-size: .9rem; }
+
+  .hovs-r2 .source-health-grid article { min-height: 0; padding: 7px 0; gap: 4px; }
+  .hovs-r2 .source-health-grid article > div > span { font-size: .58rem; }
+  .hovs-r2 .source-health-grid article > div > strong { margin-top: 2px; font-size: .9rem; line-height: 1.15; }
+  .hovs-r2 .source-health-grid article > p { font-size: .72rem; line-height: 1.2; }
+  .hovs-r2 .source-health-grid article dl { display: none; }
+
+  .hovs-r2 .civic-footer { padding: 16px 14px 10px; }
+  .hovs-r2 .civic-footer__main { grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+  .hovs-r2 .civic-footer__main > div { grid-column: 1 / -1; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+  .hovs-r2 .civic-footer__main > div .sos-brand { min-height: 44px; }
+  .hovs-r2 .civic-footer__main > div p { display: none; }
+  .hovs-r2 .civic-footer__main > div strong { font-size: .78rem; line-height: 1.2; }
+  .hovs-r2 .civic-footer__main nav { padding-top: 7px; border-top: 1px solid var(--r2-rule); }
+  .hovs-r2 .civic-footer h2 { margin: 0 0 2px; font-size: .62rem; }
+  .hovs-r2 .civic-footer__main nav a { min-height: 44px; display: flex; align-items: center; font-size: .94rem; line-height: 1.1; }
+  .hovs-r2 .civic-footer__legal { margin-top: 7px; padding-top: 6px; font-size: .68rem; line-height: 1.2; }
+}
+
+@media (max-width: 360px) {
+  .hovs-r2 .dashboard { padding-inline: 12px; }
+  .hovs-r2 .hydro-level strong { font-size: clamp(4.25rem,22vw,5.2rem); }
+  .hovs-r2 .hydro-reading { grid-template-columns: minmax(145px,1.2fr) minmax(95px,.8fr); gap: 7px; }
+  .hovs-r2 .civic-quick-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 8px; }
+  .hovs-r2 .civic-quick-tile { min-height: 48px; grid-template-columns: 20px 1fr; }
+  .hovs-r2 .civic-quick-tile::after { display: none; }
+  .hovs-r2 .civic-quick-tile span { font-size: .88rem; }
+  .hovs-r2 .contact-grid__primary { grid-template-columns: auto 1fr; }
+  .hovs-r2 .contact-grid__primary strong { font-size: 3.25rem !important; }
+}
