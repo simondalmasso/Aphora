@@ -5,13 +5,13 @@ text = path.read_text()
 replacements = [
     (
         "return main?.getAttribute('data-snapshot-id') === expectedId && Boolean(level?.textContent?.includes(expectedLevelText)) && Boolean(source?.textContent?.trim()) && Boolean(chart);",
-        "return Boolean(main?.getAttribute('data-snapshot-id')) && Boolean(level?.textContent?.includes(expectedLevelText)) && Boolean(source?.textContent?.trim()) && Boolean(chart);",
-        'production semantic wait must compare API data, not independently generated snapshot IDs',
+        "return Boolean(main?.getAttribute('data-snapshot-id')) && /\\d+[,.]\\d+/.test(level?.textContent || '') && Boolean(source?.textContent?.trim()) && Boolean(chart);",
+        'production semantic wait must require a terminal numeric hydrometric reading, source and chart without coupling independent snapshot IDs',
     ),
     (
         "if (result.snapshotId !== snapshot.id || !result.levelText?.includes(expectedLevel) || !result.hasChart) throw new Error(`API_UI_INCONSISTENCY_${viewport.width}`);",
-        "if (!result.snapshotId || !result.levelText?.includes(expectedLevel) || !result.hasChart) throw new Error(`API_UI_INCONSISTENCY_${viewport.width}`);",
-        'production API/UI consistency check must tolerate independently generated snapshot IDs',
+        "const uiLevelMatch = result.levelText?.match(/-?\\d+(?:[,.]\\d+)?/);\n      const uiLevel = uiLevelMatch ? Number(uiLevelMatch[0].replace(',', '.')) : Number.NaN;\n      const verificationResponse = await getApi('/api/snapshot');\n      if (verificationResponse.status !== 200) throw new Error(`API_UI_VERIFICATION_HTTP_${verificationResponse.status}_${viewport.width}`);\n      const verificationSnapshot = dataOf(verificationResponse);\n      const verificationSystems = Array.isArray(verificationSnapshot?.systems) ? verificationSnapshot.systems : [];\n      const verificationPrimary = verificationSystems.find((system) => system.id === verificationSnapshot?.river?.systemId) ?? verificationSystems.find((system) => system?.available === true && typeof system?.currentMetres === 'number' && String(system?.sourceId || '').startsWith('ina-rest'));\n      if (!verificationPrimary || typeof verificationPrimary.currentMetres !== 'number' || !String(verificationPrimary.sourceId || '').startsWith('ina-rest')) throw new Error(`API_UI_VERIFICATION_PRIMARY_NOT_INA_${viewport.width}`);\n      const apiUiDeltaMetres = Math.abs(uiLevel - verificationPrimary.currentMetres);\n      if (!result.snapshotId || !Number.isFinite(uiLevel) || !result.hasChart || !/INA/i.test(result.sourceText || '') || apiUiDeltaMetres > 0.10) throw new Error(`API_UI_INCONSISTENCY_${viewport.width}:${uiLevel}:${verificationPrimary.currentMetres}:${apiUiDeltaMetres}:${result.sourceText}`);\n      result.apiVerificationSnapshotId = verificationSnapshot.id ?? null;\n      result.apiVerificationLevel = verificationPrimary.currentMetres;\n      result.apiUiDeltaMetres = apiUiDeltaMetres;",
+        'production API/UI consistency must compare terminal UI against a fresh same-run INA snapshot with a bounded hydrometric delta',
     ),
     (
         "const configured = !['NOT_CONFIGURED','SUSPENDED'].includes(classification);",
