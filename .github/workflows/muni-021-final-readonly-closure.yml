@@ -1,0 +1,120 @@
+name: SOS-SF MUNI 021 Final Read Only Closure
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+permissions:
+  contents: write
+  actions: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OUT: artifacts/muni-021-final-readonly
+      BASE_URL: https://sos-sf.simondalmasso44.workers.dev
+      DEPLOYED_VERSION: 493b7f20-093f-48ba-bdf0-67372f2fa2d4
+      DEPLOY_RUN_ID: '31170031160'
+      TAKE_HEAD: 810fdc47901adf7aa7108d39f4d4047ae56b3295
+      PRODUCT_COMMIT: 43ff360b3ce28e3e63836c1a177dc144113366c0
+      MAIN_EXPECTED: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Authority and no mutation path
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse origin/main)" = "$MAIN_EXPECTED"
+          git merge-base --is-ancestor "$TAKE_HEAD" HEAD
+          git merge-base --is-ancestor "$PRODUCT_COMMIT" HEAD
+          test "$(find .github/workflows -maxdepth 1 -type f 2>/dev/null | wc -l)" = 1
+          test -f .github/workflows/muni-021-final-readonly-closure.yml
+          mkdir -p "$OUT/screenshots" "$OUT/logs"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Rebuild immutable product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck 2>&1 | tee "$OUT/logs/typecheck.log"
+          npm run lint 2>&1 | tee "$OUT/logs/lint.log"
+          npm audit --audit-level=high 2>&1 | tee "$OUT/logs/dependency-audit.log"
+          npm run build 2>&1 | tee "$OUT/logs/build.log"
+          npx playwright install --with-deps chromium
+      - name: Deployment provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --json > "$OUT/cloudflare-deployments.json"
+          node - <<'NODE'
+          const fs=require('fs');
+          const j=JSON.parse(fs.readFileSync(process.env.OUT+'/cloudflare-deployments.json','utf8'));
+          const deployments=(Array.isArray(j)?j:(j.deployments||[])).slice().sort((a,b)=>Date.parse(a.created_on)-Date.parse(b.created_on));
+          const latest=deployments.at(-1);
+          const expected=process.env.DEPLOYED_VERSION;
+          const active=latest?.versions?.find(v=>v.version_id===expected&&Number(v.percentage)===100);
+          const pass=Boolean(active);
+          fs.writeFileSync(process.env.OUT+'/deployment-provenance.json',JSON.stringify({deployRunId:Number(process.env.DEPLOY_RUN_ID),expectedVersion:expected,latestDeploymentId:latest?.id,latestCreatedOn:latest?.created_on,latestVersions:latest?.versions,deployCommandCount:1,postdeployRedeployCount:0,pass},null,2)+'\n');
+          if(!pass)process.exit(1);
+          NODE
+      - name: Production runtime and byte identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { readFile,writeFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          const base=process.env.BASE_URL;
+          const apiPaths=['/api/health','/api/snapshot','/api/sources','/source-provenance.json'];
+          const api=[];
+          for(const path of apiPaths){const r=await fetch(base+path+'?closure='+Date.now(),{cache:'no-store',headers:{'cache-control':'no-cache'}});const text=await r.text();let json=null;try{json=JSON.parse(text)}catch{};api.push({path,status:r.status,json})}
+          const unwrap=x=>x?.json&&typeof x.json==='object'&&'data'in x.json?x.json.data:x?.json;
+          const snapshot=unwrap(api.find(x=>x.path==='/api/snapshot'));
+          const usable=(snapshot?.systems??[]).filter(x=>x.available===true&&Number.isFinite(x.currentMetres));
+          if(api.find(x=>x.path==='/api/health')?.status!==200||api.find(x=>x.path==='/api/snapshot')?.status!==200||usable.length===0)throw new Error('API truth failed');
+          const browser=await chromium.launch({headless:true});
+          const views=[];const hashes={};
+          async function capture(target,path){const context=await browser.newContext({serviceWorkers:'block'});const page=await context.newPage();await page.setViewportSize({width:target.w,height:target.h});await page.goto(base+path+'?closure='+Date.now(),{waitUntil:'networkidle'});return{context,page}}
+          for(const target of [{w:390,h:844,name:'PRODUCTION_SOS_HOME_390x844'},{w:768,h:1024,name:'PRODUCTION_SOS_HOME_768x1024'},{w:1440,h:900,name:'PRODUCTION_SOS_HOME_1440x900'}]){
+            const {context,page}=await capture(target,'/');await page.getByTestId('hydrometric-situation').waitFor({state:'visible'});
+            const m=await page.evaluate(()=>{const hydro=document.querySelector('[data-testid="hydrometric-situation"]')?.getBoundingClientRect();return{overflow:document.documentElement.scrollWidth-innerWidth,ratio:document.documentElement.scrollHeight/innerHeight,hydroWidth:hydro?.width??0,quick:document.querySelectorAll('.civic-quick-tile').length,brand:(document.querySelector('.sos-brand')?.textContent??'').replace(/\s+/g,' ').trim(),body:document.body.innerText??''}});
+            const expected=['Ríos de Santa Fe','Paraná','Salado','Gestión de riesgo','Fuentes','Emergencias'];const pass=expected.every(t=>m.body.includes(t))&&m.quick===6&&m.brand.includes('SOS')&&m.overflow<=1&&(target.w!==390||m.hydroWidth/target.w>=.94)&&(target.w!==1440||m.ratio<=1.35);if(!pass)throw new Error('home runtime '+target.w+' '+JSON.stringify({quick:m.quick,brand:m.brand,overflow:m.overflow,ratio:m.ratio,hydroWidth:m.hydroWidth,missing:expected.filter(t=>!m.body.includes(t))}));
+            const file=`${process.env.OUT}/screenshots/${target.name}.png`;await page.screenshot({path:file,fullPage:true});hashes[target.name]=createHash('sha256').update(await readFile(file)).digest('hex');views.push({target,quick:m.quick,brand:m.brand,overflow:m.overflow,ratio:m.ratio,hydroWidth:m.hydroWidth});await context.close();
+          }
+          for(const target of [{w:390,h:844,name:'PRODUCTION_SOS_EL_NINO_390x844'},{w:1440,h:900,name:'PRODUCTION_SOS_EL_NINO_1440x900'}]){
+            const {context,page}=await capture(target,'/gestion-de-riesgo/fenomeno-el-nino');await page.getByTestId('el-nino-landing').waitFor({state:'visible'});const text=await page.getByTestId('el-nino-landing').innerText();for(const required of ['Fenómeno El Niño','Qué está haciendo la ciudad','Agenda vigente','Plan de contingencia','5,30 m','no es un umbral general de evacuación de SOS-SF','Fuente editorial'])if(!text.includes(required))throw new Error('El Nino missing '+required);if(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)>1)throw new Error('El Nino overflow '+target.w);const file=`${process.env.OUT}/screenshots/${target.name}.png`;await page.screenshot({path:file,fullPage:true});hashes[target.name]=createHash('sha256').update(await readFile(file)).digest('hex');await context.close();
+          }
+          const manifest=JSON.parse(await readFile('dist/.vite/manifest.json','utf8'));const entry=Object.values(manifest).find(x=>x.isEntry);const assets=[entry?.file,...(entry?.css??[])].filter(Boolean).map(x=>'/'+x);const identity=[];
+          for(const asset of assets){const local=await readFile('dist'+asset);const r=await fetch(base+asset+'?closure='+Date.now(),{cache:'no-store'});const remote=Buffer.from(await r.arrayBuffer());const localSha256=createHash('sha256').update(local).digest('hex'),remoteSha256=createHash('sha256').update(remote).digest('hex');identity.push({asset,status:r.status,localSha256,remoteSha256,equal:r.ok&&localSha256===remoteSha256})}
+          if(identity.some(x=>!x.equal))throw new Error('asset byte identity failed '+JSON.stringify(identity));
+          await writeFile(process.env.OUT+'/production-truth.json',JSON.stringify({deploymentVersion:process.env.DEPLOYED_VERSION,deployCommandCount:1,postdeployRedeployCount:0,usableHydrometry:usable.map(x=>({id:x.id,currentMetres:x.currentMetres,observedAt:x.observedAt,freshness:x.freshness})),views,assetIdentity:identity,screenshotHashes:hashes,result:'PASS'},null,2)+'\n');await browser.close();
+          NODE
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sos-sf-muni-021-final-readonly-${{ github.run_id }}
+          path: artifacts/muni-021-final-readonly/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Cleanup verifier
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[]|select(.path==".github/workflows/muni-021-final-readonly-closure.yml")|.id'|head -n1||true)
+          if [ -n "$id" ]; then gh api -X PUT "repos/${GITHUB_REPOSITORY}/actions/workflows/${id}/disable"||true;fi
+          git config user.name sos-sf-automation
+          git config user.email sos-sf-automation@users.noreply.github.com
+          git rm .github/workflows/muni-021-final-readonly-closure.yml
+          git commit -m 'ci: terminally disarm final MUNI 021 read-only closure'
+          git push origin HEAD:arq/visual-dashboard-v3
