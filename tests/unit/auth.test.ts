@@ -55,8 +55,9 @@ describe('direct Google identity and own sessions', () => {
     })));
     const token = await tokenFor(claims);
     const verification = verifyGoogleIdToken(token, clientId, now);
+    const expectedRejection = expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');
     await vi.advanceTimersByTimeAsync(5_001);
-    await expect(verification).rejects.toThrow('GOOGLE_JWKS_TIMEOUT');
+    await expectedRejection;
   });
 
   it('creates signed finite HttpOnly sessions with unique identity and server-side role', async () => {
