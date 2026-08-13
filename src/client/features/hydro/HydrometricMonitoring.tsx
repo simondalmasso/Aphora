@@ -63,7 +63,7 @@ function OperationalRiverPanel({ system, snapshot, priority }: {
       <div className="river-priority__level"><dt>Nivel</dt><dd>{formatLevel(system)}</dd></div>
       <div><dt>Tendencia</dt><dd>{trendLabel(system)}</dd></div>
       <div><dt>Δ24h</dt><dd>{formatDelta(system.delta24h)}</dd></div>
-      <div><dt>Vigencia</dt><dd>{formatLocalDateTime(system.observedAt)}</dd></div>
+      <div><dt>Vigencia</dt><dd>{freshnessLabel(system)} · hasta {formatLocalDateTime(system.validUntil)}</dd></div>
       <div className="river-priority__source"><dt>Fuente</dt><dd>{source?.organizationName ?? system.sourceName} · {sourceFamily(source, system)}</dd></div>
       <div className="river-priority__status"><dt>Estado / alerta relacionada</dt><dd>{signals.map((signal) => <span key={`${signal.kind}-${signal.sourceId}-${signal.reason}`}>{signal.reason}</span>)}</dd></div>
     </dl>
