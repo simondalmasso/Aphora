@@ -5,24 +5,26 @@ on:
     branches:
       - arq/visual-dashboard-v3
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'playwright.config.ts'
-      - 'vite.config.ts'
-      - 'wrangler*.jsonc'
       - '.github/workflows/order-021d-one-shot.yml'
 
 permissions:
   contents: read
 
+concurrency:
+  group: sos-sf-order-021d-production
+  cancel-in-progress: false
+
 jobs:
-  verify:
+  verify-and-deploy-once:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       EVIDENCE_DIR: artifacts/order-021d
+      PRODUCT_COMMIT: 9ab476a8e1106056f811ce547eab12b0092c728c
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      PROD_URL: https://sos-sf.simondalmasso44.workers.dev
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Checkout canonical branch
         uses: actions/checkout@v4
@@ -30,16 +32,28 @@ jobs:
           ref: arq/visual-dashboard-v3
           fetch-depth: 0
 
-      - name: Authority gate
+      - name: Authority and product immutability gate
         shell: bash
         run: |
           set -euo pipefail
           test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
           git fetch origin main --quiet
           main_sha="$(git rev-parse origin/main)"
-          test "$main_sha" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          test "$main_sha" = "$EXPECTED_MAIN"
+          git cat-file -e "$PRODUCT_COMMIT^{commit}"
+          git diff --quiet "$PRODUCT_COMMIT" HEAD -- src tests package.json package-lock.json playwright.config.ts vite.config.ts wrangler.jsonc public
           echo "MAIN_SHA=$main_sha"
-          echo "PRODUCT_SHA=$(git rev-parse HEAD)"
+          echo "PRODUCT_COMMIT=$PRODUCT_COMMIT"
+          echo "DEPLOY_HEAD=$(git rev-parse HEAD)"
+
+      - name: Cloudflare auth gate before any mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+          npx wrangler whoami >/dev/null
+          echo "CLOUDFLARE_AUTH=PASS"
 
       - name: Install dependencies
         run: npm ci
@@ -68,27 +82,139 @@ jobs:
       - name: End-to-end and visual QA
         run: npm run test:e2e
 
-      - name: Cloudflare dry run only
+      - name: Cloudflare dry run
         run: npm run deploy:dry
 
-      - name: Write verification summary
+      - name: Predeploy canonical production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /api/health /api/snapshot /api/sources /api/auth/config; do
+            code="$(curl -sS --retry 2 --retry-delay 1 -o /dev/null -w '%{http_code}' "$PROD_URL$path")"
+            test "$code" = "200"
+            printf '%s %s\n' "$path" "$code"
+          done
+
+      - name: Deploy product exactly once
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          printf '1\n' > "$EVIDENCE_DIR/deploy-command-invocations.txt"
+          export WRANGLER_OUTPUT_FILE_PATH="$EVIDENCE_DIR/wrangler-output.ndjson"
+          export WRANGLER_SEND_METRICS=false
+          export WRANGLER_LOG_SANITIZE=true
+          npx wrangler deploy --config wrangler.jsonc 2>&1 | tee "$EVIDENCE_DIR/wrangler-deploy.log"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = process.env.WRANGLER_OUTPUT_FILE_PATH;
+          const entries = fs.readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+          const deployment = [...entries].reverse().find((entry) => entry.type === 'deploy');
+          if (!deployment?.version_id) throw new Error('Wrangler deploy metadata did not contain version_id');
+          const target = Array.isArray(deployment.targets) ? deployment.targets.find((value) => typeof value === 'string' && value.startsWith('https://')) : undefined;
+          const meta = {
+            workerName: deployment.worker_name,
+            versionId: deployment.version_id,
+            target: target ?? process.env.PROD_URL,
+            timestamp: deployment.timestamp,
+          };
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/deployment-meta.json`, `${JSON.stringify(meta, null, 2)}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version_id=${meta.versionId}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `deployment_url=${meta.target}\n`);
+          NODE
+
+      - name: Read-only deployment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler versions list --name sos-sf --json > "$EVIDENCE_DIR/versions.json"
+          npx wrangler deployments list --name sos-sf --json > "$EVIDENCE_DIR/deployments.json"
+
+      - name: Verify production served bytes and APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /gestion-de-riesgo /gestion-de-riesgo/fenomeno-el-nino /lite /manifest.webmanifest /service-worker.js /api/health /api/snapshot /api/sources /api/auth/config; do
+            code="$(curl -sS --retry 3 --retry-delay 2 -o /dev/null -w '%{http_code}' "$PROD_URL$path")"
+            test "$code" = "200"
+            printf '%s %s\n' "$path" "$code" | tee -a "$EVIDENCE_DIR/postdeploy-http.txt"
+          done
+          curl -fsS --retry 3 --retry-delay 2 "$PROD_URL/" > "$EVIDENCE_DIR/prod-index.html"
+          asset_js="$(grep -Eo 'assets/index-[^"[:space:]]+\.js' dist/index.html | head -n 1)"
+          test -n "$asset_js"
+          grep -Fq "$asset_js" "$EVIDENCE_DIR/prod-index.html"
+          printf 'REMOTE_ASSET=%s\n' "$asset_js" | tee "$EVIDENCE_DIR/served-byte-proof.txt"
+
+      - name: Verify production browser mobile and desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch();
+          const results = [];
+          try {
+            for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+              const context = await browser.newContext({ viewport });
+              const page = await context.newPage();
+              const response = await page.goto(process.env.PROD_URL, { waitUntil: 'networkidle' });
+              if (!response?.ok()) throw new Error(`Production navigation failed at ${viewport.width}`);
+              await page.locator('#hydrometric-title').waitFor({ state: 'visible' });
+              const title = (await page.locator('#hydrometric-title').textContent())?.trim();
+              if (title !== 'Pulso hídrico de Santa Fe') throw new Error(`Unexpected title: ${title}`);
+              const geometry = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+              if (geometry.scrollWidth - geometry.width > 1) throw new Error(`Horizontal overflow at ${viewport.width}`);
+              results.push({ viewport, title, ...geometry });
+              await context.close();
+            }
+          } finally {
+            await browser.close();
+          }
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/production-browser.json`, `${JSON.stringify(results, null, 2)}\n`);
+          NODE
+
+      - name: Verify Firebase alias still points to canonical Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSI https://sos-sf.web.app/ | tr -d '\r' > "$EVIDENCE_DIR/firebase-alias-headers.txt"
+          grep -Eqi '^HTTP/2 302|^HTTP/1\.[01] 302' "$EVIDENCE_DIR/firebase-alias-headers.txt"
+          grep -Fqi 'location: https://sos-sf.simondalmasso44.workers.dev/' "$EVIDENCE_DIR/firebase-alias-headers.txt"
+
+      - name: Final main immutability gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          echo "MAIN_UNCHANGED=YES"
+
+      - name: Write terminal evidence
         if: always()
         shell: bash
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment_url }}
         run: |
           mkdir -p "$EVIDENCE_DIR"
           cat > "$EVIDENCE_DIR/verification-context.txt" <<EOF
           ORDER=021-D
           BRANCH=arq/visual-dashboard-v3
           HEAD=$(git rev-parse HEAD)
-          MAIN=$(git rev-parse origin/main)
-          DEPLOY_EXECUTED=NO
+          PRODUCT_COMMIT=$PRODUCT_COMMIT
+          MAIN=$(git rev-parse origin/main 2>/dev/null || echo unknown)
+          DEPLOY_COMMAND_INVOKED=$(test -f "$EVIDENCE_DIR/deploy-command-invocations.txt" && cat "$EVIDENCE_DIR/deploy-command-invocations.txt" || echo 0)
+          VERSION_ID=${VERSION_ID:-UNKNOWN}
+          DEPLOYMENT_URL=${DEPLOYMENT_URL:-UNKNOWN}
           EOF
 
-      - name: Upload evidence
+      - name: Upload terminal evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: order-021d-verification-${{ github.run_id }}
+          name: order-021d-terminal-${{ github.run_id }}
           path: artifacts/order-021d
-          if-no-files-found: warn
-          retention-days: 7
+          if-no-files-found: error
+          retention-days: 14
