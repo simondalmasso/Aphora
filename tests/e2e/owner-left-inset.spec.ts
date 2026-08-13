@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { stableHydrometricSnapshot } from './fixtures/stable-hydrometric.ts';
 
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/owner-left-inset-002';
-const production = 'https://sos-sf.simondalmasso44.workers.dev';
 
 const selectors = [
   ['section-kicker', '.hydrometric-hero__header .section-kicker'],
@@ -21,17 +21,24 @@ test.beforeAll(async () => {
   await mkdir(`${evidenceDir}/screenshots`, { recursive: true });
 });
 
-test('OWNER left inset, decorative gap and edge collision gates', async ({ page, request }) => {
-  const snapshotResponse = await request.get(`${production}/api/snapshot?owner-inset=${Date.now()}`);
-  const sourcesResponse = await request.get(`${production}/api/sources?owner-inset=${Date.now()}`);
-  expect(snapshotResponse.ok()).toBeTruthy();
-  expect(sourcesResponse.ok()).toBeTruthy();
-  const snapshotEnvelope = await snapshotResponse.json();
-  const sourcesEnvelope = await sourcesResponse.json();
+test('OWNER left inset, decorative gap and edge collision gates', async ({ page }) => {
+  const snapshotEnvelope = {
+    ok: true,
+    data: stableHydrometricSnapshot,
+    meta: { schemaVersion: '1.0', generatedAt: stableHydrometricSnapshot.generatedAt, mode: stableHydrometricSnapshot.mode, official: false },
+  };
+  const sourcesEnvelope = {
+    ok: true,
+    data: {
+      snapshotId: stableHydrometricSnapshot.id,
+      systems: stableHydrometricSnapshot.systems ?? [],
+      sources: stableHydrometricSnapshot.sources,
+    },
+  };
 
   await page.route('**/api/snapshot*', (route) => route.fulfill({ json: snapshotEnvelope }));
   await page.route('**/api/sources*', (route) => route.fulfill({ json: sourcesEnvelope }));
-  await page.route('**/api/messages*', (route) => route.fulfill({ json: { ok: true, data: { snapshotId: snapshotEnvelope.data?.id, messages: [], deliveryClaims: 'NONE' } } }));
+  await page.route('**/api/messages*', (route) => route.fulfill({ json: { ok: true, data: { snapshotId: stableHydrometricSnapshot.id, messages: [], deliveryClaims: 'NONE' } } }));
   await page.route('**/api/auth/config*', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, reportingEnabled: false, googleClientId: null } } }));
   await page.route('**/api/session*', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
 
@@ -121,6 +128,7 @@ test('OWNER left inset, decorative gap and edge collision gates', async ({ page,
   await writeFile(`${evidenceDir}/mobile-left-inset-audit.json`, `${JSON.stringify({
     amendment: '021-HOVS-OWNER-LEFT-INSET-EDGE-COLLISION-002',
     ownerCommentId: 5219229883,
+    fixture: stableHydrometricSnapshot.id,
     heroInnerContentInsetMinimumPx: minContentInset,
     decorativeRuleToTextGapMinimumPx: minRuleGap,
     textToVisibleBorderGapMinimumPx: minBorderGap,
