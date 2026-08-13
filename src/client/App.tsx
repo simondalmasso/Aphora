@@ -26,6 +26,7 @@ import './styles/hovs-r2-desktop-final.css';
 import './styles/hovs-r2-terminal-lock.css';
 import './styles/owner-left-inset-002.css';
 import './styles/owner-final-corrective-003.css';
+import './styles/dual-river-021d.css';
 
 function canonicalPath(): string {
   const path = window.location.pathname.replace(/\/+$/, '');
