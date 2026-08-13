@@ -1,0 +1,146 @@
+name: order-021d-postdeploy-readonly
+
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+    paths:
+      - '.github/workflows/order-021d-postdeploy-readonly.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EVIDENCE_DIR: artifacts/order-021d-postdeploy
+      PRODUCT_COMMIT: 9ab476a8e1106056f811ce547eab12b0092c728c
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      EXPECTED_VERSION_ID: 50d17129-944c-415d-aaa2-26af7c5dd4bc
+      PROD_URL: https://sos-sf.simondalmasso44.workers.dev
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Read-only authority gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git cat-file -e "$PRODUCT_COMMIT^{commit}"
+          git diff --quiet "$PRODUCT_COMMIT" HEAD -- src tests package.json package-lock.json playwright.config.ts vite.config.ts wrangler.jsonc public
+          if grep -R "wrangler deploy" -n .github/workflows 2>/dev/null | grep -v -- "--dry-run"; then
+            echo "Unexpected deploy command remains in active workflows" >&2
+            exit 1
+          fi
+          echo "MUTATION_CAPABILITY=ABSENT"
+
+      - name: Install dependencies and build exact product bytes
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify current production bytes with cache bust
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          js="$(grep -Eo 'assets/index-[^"[:space:]]+\.js' dist/index.html | head -n 1)"
+          css="$(grep -Eo 'assets/index-[^"[:space:]]+\.css' dist/index.html | head -n 1)"
+          test -n "$js"
+          test -n "$css"
+          matched=0
+          for attempt in 1 2 3 4 5 6; do
+            url="$PROD_URL/?021d=$EXPECTED_VERSION_ID-$attempt-$(date +%s%N)"
+            curl -fsS --retry 2 -H 'Cache-Control: no-cache' "$url" > "$EVIDENCE_DIR/prod-index-attempt-$attempt.html"
+            if grep -Fq "$js" "$EVIDENCE_DIR/prod-index-attempt-$attempt.html" && grep -Fq "$css" "$EVIDENCE_DIR/prod-index-attempt-$attempt.html"; then
+              matched=1
+              printf 'JS=%s\nCSS=%s\nATTEMPT=%s\n' "$js" "$css" "$attempt" > "$EVIDENCE_DIR/served-byte-proof.txt"
+              break
+            fi
+            sleep 5
+          done
+          test "$matched" = "1"
+
+      - name: Verify production routes and APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /gestion-de-riesgo /gestion-de-riesgo/fenomeno-el-nino /lite /manifest.webmanifest /service-worker.js /api/health /api/snapshot /api/sources /api/auth/config; do
+            code="$(curl -sS --retry 3 --retry-delay 1 -H 'Cache-Control: no-cache' -o /dev/null -w '%{http_code}' "$PROD_URL$path?021d=$EXPECTED_VERSION_ID")"
+            test "$code" = "200"
+            printf '%s %s\n' "$path" "$code" | tee -a "$EVIDENCE_DIR/http-status.txt"
+          done
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify production browser on mobile and desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch();
+          const results = [];
+          try {
+            for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+              const context = await browser.newContext({ viewport, serviceWorkers: 'block' });
+              const page = await context.newPage();
+              const url = `${process.env.PROD_URL}/?021d=${process.env.EXPECTED_VERSION_ID}-${viewport.width}-${Date.now()}`;
+              const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
+              if (!response?.ok()) throw new Error(`Navigation failed: ${viewport.width}`);
+              await page.locator('#hydrometric-title').waitFor({ state: 'visible', timeout: 15000 });
+              const title = (await page.locator('#hydrometric-title').textContent())?.trim();
+              if (title !== 'Pulso hídrico de Santa Fe') throw new Error(`Unexpected title: ${title}`);
+              const geometry = await page.evaluate(() => ({ width: innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+              if (geometry.scrollWidth - geometry.width > 1) throw new Error(`Horizontal overflow: ${viewport.width}`);
+              results.push({ viewport, title, ...geometry });
+              await page.screenshot({ path: `${process.env.EVIDENCE_DIR}/production-${viewport.width}.png`, fullPage: true });
+              await context.close();
+            }
+          } finally {
+            await browser.close();
+          }
+          fs.writeFileSync(`${process.env.EVIDENCE_DIR}/browser.json`, `${JSON.stringify(results, null, 2)}\n`);
+          NODE
+
+      - name: Verify Firebase alias remains intact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSI https://sos-sf.web.app/ | tr -d '\r' > "$EVIDENCE_DIR/firebase-alias-headers.txt"
+          grep -Eqi '^HTTP/2 302|^HTTP/1\.[01] 302' "$EVIDENCE_DIR/firebase-alias-headers.txt"
+          grep -Fqi 'location: https://sos-sf.simondalmasso44.workers.dev/' "$EVIDENCE_DIR/firebase-alias-headers.txt"
+
+      - name: Final immutable state proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          cat > "$EVIDENCE_DIR/terminal.txt" <<EOF
+          ORDER=021-D
+          PRODUCT_COMMIT=$PRODUCT_COMMIT
+          EXPECTED_VERSION_ID=$EXPECTED_VERSION_ID
+          MAIN=$(git rev-parse origin/main)
+          DEPLOY_COMMANDS_IN_WORKFLOW=0
+          READ_ONLY_VERIFICATION=PASS
+          EOF
+
+      - name: Upload read-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-021d-postdeploy-readonly-${{ github.run_id }}
+          path: artifacts/order-021d-postdeploy
+          if-no-files-found: error
+          retention-days: 14
