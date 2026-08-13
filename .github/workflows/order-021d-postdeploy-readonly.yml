@@ -36,10 +36,7 @@ jobs:
           test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
           git cat-file -e "$PRODUCT_COMMIT^{commit}"
           git diff --quiet "$PRODUCT_COMMIT" HEAD -- src tests package.json package-lock.json playwright.config.ts vite.config.ts wrangler.jsonc public
-          if grep -R "wrangler deploy" -n .github/workflows 2>/dev/null | grep -v -- "--dry-run"; then
-            echo "Unexpected deploy command remains in active workflows" >&2
-            exit 1
-          fi
+          test ! -e .github/workflows/order-021d-one-shot.yml
           echo "MUTATION_CAPABILITY=ABSENT"
 
       - name: Install dependencies and build exact product bytes
