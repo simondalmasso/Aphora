@@ -173,10 +173,11 @@ const falseEmergency = makeSnapshot({
   paranaMetres: 8.2,
   saladoMetres: 3.4,
   paranaSource: {
-    kind: 'DEMO_FIXTURE',
-    official: false,
-    determinesPrimaryState: false,
-    classification: 'SUPPLEMENTARY',
+    status: 'UNAVAILABLE',
+    connected: false,
+    classification: 'DEGRADED',
+    freshness: 'NO_DISPONIBLE',
+    limitations: 'La fuente oficial no está disponible para una decisión operativa.',
   },
 });
 
