@@ -27,20 +27,29 @@ function normalized(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-function sourceIsOperationalOfficialObservation(source: Source | undefined): source is Source {
+function isValidAt(validUntil: string | null | undefined, generatedAt: string): boolean {
+  if (!validUntil) return false;
+  const expiry = Date.parse(validUntil);
+  const now = Date.parse(generatedAt);
+  return Number.isFinite(expiry) && Number.isFinite(now) && expiry >= now;
+}
+
+function sourceIsOperationalOfficialObservation(source: Source | undefined, generatedAt: string): source is Source {
   if (!source || !source.official || source.kind !== 'OFFICIAL_OBSERVATION' || !source.determinesPrimaryState) return false;
   if (source.status !== 'FRESH' && source.status !== 'STALE') return false;
+  if (!isValidAt(source.validUntil, generatedAt)) return false;
   return source.classification === undefined || source.classification === 'OPERATIONAL_FRESH' || source.classification === 'OPERATIONAL_STALE';
 }
 
-function systemHasUsableOfficialReading(system: HydrologicalSystem, source: Source | undefined): boolean {
-  if (!sourceIsOperationalOfficialObservation(source)) return false;
+function systemHasUsableOfficialReading(system: HydrologicalSystem, source: Source | undefined, generatedAt: string): boolean {
+  if (!sourceIsOperationalOfficialObservation(source, generatedAt)) return false;
   if (!system.available || system.currentMetres === null || !Number.isFinite(system.currentMetres)) return false;
+  if (!isValidAt(system.validUntil, generatedAt)) return false;
   return system.freshness === 'ACTUALIZADO' || system.freshness === 'ACTUALIZACION_DEMORADA';
 }
 
-function verifiedHydroSignal(system: HydrologicalSystem, source: Source | undefined): HydroPrioritySignal | null {
-  if (!systemHasUsableOfficialReading(system, source) || system.currentMetres === null || !source) return null;
+function verifiedHydroSignal(system: HydrologicalSystem, source: Source | undefined, generatedAt: string): HydroPrioritySignal | null {
+  if (!systemHasUsableOfficialReading(system, source, generatedAt) || system.currentMetres === null || !source) return null;
   const currentMetres = system.currentMetres;
   const reached = [...system.thresholds]
     .filter((threshold) => threshold.id === 'ALERTA' || threshold.id === 'EVACUACION')
@@ -62,6 +71,7 @@ function officialAlertFeedIsUsable(snapshot: Snapshot): Source | undefined {
     source.official &&
     source.determinesPrimaryState &&
     (source.status === 'FRESH' || source.status === 'STALE') &&
+    isValidAt(source.validUntil, snapshot.generatedAt) &&
     (source.classification === undefined || source.classification === 'OPERATIONAL_FRESH' || source.classification === 'OPERATIONAL_STALE'));
 }
 
@@ -106,7 +116,7 @@ export function deriveHydroPriority(snapshot: Snapshot): HydroPriorityDecision {
   const signals: HydroPrioritySignal[] = [];
   for (const system of systems) {
     const source = snapshot.sources.find((item) => item.id === system.sourceId);
-    const signal = verifiedHydroSignal(system, source);
+    const signal = verifiedHydroSignal(system, source, snapshot.generatedAt);
     if (signal) signals.push(signal);
   }
   signals.push(...verifiedAlertSignals(snapshot, systems));
