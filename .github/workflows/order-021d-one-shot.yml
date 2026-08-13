@@ -1,0 +1,94 @@
+name: order-021d-one-shot
+
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'playwright.config.ts'
+      - 'vite.config.ts'
+      - 'wrangler*.jsonc'
+      - '.github/workflows/order-021d-one-shot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EVIDENCE_DIR: artifacts/order-021d
+    steps:
+      - name: Checkout canonical branch
+        uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Authority gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "arq/visual-dashboard-v3"
+          git fetch origin main --quiet
+          main_sha="$(git rev-parse origin/main)"
+          test "$main_sha" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          echo "MAIN_SHA=$main_sha"
+          echo "PRODUCT_SHA=$(git rev-parse HEAD)"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Contract tests
+        run: npm run test:contract
+
+      - name: Build
+        run: npm run build
+
+      - name: Worker tests
+        run: npm run test:worker
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end and visual QA
+        run: npm run test:e2e
+
+      - name: Cloudflare dry run only
+        run: npm run deploy:dry
+
+      - name: Write verification summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$EVIDENCE_DIR"
+          cat > "$EVIDENCE_DIR/verification-context.txt" <<EOF
+          ORDER=021-D
+          BRANCH=arq/visual-dashboard-v3
+          HEAD=$(git rev-parse HEAD)
+          MAIN=$(git rev-parse origin/main)
+          DEPLOY_EXECUTED=NO
+          EOF
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-021d-verification-${{ github.run_id }}
+          path: artifacts/order-021d
+          if-no-files-found: warn
+          retention-days: 7
