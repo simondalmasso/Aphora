@@ -40,17 +40,18 @@ function systemHasUsableOfficialReading(system: HydrologicalSystem, source: Sour
 }
 
 function verifiedHydroSignal(system: HydrologicalSystem, source: Source | undefined): HydroPrioritySignal | null {
-  if (!systemHasUsableOfficialReading(system, source)) return null;
+  if (!systemHasUsableOfficialReading(system, source) || system.currentMetres === null || !source) return null;
+  const currentMetres = system.currentMetres;
   const reached = [...system.thresholds]
     .filter((threshold) => threshold.id === 'ALERTA' || threshold.id === 'EVACUACION')
-    .filter((threshold) => system.currentMetres! >= threshold.metres)
+    .filter((threshold) => currentMetres >= threshold.metres)
     .sort((left, right) => right.metres - left.metres)[0];
   if (!reached) return null;
   return Object.freeze({
     systemId: system.id,
     kind: 'VERIFIED_HYDRO_CONDITION' as const,
     reason: `Condición hídrica verificada: lectura oficial sobre ${reached.label.toLowerCase()}. No equivale por sí sola a una orden de evacuación.`,
-    sourceId: source!.id,
+    sourceId: source.id,
   });
 }
 
