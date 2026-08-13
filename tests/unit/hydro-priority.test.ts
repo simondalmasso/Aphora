@@ -33,8 +33,8 @@ function observationSource(target: HydrologicalSystem, official = true): Source 
     name: 'INA REST',
     kind: official ? 'OFFICIAL_OBSERVATION' : 'DEMO_FIXTURE',
     status: 'FRESH',
-    observedAt: target.observedAt!,
-    validUntil: target.validUntil!,
+    observedAt: target.observedAt ?? '2026-08-12T23:00:00.000Z',
+    validUntil: target.validUntil ?? '2026-08-13T23:00:00.000Z',
     contribution: 'Lectura hidrométrica',
     official,
     determinesPrimaryState: official,
@@ -84,7 +84,8 @@ function alert(headline: string): OfficialAlert {
 }
 
 function snapshot(systems: readonly HydrologicalSystem[], sources: readonly Source[], alerts: readonly OfficialAlert[] = [], alertStatus: Snapshot['alertStatus'] = 'SIN_ALERTAS_OFICIALES_DETECTADAS'): Snapshot {
-  const primary = systems[0]!;
+  const primary = systems[0];
+  if (!primary) throw new TypeError('El fixture requiere al menos un sistema hídrico.');
   return {
     schemaVersion: '1.0',
     id: 'test',
@@ -110,9 +111,9 @@ function snapshot(systems: readonly HydrologicalSystem[], sources: readonly Sour
       delta6h: 0,
       delta24h: 0,
       trend: primary.trend,
-      observedAt: primary.observedAt!,
-      fetchedAt: primary.fetchedAt!,
-      validUntil: primary.validUntil!,
+      observedAt: primary.observedAt ?? '2026-08-12T23:00:00.000Z',
+      fetchedAt: primary.fetchedAt ?? '2026-08-12T23:01:00.000Z',
+      validUntil: primary.validUntil ?? '2026-08-13T23:00:00.000Z',
       sourceId: primary.sourceId,
       points: [],
       forecastPoints: [],
