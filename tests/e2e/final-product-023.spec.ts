@@ -7,6 +7,7 @@ import { stableHydrometricSnapshot } from './fixtures/stable-hydrometric.ts';
 const evidenceDir = process.env.EVIDENCE_DIR ?? 'artifacts/order-023';
 const generatedAt = stableHydrometricSnapshot.generatedAt;
 const validUntil = '2026-08-13T23:00:00.000Z';
+const STORAGE_KEY = 'sos-sf:last-public-safety-snapshot:v4';
 
 function saladoSystem(metres: number): HydrologicalSystem {
   const base = stableHydrometricSnapshot.systems?.[0];
@@ -112,7 +113,7 @@ async function installFixture(page: Page, snapshot: Snapshot = normal) {
   await page.route('**/api/session*', (route) => route.fulfill({ json: { ok: true, data: { enabled: false, authenticated: false, principal: null } } }));
 }
 
-async function open(page: Page, snapshot: Snapshot = normal) {
+async function openScenario(page: Page, snapshot: Snapshot = normal) {
   await installFixture(page, snapshot);
   await page.goto('/');
   await expect(page.locator('main')).toHaveAttribute('data-snapshot-id', snapshot.id);
@@ -130,7 +131,7 @@ test.beforeAll(async () => {
 test('mobile first viewport answers river, level, movement, recency, source and alert status', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Viewport matrix is executed once.');
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page);
+  await openScenario(page);
   await expect(page.getByRole('heading', { level: 1, name: 'Así están el Paraná y el Salado' })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Paraná/ })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Salado/ })).toBeVisible();
@@ -138,7 +139,7 @@ test('mobile first viewport answers river, level, movement, recency, source and 
   await expect(page.getByText('Sube lentamente')).toBeVisible();
   await expect(page.getByText(/Última medición/)).toBeVisible();
   await expect(page.getByTestId('hydro-source-strip')).toContainText('Instituto Nacional del Agua');
-  await expect(page.getByRole('button', { name: 'Sin alertas oficiales' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sin alertas oficiales', exact: true })).toBeVisible();
   await expect(page.getByTestId('main-hydro-chart')).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
@@ -152,7 +153,7 @@ test('responsive matrix has no horizontal overflow and keeps core controls usabl
   const rows: Array<Record<string, number | string>> = [];
   for (const [width, height] of cases) {
     await page.setViewportSize({ width, height });
-    await open(page, { ...normal, id: `023-normal-${width}x${height}` });
+    await openScenario(page, { ...normal, id: `023-normal-${width}x${height}` });
     await expect(page.getByTestId('hydro-current-level')).toBeVisible();
     await expect(page.getByTestId('main-hydro-chart')).toBeVisible();
     const metrics = await page.evaluate(() => ({
@@ -167,9 +168,10 @@ test('responsive matrix has no horizontal overflow and keeps core controls usabl
   await writeFile(`${evidenceDir}/responsive-matrix.json`, `${JSON.stringify(rows, null, 2)}\n`);
 });
 
-test('mobile dock is one-handed and communications remains reachable', async ({ page }) => {
+test('mobile dock is one-handed and communications remains reachable', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Explicit mobile viewport runs once.');
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page);
+  await openScenario(page);
   const dock = page.locator('.mobile-dock');
   await expect(dock).toBeVisible();
   for (const label of ['Inicio', 'Ríos', 'Riesgo', 'Más']) {
@@ -179,8 +181,11 @@ test('mobile dock is one-handed and communications remains reachable', async ({ 
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(48);
   }
   await dock.getByRole('button', { name: 'Más' }).click();
-  const communications = page.getByRole('button', { name: /Comunicaciones/ });
-  await expect(communications).toBeVisible();
+  const menu = page.locator('#civic-mobile-menu');
+  await expect(menu).toBeVisible();
+  const communications = menu.getByRole('button', { name: /Comunicaciones/ });
+  await communications.scrollIntoViewIfNeeded();
+  await expect(communications).toBeInViewport();
   await communications.click();
   const dialog = page.locator('dialog.messages-panel');
   await expect(dialog).toBeVisible();
@@ -189,21 +194,27 @@ test('mobile dock is one-handed and communications remains reachable', async ({ 
   await expect(dialog).not.toBeVisible();
 });
 
-test('reports remain reachable without changing public state', async ({ page }) => {
+test('reports remain reachable without changing public state', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'Explicit mobile viewport runs once.');
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page);
+  await openScenario(page);
   const more = page.locator('.secondary-actions');
   await more.locator('summary').click();
   const report = page.getByRole('button', { name: 'Enviar un reporte' });
   await expect(report).toBeVisible();
   await report.click();
-  const dialog = page.locator('dialog').filter({ hasText: /report/i }).last();
+  const dialog = page.locator('dialog.report-dialog');
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Reportar una situación' })).toBeVisible();
+  await expect(dialog).toContainText('no inicia un despacho de emergencia');
   await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await expect(page.getByTestId('hydrometric-situation')).toHaveAttribute('data-priority-mode', 'NORMAL');
 });
 
-test('source detail remains progressive, traceable and keyboard reachable', async ({ page }) => {
-  await open(page);
+test('source detail remains progressive, traceable and keyboard reachable', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One keyboard pass is enough.');
+  await openScenario(page);
   const sourceButton = page.getByRole('button', { name: 'Ver fuente y detalle' }).first();
   await sourceButton.focus();
   await expect(sourceButton).toBeFocused();
@@ -212,13 +223,15 @@ test('source detail remains progressive, traceable and keyboard reachable', asyn
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('Instituto Nacional del Agua');
   await expect(dialog).toContainText('Mediciones por estación');
+  await expect(dialog).toContainText('Metodología de interpretación');
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
+  await expect(sourceButton).toBeFocused();
 });
 
 test('021-D single priority keeps Salado first without hiding Paraná', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await open(page, single);
+  await openScenario(page, single);
   const hydro = page.getByTestId('hydrometric-situation');
   await expect(hydro).toHaveAttribute('data-priority-mode', 'SINGLE_RIVER_PRIORITY');
   const priority = page.getByTestId('river-operational-priority');
@@ -231,7 +244,7 @@ test('021-D single priority keeps Salado first without hiding Paraná', async ({
 
 test('021-D dual risk gives Paraná and Salado equal visual weight', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await open(page, dual);
+  await openScenario(page, dual);
   const hydro = page.getByTestId('hydrometric-situation');
   await expect(hydro).toHaveAttribute('data-priority-mode', 'DUAL_EMERGENCY');
   const priority = page.getByTestId('river-operational-priority');
@@ -246,6 +259,32 @@ test('021-D dual risk gives Paraná and Salado equal visual weight', async ({ pa
   expect(Math.abs((a?.width ?? 0) - (b?.width ?? 0))).toBeLessThanOrEqual(2);
 });
 
+test('offline keeps the last valid reading but clearly removes currentness claims', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One offline cache pass is enough.');
+  const cached = { ...normal, id: '023-offline-cache', messages: [publicMessage] };
+  await page.addInitScript(({ key, snapshot, savedAt }) => {
+    Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => false });
+    localStorage.setItem(key, JSON.stringify({ snapshot, savedAt }));
+  }, { key: STORAGE_KEY, snapshot: cached, savedAt: generatedAt });
+  await page.goto('/');
+  await expect(page.locator('main')).toHaveAttribute('data-snapshot-id', cached.id);
+  await expect(page.getByTestId('hydro-current-level')).toContainText('3,20');
+  await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Verificación no disponible', exact: true })).toBeVisible();
+  await expect(page.getByText('Sin vigencia confirmada').first()).toBeVisible();
+});
+
+test('lite mode remains server-rendered, readable and JavaScript-independent', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One lite pass is enough.');
+  const response = await page.goto('/lite');
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1, name: 'Información pública para emergencias' })).toBeVisible();
+  await expect(page.getByText('Esta versión funciona sin JavaScript')).toBeVisible();
+  await expect(page.getByRole('link', { name: /911/ })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test('El Niño is an editorial guide, not an alarm surface', async ({ page }) => {
   await installFixture(page);
   await page.goto('/gestion-de-riesgo/fenomeno-el-nino');
@@ -256,11 +295,16 @@ test('El Niño is an editorial guide, not an alarm surface', async ({ page }) =>
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
-test('reduced motion preference disables nonessential transitions', async ({ page }) => {
+test('reduced motion preference disables nonessential transitions', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One reduced-motion pass is enough.');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await open(page);
-  const duration = await page.locator('.civic-quick-tile').first().evaluate((node) => getComputedStyle(node).transitionDuration);
-  expect(duration === '0s' || duration === '0.000001s' || duration === '0.001ms').toBeTruthy();
+  await openScenario(page);
+  const motion = await page.locator('.civic-quick-tile').first().evaluate((node) => ({
+    transitionDuration: getComputedStyle(node).transitionDuration,
+    animationName: getComputedStyle(node).animationName,
+  }));
+  expect(motion.transitionDuration).toBe('0s');
+  expect(motion.animationName).toBe('none');
 });
 
 test('visual evidence is semantic and collision-safe', async ({ page }, testInfo) => {
@@ -271,13 +315,15 @@ test('visual evidence is semantic and collision-safe', async ({ page }, testInfo
     { name: 'single-390', width: 390, height: 844, snapshot: single, semantic: 'SINGLE_SALADO_PRIORITY' },
     { name: 'dual-1440', width: 1440, height: 900, snapshot: dual, semantic: 'DUAL_50_50' },
   ] as const;
-  const manifest: Record<string, { sha256: string; snapshotId: string; semantic: string }> = {};
+  const manifest: Record<string, { sha256: string; snapshotId: string; semantic: string; overflow: number }> = {};
   for (const item of cases) {
     await page.setViewportSize({ width: item.width, height: item.height });
-    await open(page, item.snapshot);
+    await openScenario(page, item.snapshot);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(overflow, item.name).toBeLessThanOrEqual(1);
     const path = `${evidenceDir}/screenshots/${item.name}.png`;
     await page.screenshot({ path, fullPage: true });
-    manifest[item.name] = { sha256: await sha256(path), snapshotId: item.snapshot.id, semantic: item.semantic };
+    manifest[item.name] = { sha256: await sha256(path), snapshotId: item.snapshot.id, semantic: item.semantic, overflow };
     await page.unrouteAll({ behavior: 'wait' });
   }
   const hashes = Object.values(manifest).map((value) => value.sha256);
