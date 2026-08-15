@@ -61,6 +61,20 @@
   .final-product-023 .contact-grid a:nth-child(n+4) {
     display: grid;
   }
+
+  .final-product-023 .civic-mobile-menu.civic-mobile-menu--open {
+    display: block !important;
+    position: fixed !important;
+    top: 72px !important;
+    right: 10px !important;
+    bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+    left: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: auto !important;
+    transform: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
