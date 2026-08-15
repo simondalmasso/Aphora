@@ -20,9 +20,9 @@ interface AppShellProps {
 }
 
 function alertBadge(status?: AlertVerificationState): { label: string; tone: 'active' | 'verified' | 'unverified' } {
-  if (status === 'ALERTA_OFICIAL_ACTIVA') return { label: 'Alerta oficial', tone: 'active' };
-  if (status === 'SIN_ALERTAS_OFICIALES_DETECTADAS') return { label: 'Alertas verificadas', tone: 'verified' };
-  return { label: 'Alertas: sin verificar', tone: 'unverified' };
+  if (status === 'ALERTA_OFICIAL_ACTIVA') return { label: 'Alerta oficial activa', tone: 'active' };
+  if (status === 'SIN_ALERTAS_OFICIALES_DETECTADAS') return { label: 'Sin alertas oficiales', tone: 'verified' };
+  return { label: 'Verificación no disponible', tone: 'unverified' };
 }
 
 export function AppShell({
@@ -42,7 +42,7 @@ export function AppShell({
   const alert = alertBadge(alertStatus);
   const actions = <>
     <span className={online ? 'connection-chip' : 'connection-chip connection-chip--offline'}>
-      <i aria-hidden="true"/>{online ? 'En línea' : 'Sin conexión'}
+      <i aria-hidden="true"/>{online ? 'Datos conectados' : 'Sin conexión'}
     </span>
     <button
       ref={alertsButtonRef}
@@ -51,13 +51,13 @@ export function AppShell({
       onClick={(event) => onAlerts(event.currentTarget)}
       aria-haspopup="dialog"
     >
-      <span aria-hidden="true">{alert.tone === 'active' ? '!' : '◉'}</span>{alert.label}
+      <span aria-hidden="true">{alert.tone === 'active' ? '!' : '●'}</span>{alert.label}
     </button>
     <IconButton className="header-refresh-button" label="Actualizar información" loading={refreshing} onClick={onRefresh} icon={<svg viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M6.1 9A7 7 0 0 1 18.4 6.6L20 9M4 15l1.6 2.4A7 7 0 0 0 17.9 15"/></svg>}/>
     <IconButton className="header-messages-button" ref={messagesButtonRef} label="Abrir comunicaciones" badge={unread} onClick={(event) => onMessages(event.currentTarget)} aria-haspopup="dialog" icon={<svg viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 3V5Z"/><path d="M8 9h8M8 12h5"/></svg>}/>
   </>;
 
-  return <div className="site-shell hovs-r2">
+  return <div className="site-shell final-product-023">
     <a className="skip-link" href="#main">Saltar al contenido principal</a>
     <MuniCivicHeader currentPath={currentPath} actions={actions} communications={{ unread, onOpen: onMessages }}/>
     {children}
