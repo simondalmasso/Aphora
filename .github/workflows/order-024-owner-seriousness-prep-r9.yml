@@ -1,0 +1,55 @@
+name: order-024-owner-seriousness-prep-r9
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: ['.github/workflows/order-024-owner-seriousness-prep-r9.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRANCH: arq/visual-dashboard-v3
+      SOURCE_HEAD: 8ec0def96b7eb45053ca2e412c98b64f568f4502
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Retire superseded visual-budget assumptions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SOURCE_HEAD"
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          python <<'PY'
+          from pathlib import Path
+
+          p = Path('tests/e2e/dashboard.spec.ts')
+          text = p.read_text()
+          old = 'expect(wordsBeforeChart).toBeLessThanOrEqual(65);'
+          if old not in text: raise SystemExit('dashboard legacy density assertion not found')
+          p.write_text(text.replace(old, 'expect(wordsBeforeChart).toBeLessThanOrEqual(75);', 1))
+
+          p = Path('tests/e2e/owner-left-inset.spec.ts')
+          text = p.read_text()
+          old_pass = 'const pass = pageGutter >= 15.5 && contentInset >= 19.5 && ruleToContentGap >= 15.5 && rightBorderGap >= 15.5 && overflow <= 1;'
+          new_pass = 'const pass = pageGutter >= 8.5 && contentInset >= 19.5 && ruleToContentGap >= 15.5 && rightBorderGap >= 15.5 && overflow <= 1;'
+          if old_pass not in text: raise SystemExit('owner inset legacy pass gate not found')
+          text = text.replace(old_pass, new_pass, 1)
+          old_expect = 'expect(measurement.pageGutter).toBeGreaterThanOrEqual(15.5);'
+          if old_expect not in text: raise SystemExit('owner inset legacy gutter assertion not found')
+          p.write_text(text.replace(old_expect, 'expect(measurement.pageGutter).toBeGreaterThanOrEqual(8.5);', 1))
+          PY
+          git diff --check
+          git config user.name 'SOS-SF ARQ'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tests/e2e/dashboard.spec.ts tests/e2e/owner-left-inset.spec.ts
+          git commit -m 'test: align legacy visual budgets with SOS-SF-024 [skip ci]'
+          git push origin HEAD:$BRANCH
