@@ -61,13 +61,15 @@ describe('public read-only API contract', () => {
     expect((await request('/api/health')).headers.get('cache-control')).toBe('no-store');
   });
 
-  it('serves lite HTML without JavaScript or demo claims', async () => {
+  it('serves final-product lite HTML without JavaScript, demo claims, or unsafe threshold inference', async () => {
     const response = await request('/lite');
     const html = await response.text();
     expect(response.headers.get('content-type')).toContain('text/html');
-    expect(html).toContain('Situación hidrométrica');
-    expect(html).toContain('Esta versión funciona sin JavaScript');
-    expect(html).toContain('Un umbral numérico no constituye una orden oficial');
+    expect(html).toContain('Ríos y alertas, en modo liviano');
+    expect(html).toContain('versión rápida, simple y sin JavaScript');
+    expect(html).toContain('Paraná y Salado');
+    expect(html).toContain('Una cifra o un umbral aislado no constituye una orden oficial');
+    expect(html).toContain('Un reporte no inicia un despacho de emergencia');
     expect(html).not.toContain('DEMO / NO OFICIAL');
     expect(html).not.toContain('<script');
   });
