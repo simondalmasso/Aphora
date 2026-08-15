@@ -118,9 +118,9 @@ export function HydrometricMonitoring({
     <HydrometricHero>
       <header className="hydrometric-hero__header">
         <div className="hydrometric-hero__intro">
-          <p className="section-kicker">Santa Fe, hoy</p>
-          <h1 id="hydrometric-title">Así están el Paraná y el Salado</h1>
-          <p className="hydrometric-hero__lede">Mediciones públicas, tendencia y vigencia explicadas sin vueltas.</p>
+          <p className="section-kicker">Santa Fe · monitoreo hídrico</p>
+          <h1 id="hydrometric-title">Situación hidrométrica</h1>
+          <p className="hydrometric-hero__lede">Niveles, tendencia y vigencia de las últimas mediciones disponibles.</p>
         </div>
         <div className="hydrometric-hero__controls">
           <StationSwitcher
@@ -173,7 +173,7 @@ export function HydrometricMonitoring({
 
         <div className="hydro-reading">
           <div className="hydro-level">
-            <span>Nivel actual</span>
+            <span>Último nivel disponible</span>
             <strong data-testid="hydro-current-level">
               {selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}
               {selected.currentMetres !== null && <small>m</small>}
@@ -187,8 +187,9 @@ export function HydrometricMonitoring({
         </div>
 
         <SourceLine buttonRef={sourcesButtonRef} onOpen={onSources}>
-          <span><b>Datos del {selectedSource?.organizationName ?? selected.sourceName}</b></span>
-          <span>Recibidos {formatHumanAge(selected.fetchedAt, snapshot.generatedAt)}</span>
+          <span><b>Fuente · {selectedSource?.organizationName ?? selected.sourceName}</b></span>
+          <span>Medición · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}</span>
+          <span>Consulta de la fuente · {formatHumanAge(selected.fetchedAt, snapshot.generatedAt)}</span>
           {corroboratingTransport && <span className="source-strip__technical">Otra vía del mismo organismo disponible</span>}
           {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
         </SourceLine>
