@@ -278,8 +278,8 @@ test('lite mode remains server-rendered, readable and JavaScript-independent', a
   test.skip(testInfo.project.name !== 'desktop', 'One lite pass is enough.');
   const response = await page.goto('/lite');
   expect(response?.status()).toBe(200);
-  await expect(page.getByRole('heading', { level: 1, name: 'Información pública para emergencias' })).toBeVisible();
-  await expect(page.getByText('Esta versión funciona sin JavaScript')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Ríos y alertas, en modo liviano' })).toBeVisible();
+  await expect(page.getByText('La misma información pública esencial en una versión rápida, simple y sin JavaScript.')).toBeVisible();
   await expect(page.getByRole('link', { name: /911/ })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
