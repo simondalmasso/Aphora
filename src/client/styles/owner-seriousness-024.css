@@ -46,6 +46,7 @@
 
 .final-product-023 .source-strip__copy > span:nth-child(2),
 .final-product-023 .source-strip__copy > span:nth-child(3) {
+  display: inline;
   font-variant-numeric: tabular-nums;
 }
 
@@ -75,6 +76,13 @@
     font-size: .88rem;
     line-height: 1.45;
   }
+
+  .final-product-023 .source-strip__copy {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
 }
 
 @media (max-width: 390px) {
@@ -86,5 +94,10 @@
 @media (max-width: 340px) {
   .final-product-023 .hydrometric-hero__header h1 {
     font-size: 1.7rem;
+  }
+
+  .final-product-023 .source-strip__copy > span:nth-child(2),
+  .final-product-023 .source-strip__copy > span:nth-child(3) {
+    display: inline;
   }
 }
