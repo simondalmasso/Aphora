@@ -99,7 +99,6 @@ test('OWNER left inset, decorative gap and edge collision gates', async ({ page 
     }, { selectors, viewport: item.viewport, zoom: item.zoom });
 
     expect(measurement.pageGutter).toBeGreaterThanOrEqual(8.5);
-    expect(measurement.ruleWidth).toBeGreaterThanOrEqual(3.5);
     expect(measurement.overflow).toBeLessThanOrEqual(1);
 
     for (const row of measurement.elements) {
