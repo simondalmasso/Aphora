@@ -31,8 +31,8 @@ function staleSnapshot(): Snapshot {
   return {
     ...stableHydrometricSnapshot,
     id: '024-stale-measurement-recent-source-check',
-    systems: [system],
-    sources: [source],
+    systems: [system, ...(stableHydrometricSnapshot.systems ?? []).slice(1)],
+    sources: [source, ...stableHydrometricSnapshot.sources.slice(1)],
     river: {
       ...stableHydrometricSnapshot.river,
       observedAt: staleObservedAt,

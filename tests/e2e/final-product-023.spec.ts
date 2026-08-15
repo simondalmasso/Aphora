@@ -132,7 +132,7 @@ test('mobile first viewport answers river, level, movement, recency, source and 
   test.skip(testInfo.project.name !== 'desktop', 'Viewport matrix is executed once.');
   await page.setViewportSize({ width: 390, height: 844 });
   await openScenario(page);
-  await expect(page.getByRole('heading', { level: 1, name: 'Así están el Paraná y el Salado' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Paraná/ })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Salado/ })).toBeVisible();
   await expect(page.getByTestId('hydro-current-level')).toContainText('3,20');

@@ -199,7 +199,7 @@ test('single-river verified risk temporarily promotes only the affected river an
   await openScenario(page, singleSalado);
   const priority = page.getByTestId('river-operational-priority');
   await expect(page.getByTestId('hydrometric-situation')).toHaveAttribute('data-priority-mode', 'SINGLE_RIVER_PRIORITY');
-  await expect(priority).toContainText('Río Salado · prioridad temporal');
+  await expect(priority).toContainText('Río Salado requiere atención primero');
   await expect(priority.locator('[data-river-system="salado-santo-tome"]')).toBeVisible();
   await expect(priority.locator('[data-river-system="parana-santa-fe"]')).toHaveCount(0);
   await expect(priority).toContainText('Condición hídrica verificada');
@@ -220,7 +220,7 @@ test('dual verified risk renders Paraná and Salado at equal first-contact weigh
   await openScenario(page, dual);
   const priority = page.getByTestId('river-operational-priority');
   await expect(page.getByTestId('hydrometric-situation')).toHaveAttribute('data-priority-mode', 'DUAL_EMERGENCY');
-  await expect(priority).toContainText('Paraná + Salado · prioridad equivalente 50/50');
+  await expect(priority).toContainText('Paraná y Salado requieren el mismo peso ahora');
   const parana = priority.locator('[data-river-system="parana-santa-fe"]');
   const salado = priority.locator('[data-river-system="salado-santo-tome"]');
   await expect(parana).toBeVisible();

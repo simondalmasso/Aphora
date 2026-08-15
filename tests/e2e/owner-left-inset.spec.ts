@@ -9,11 +9,10 @@ const selectors = [
   ['hero-title', '#hydrometric-title'],
   ['station-label', '.station-identification > div > span'],
   ['river-name', '.station-identification > div > strong'],
-  ['signature-axis', '.hydro-signature-axis'],
   ['level-label', '.hydro-level > span'],
   ['level-value', '[data-testid="hydro-current-level"]'],
   ['observation-time', '.hydro-level time'],
-  ['source-line', '[data-testid="hydro-source-strip"] > span:first-child'],
+  ['source-line', '[data-testid="hydro-source-strip"] .source-strip__copy > span:first-child'],
   ['chart', '[data-testid="main-hydro-chart"]'],
 ] as const;
 

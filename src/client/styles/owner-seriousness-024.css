@@ -49,6 +49,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.final-product-023 .source-strip button {
+  min-height: 44px;
+}
+
 @media (max-width: 720px) {
   .final-product-023 .muni-hydrometric-hero {
     padding-top: 18px;

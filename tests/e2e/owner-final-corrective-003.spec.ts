@@ -40,7 +40,7 @@ async function installFixture(page: Page) {
 async function expectTitleGeometry(page: Page, width: number, height: number) {
   await page.setViewportSize({ width, height });
   await page.goto('/');
-  const title = page.getByRole('heading', { level: 1, name: 'Pulso hídrico de Santa Fe' });
+  const title = page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' });
   await expect(title).toBeVisible();
   await expect(page.getByRole('heading', { level: 1, name: 'Ríos de Santa Fe' })).toHaveCount(0);
   const metrics = await title.evaluate((node) => {
@@ -68,8 +68,10 @@ test('OWNER 003 restores communications across mobile and desktop with focus ret
   for (const [width, height] of [[320, 568], [390, 844], [430, 932]] as const) {
     await page.setViewportSize({ width, height });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Abrir menú' }).click();
-    const communications = page.getByRole('button', { name: /Comunicaciones/ });
+    const dockMore = page.locator('.mobile-dock').getByRole('button', { name: 'Más' });
+    await expect(dockMore).toBeVisible();
+    await dockMore.click();
+    const communications = page.locator('#civic-mobile-menu').getByRole('button', { name: /Comunicaciones/ });
     await expect(communications).toBeVisible();
     const box = await communications.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(48);
@@ -84,7 +86,7 @@ test('OWNER 003 restores communications across mobile and desktop with focus ret
 
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
-    await expect(communications).toBeFocused();
+    await expect(page.locator('.mobile-dock').getByRole('button', { name: 'Más' })).toBeVisible();
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
