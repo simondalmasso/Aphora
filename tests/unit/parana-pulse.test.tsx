@@ -17,9 +17,12 @@ describe('final product 023 hydrometric-first progressive rendering', () => {
 
     expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section"/);
     expect(html).toContain('data-testid="hydrometric-situation"');
-    expect(html).toContain('Santa Fe, hoy');
-    expect(html).toContain('Así están el Paraná y el Salado');
-    expect(html).toContain('Mediciones públicas, tendencia y vigencia explicadas sin vueltas.');
+    expect(html).toContain('Santa Fe · monitoreo hídrico');
+    expect(html).toContain('Situación hidrométrica');
+    expect(html).toContain('Niveles, tendencia y vigencia de las últimas mediciones disponibles.');
+    expect(html).toContain('Último nivel disponible');
+    expect(html).toContain('Medición · antigüedad no disponible');
+    expect(html).toContain('Consulta de la fuente · antigüedad no disponible');
     expect(html).toContain('Río Paraná');
     expect(html).toContain('Río Salado');
     expect(html).toContain('No pudimos obtener una medición reciente');
@@ -30,8 +33,9 @@ describe('final product 023 hydrometric-first progressive rendering', () => {
     expect(html).toContain('911');
     expect(html).toContain('103');
     expect(html).toContain('107');
+    expect(html).not.toContain('Santa Fe, hoy');
+    expect(html).not.toContain('Así están el Paraná y el Salado');
     expect(html).not.toContain('Pulso hídrico de Santa Fe');
-    expect(html).not.toContain('Situación hidrométrica');
     expect(html).not.toContain('Datos en vivo');
     expect(html).not.toContain('<canvas');
   });
