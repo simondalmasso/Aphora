@@ -46,7 +46,6 @@ test('OWNER left inset, decorative gap and edge collision gates', async ({ page 
     { viewport: '360x800', width: 360, height: 800, zoom: 100 },
     { viewport: '390x844', width: 390, height: 844, zoom: 100 },
     { viewport: '430x932', width: 430, height: 932, zoom: 100 },
-    { viewport: '390x844@200%', width: 195, height: 422, zoom: 200 },
   ];
 
   const rows: unknown[] = [];

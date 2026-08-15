@@ -207,7 +207,7 @@ test('single-river verified risk temporarily promotes only the affected river an
   await expect(page.getByRole('tab', { name: 'Salado' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('tab', { name: 'Paraná' })).toBeVisible();
   await expect(page.getByTestId('hydro-current-level')).toContainText('4,80');
-  const trace = page.getByRole('button', { name: 'Ver trazabilidad de fuentes' });
+  const trace = page.getByRole('button', { name: 'Ver por qué' });
   await trace.focus();
   await expect(trace).toBeFocused();
   await trace.click();
@@ -228,11 +228,11 @@ test('dual verified risk renders Paraná and Salado at equal first-contact weigh
   for (const panel of [parana, salado]) {
     await expect(panel).toContainText('Estación');
     await expect(panel).toContainText('Nivel');
-    await expect(panel).toContainText('Tendencia');
-    await expect(panel).toContainText('Δ24h');
+    await expect(panel).toContainText('Movimiento');
+    await expect(panel).toContainText('Últimas 24 h');
     await expect(panel).toContainText('Vigencia');
     await expect(panel).toContainText('Fuente');
-    await expect(panel).toContainText('Estado / alerta relacionada');
+    await expect(panel).toContainText('Por qué se prioriza');
     await expect(panel).toContainText('Instituto Nacional del Agua');
   }
   const [paranaBox, saladoBox] = await Promise.all([parana.boundingBox(), salado.boundingBox()]);

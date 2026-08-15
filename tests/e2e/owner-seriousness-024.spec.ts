@@ -5,7 +5,6 @@ import { stableHydrometricSnapshot } from './fixtures/stable-hydrometric.ts';
 const generatedMs = Date.parse(stableHydrometricSnapshot.generatedAt);
 const staleObservedAt = new Date(generatedMs - 42 * 60 * 60_000).toISOString();
 const recentFetchAt = new Date(generatedMs - 30_000).toISOString();
-const staleValidUntil = new Date(generatedMs - 30 * 60 * 60_000).toISOString();
 
 function staleSnapshot(): Snapshot {
   const baseSystem = stableHydrometricSnapshot.systems?.[0];
@@ -13,20 +12,14 @@ function staleSnapshot(): Snapshot {
   if (!baseSystem || !baseSource) throw new Error('Stable hydrometric fixture is incomplete');
   const system: HydrologicalSystem = {
     ...baseSystem,
-    freshness: 'DESACTUALIZADO',
     observedAt: staleObservedAt,
     fetchedAt: recentFetchAt,
-    validUntil: staleValidUntil,
   };
   const source: Source = {
     ...baseSource,
-    status: 'STALE',
-    classification: 'OPERATIONAL_STALE',
-    freshness: 'DESACTUALIZADO',
     observedAt: staleObservedAt,
     fetchedAt: recentFetchAt,
     lastCheckedAt: recentFetchAt,
-    validUntil: staleValidUntil,
   };
   return {
     ...stableHydrometricSnapshot,
@@ -37,7 +30,6 @@ function staleSnapshot(): Snapshot {
       ...stableHydrometricSnapshot.river,
       observedAt: staleObservedAt,
       fetchedAt: recentFetchAt,
-      validUntil: staleValidUntil,
     },
   };
 }

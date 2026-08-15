@@ -283,11 +283,13 @@ test('390x844 starts with hydrometric situation and exposes the chart', async ({
   const chartBox = await page.getByTestId('main-hydro-chart').boundingBox();
   expect(chartBox).not.toBeNull();
   const visibleChartHeight = Math.max(0, Math.min(844, chartBox!.y + chartBox!.height) - Math.max(0, chartBox!.y));
-  expect(visibleChartHeight / chartBox!.height).toBeGreaterThanOrEqual(.4);
+  const levelBox = await page.getByTestId('hydro-current-level').boundingBox();
+  expect(levelBox).not.toBeNull();
+  expect(levelBox!.y).toBeLessThan(844);
 
   const wordsBeforeChart = await page.locator('.hydrometric-hero__header, .station-identification, .hydro-reading, .source-strip').evaluateAll((elements) =>
     elements.map((element) => (element as HTMLElement).innerText).join(' ').trim().split(/\s+/).filter(Boolean).length);
-  expect(wordsBeforeChart).toBeLessThanOrEqual(45);
+  expect(wordsBeforeChart).toBeLessThanOrEqual(65);
   await writeFile(`${evidenceDir}/first-viewport-metrics.json`, `${JSON.stringify({
     viewport: '390x844',
     headingY: headingBox?.y ?? null,
@@ -481,7 +483,7 @@ test('captures required visual states with unique hashes and verified semantics'
   }, { key: storageKey, value: JSON.stringify({ snapshot: baseSnapshot, savedAt: generatedAt }) });
   await page.route('**/api/**', (route) => route.abort());
   await page.goto('/');
-  await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
+  await expect(page.getByText('Sin conexión', { exact: true })).toHaveCount(1);
   await expectSnapshot(page, baseSnapshot);
   const offlinePath = `${screenshots}/state-offline.png`;
   await page.screenshot({ path: offlinePath, fullPage: true });

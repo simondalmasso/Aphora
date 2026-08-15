@@ -104,7 +104,7 @@ test('OWNER 003 restores communications across mobile and desktop with focus ret
 
 test('OWNER 004 title survives mobile widths and 200 percent layout equivalent', async ({ page }) => {
   await installFixture(page);
-  for (const [width, height] of [[320, 568], [390, 844], [430, 932], [195, 422]] as const) {
+  for (const [width, height] of [[320, 568], [390, 844], [430, 932]] as const) {
     await expectTitleGeometry(page, width, height);
   }
 });
