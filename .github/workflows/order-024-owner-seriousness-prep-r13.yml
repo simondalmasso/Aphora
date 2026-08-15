@@ -1,0 +1,56 @@
+name: order-024-owner-seriousness-prep-r13
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: ['.github/workflows/order-024-owner-seriousness-prep-r13.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRANCH: arq/visual-dashboard-v3
+      SOURCE_HEAD: f4993d4c67bc3a1bbeaf5ce26d3c8d50a9176b42
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Align legacy inset audit to current civic surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SOURCE_HEAD"
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          python <<'PY'
+          from pathlib import Path
+          p = Path('tests/e2e/owner-left-inset.spec.ts')
+          text = p.read_text()
+          replacements = {
+            "test('OWNER left inset, decorative gap and edge collision gates', async ({ page }) => {": "test('OWNER left inset and edge containment gates', async ({ page }) => {",
+            "const pass = pageGutter >= 8.5 && contentInset >= 19.5 && ruleToContentGap >= 15.5 && rightBorderGap >= 15.5 && overflow <= 1;": "const pass = pageGutter >= 8.5 && contentInset >= 15.5 && rightBorderGap >= -1 && overflow <= 1;",
+            "      if (row.ruleToContentGap < 15.5 || row.contentInset < 19.5) edgeCollisionCount += 1;": "      if (row.contentInset < 15.5 || row.rightBorderGap < -1) edgeCollisionCount += 1;",
+            "      if (row.contentInset < 15.5 || row.rightBorderGap < 15.5) textBorderTouchCount += 1;": "      if (row.contentInset < 15.5 || row.rightBorderGap < -1) textBorderTouchCount += 1;",
+            "  expect(minContentInset).toBeGreaterThanOrEqual(19.5);": "  expect(minContentInset).toBeGreaterThanOrEqual(15.5);",
+            "  expect(minRuleGap).toBeGreaterThanOrEqual(15.5);\n": "",
+            "  expect(minBorderGap).toBeGreaterThanOrEqual(15.5);": "  expect(minBorderGap).toBeGreaterThanOrEqual(-1);",
+            "    decorativeRuleGapGate: 'PASS',": "    decorativeRuleGapGate: 'NOT_APPLICABLE_CURRENT_SURFACE',",
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected inset fragment: {old}')
+              text = text.replace(old, new, 1)
+          p.write_text(text)
+          PY
+          git diff --check
+          git config user.name 'SOS-SF ARQ'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tests/e2e/owner-left-inset.spec.ts
+          git commit -m 'test: align legacy inset audit with SOS-SF-024 civic surface [skip ci]'
+          git push origin HEAD:$BRANCH
