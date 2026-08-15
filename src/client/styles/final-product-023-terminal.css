@@ -1,0 +1,74 @@
+/* Terminal cascade lock for ORDER 023.
+   The legacy stylesheet still contains historical two-column dashboard rules.
+   These selectors deliberately win without deleting functional legacy dialog styles. */
+
+.final-product-023 .dashboard {
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: row;
+}
+
+.final-product-023 .dashboard > .verified-alert-banner,
+.final-product-023 .dashboard > .hydrometric-section,
+.final-product-023 .dashboard > .civic-discovery,
+.final-product-023 .dashboard > .safety-actions,
+.final-product-023 .dashboard > .source-transparency {
+  grid-column: 1 / -1 !important;
+  width: 100%;
+  min-width: 0;
+  position: relative;
+  inset: auto;
+}
+
+.final-product-023 .hydrometric-section,
+.final-product-023 .muni-hydrometric-hero,
+.final-product-023 .primary-station,
+.final-product-023 .civic-discovery,
+.final-product-023 .safety-actions,
+.final-product-023 .source-transparency {
+  transform: none;
+}
+
+@media (max-width: 980px) {
+  .final-product-023 .dashboard {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .final-product-023 .dashboard > .verified-alert-banner,
+  .final-product-023 .dashboard > .hydrometric-section,
+  .final-product-023 .dashboard > .civic-discovery,
+  .final-product-023 .dashboard > .safety-actions,
+  .final-product-023 .dashboard > .source-transparency {
+    grid-column: 1 !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .final-product-023 .dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .final-product-023 .hydrometric-section {
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .final-product-023 .source-health-grid article:nth-child(n+3) {
+    display: block;
+  }
+
+  .final-product-023 .contact-grid a:nth-child(n+4) {
+    display: grid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .final-product-023 *,
+  .final-product-023 *::before,
+  .final-product-023 *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
