@@ -1,0 +1,86 @@
+name: order-023-terminal-readonly
+
+on:
+  push:
+    branches:
+      - arq/visual-dashboard-v3
+    paths:
+      - '.github/workflows/order-023-terminal-readonly.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      EXPECTED_ASSET: assets/index-BGqHMbr7.js
+      PROD_URL: https://sos-sf.simondalmasso44.workers.dev
+      FIREBASE_URL: https://sos-sf.web.app
+      EVIDENCE_DIR: artifacts/order-023-terminal
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Immutable main and no deploy surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          test ! -e .github/workflows/order-023-deploy-once.yml
+          mkdir -p "$EVIDENCE_DIR"
+          printf 'MAIN_SHA=%s\nMAIN_MUTATION=NO\nDEPLOY_SURFACE=ABSENT\n' "$(git rev-parse origin/main)" > "$EVIDENCE_DIR/main.txt"
+
+      - name: Fresh production route and API verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > "$EVIDENCE_DIR/http.txt"
+          for path in / /gestion-de-riesgo /gestion-de-riesgo/fenomeno-el-nino /lite /manifest.webmanifest /service-worker.js /api/health /api/snapshot /api/sources /api/auth/config; do
+            code="$(curl -sS --retry 3 --retry-delay 1 -o /tmp/order023-body -w '%{http_code}' "$PROD_URL$path?terminal=${GITHUB_RUN_ID}")"
+            test "$code" = "200"
+            printf '%s %s\n' "$path" "$code" | tee -a "$EVIDENCE_DIR/http.txt"
+          done
+          curl -fsS --retry 3 --retry-delay 1 -H 'Cache-Control: no-cache' "$PROD_URL/?terminal-asset=${GITHUB_RUN_ID}" > "$EVIDENCE_DIR/index.html"
+          grep -Fq "$EXPECTED_ASSET" "$EVIDENCE_DIR/index.html"
+          curl -fsS "$PROD_URL/api/health?terminal-health=${GITHUB_RUN_ID}" > "$EVIDENCE_DIR/health.json"
+          node -e "const j=require('./$EVIDENCE_DIR/health.json'); if(j.ok!==true||j.data?.service!=='sos-sf') process.exit(1)"
+          printf 'EXPECTED_ASSET=%s\nPRODUCTION_BYTES=VERIFIED\n' "$EXPECTED_ASSET" > "$EVIDENCE_DIR/bytes.txt"
+
+      - name: Fresh Firebase alias verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$EVIDENCE_DIR/firebase-headers.txt"
+          code="$(curl -sS -D "$headers" -o /dev/null -w '%{http_code}' "$FIREBASE_URL/gestion-de-riesgo?terminal=${GITHUB_RUN_ID}")"
+          test "$code" = "302"
+          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {$1=""; sub(/^ /,""); gsub(/\r/,""); print; exit}' "$headers")"
+          case "$location" in
+            "$PROD_URL"/gestion-de-riesgo*) ;;
+            *) echo "Unexpected Firebase redirect: $location" >&2; exit 1;;
+          esac
+          printf 'FIREBASE_STATUS=%s\nFIREBASE_LOCATION=%s\n' "$code" "$location" > "$EVIDENCE_DIR/firebase.txt"
+
+      - name: Terminal summary
+        shell: bash
+        run: |
+          cat > "$EVIDENCE_DIR/terminal.txt" <<EOF
+          ORDER=SOS-SF-023-FINAL-PRODUCT-REDESIGN-SHIP
+          PRODUCTION=VERIFIED
+          FIREBASE_ALIAS=VERIFIED
+          EXPECTED_ASSET=$EXPECTED_ASSET
+          MAIN_MUTATION=NO
+          DEPLOY_EXECUTED=NO
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: order-023-terminal-${{ github.run_id }}
+          path: artifacts/order-023-terminal
+          if-no-files-found: error
+          retention-days: 30
