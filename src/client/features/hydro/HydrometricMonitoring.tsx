@@ -7,24 +7,26 @@ import { FreshnessBadge, HydrometricChart, HydrometricHero, SourceLine, StationS
 const EMPTY_SYSTEMS: readonly HydrologicalSystem[] = Object.freeze([]);
 
 function freshnessLabel(system: HydrologicalSystem): string {
-  if (system.freshness === 'ACTUALIZADO') return 'Vigente';
-  if (system.freshness === 'ACTUALIZACION_DEMORADA') return 'Actualización demorada';
-  if (system.freshness === 'DESACTUALIZADO') return 'Desactualizada';
-  return 'Vigencia no disponible';
+  if (system.freshness === 'ACTUALIZADO') return 'Al día';
+  if (system.freshness === 'ACTUALIZACION_DEMORADA') return 'Con demora';
+  if (system.freshness === 'DESACTUALIZADO') return 'Dato desactualizado';
+  return 'Sin vigencia confirmada';
 }
 
 function trendLabel(system: HydrologicalSystem): string {
-  if (system.trend === 'RISING') return 'En ascenso';
-  if (system.trend === 'RISING_SLOWLY') return 'Ascenso lento';
-  if (system.trend === 'FALLING') return 'En descenso';
-  if (system.trend === 'STABLE') return 'Estable';
-  return 'Sin tendencia';
+  if (system.trend === 'RISING') return 'Está subiendo';
+  if (system.trend === 'RISING_SLOWLY') return 'Sube lentamente';
+  if (system.trend === 'FALLING') return 'Está bajando';
+  if (system.trend === 'STABLE') return 'Se mantiene estable';
+  return 'Sin tendencia suficiente';
 }
 
 function formatDelta(value: number | null): string {
-  if (value === null) return 'No disponible';
+  if (value === null) return 'Cambio no disponible';
   const centimetres = Math.round(value * 100);
-  return `${centimetres > 0 ? '+' : ''}${centimetres} cm`;
+  if (centimetres === 0) return 'Sin cambio en 24 h';
+  const amount = Math.abs(centimetres);
+  return `${centimetres > 0 ? 'Subió' : 'Bajó'} ${amount} cm en 24 h`;
 }
 
 function formatLevel(system: HydrologicalSystem): string {
@@ -36,9 +38,9 @@ function sourceFamily(source: Source | undefined, system: HydrologicalSystem): s
 }
 
 function sourceError(source: Source | undefined): string | null {
-  if (!source) return 'La fuente no figura en el inventario del snapshot.';
+  if (!source) return 'La fuente no figura en el inventario de esta actualización.';
   if (source.classification === 'OPERATIONAL_FRESH' || source.classification === 'OPERATIONAL_STALE') return null;
-  return source.limitations ?? 'La fuente no está operativa en este snapshot.';
+  return source.limitations ?? 'La fuente no está operativa en esta actualización.';
 }
 
 function OperationalRiverPanel({ system, snapshot, priority }: {
@@ -61,11 +63,11 @@ function OperationalRiverPanel({ system, snapshot, priority }: {
     </header>
     <dl className="river-priority__facts">
       <div className="river-priority__level"><dt>Nivel</dt><dd>{formatLevel(system)}</dd></div>
-      <div><dt>Tendencia</dt><dd>{trendLabel(system)}</dd></div>
-      <div><dt>Δ24h</dt><dd>{formatDelta(system.delta24h)}</dd></div>
+      <div><dt>Movimiento</dt><dd>{trendLabel(system)}</dd></div>
+      <div><dt>Últimas 24 h</dt><dd>{formatDelta(system.delta24h)}</dd></div>
       <div><dt>Vigencia</dt><dd>{freshnessLabel(system)} · hasta {formatLocalDateTime(system.validUntil)}</dd></div>
-      <div className="river-priority__source"><dt>Fuente</dt><dd>{source?.organizationName ?? system.sourceName} · {sourceFamily(source, system)}</dd></div>
-      <div className="river-priority__status"><dt>Estado / alerta relacionada</dt><dd>{signals.map((signal) => <span key={`${signal.kind}-${signal.sourceId}-${signal.reason}`}>{signal.reason}</span>)}</dd></div>
+      <div className="river-priority__source"><dt>Fuente</dt><dd>{source?.organizationName ?? system.sourceName}</dd></div>
+      <div className="river-priority__status"><dt>Por qué se prioriza</dt><dd>{signals.map((signal) => <span key={`${signal.kind}-${signal.sourceId}-${signal.reason}`}>{signal.reason}</span>)}</dd></div>
     </dl>
   </article>;
 }
@@ -119,9 +121,10 @@ export function HydrometricMonitoring({
   >
     <HydrometricHero>
       <header className="hydrometric-hero__header">
-        <div>
-          <p className="section-kicker">Situación hidrométrica</p>
-          <h1 id="hydrometric-title">Pulso hídrico de Santa Fe</h1>
+        <div className="hydrometric-hero__intro">
+          <p className="section-kicker">Santa Fe, hoy</p>
+          <h1 id="hydrometric-title">Así están el Paraná y el Salado</h1>
+          <p className="hydrometric-hero__lede">Mediciones públicas, tendencia y vigencia explicadas sin vueltas.</p>
         </div>
         <div className="hydrometric-hero__controls">
           <StationSwitcher
@@ -142,16 +145,16 @@ export function HydrometricMonitoring({
       >
         <header className="river-priority__masthead">
           <div>
-            <p>Jerarquía operativa</p>
+            <p>{priority.mode === 'DUAL_EMERGENCY' ? 'Atención compartida' : 'Atención prioritaria'}</p>
             <h2 id="river-priority-title">{priority.mode === 'DUAL_EMERGENCY'
-              ? 'Paraná + Salado · prioridad equivalente 50/50'
-              : `${prioritySystems[0]?.watercourse ?? 'Sistema hídrico'} · prioridad temporal`}</h2>
+              ? 'Paraná y Salado requieren el mismo peso ahora'
+              : `${prioritySystems[0]?.watercourse ?? 'Este sistema'} requiere atención primero`}</h2>
           </div>
           <div className="river-priority__explain">
             <p>{priority.mode === 'DUAL_EMERGENCY'
-              ? 'Hay condiciones verificables relacionadas con ambos sistemas. Los dos ríos se muestran con el mismo peso visual.'
-              : 'La prioridad cambia temporalmente porque existe una condición verificable relacionada con este sistema.'}</p>
-            <button type="button" onClick={(event) => onSources(event.currentTarget)}>Ver trazabilidad de fuentes</button>
+              ? 'Hay condiciones verificables relacionadas con ambos sistemas. La vista mantiene prioridad equivalente 50/50.'
+              : 'La jerarquía cambia temporalmente porque hay una condición verificable relacionada con este río. El otro sistema sigue disponible.'}</p>
+            <button type="button" onClick={(event) => onSources(event.currentTarget)}>Ver por qué</button>
           </div>
         </header>
         <div className="river-priority__grid">
@@ -164,20 +167,17 @@ export function HydrometricMonitoring({
           <div>
             <span>Estación {selected.stationName}</span>
             <strong>{selected.watercourse}</strong>
+            <small>Última medición · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}</small>
           </div>
           <FreshnessBadge
             className={`freshness-badge--${(selected.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}
-            label={`${freshnessLabel(selected)} · ${formatHumanAge(selected.observedAt, snapshot.generatedAt)}`}
+            label={freshnessLabel(selected)}
           />
-        </div>
-
-        <div className="hydro-signature-axis" aria-label="Lectura organizada por río, regla y tiempo">
-          <span>RÍO</span><i aria-hidden="true"/><span>REGLA</span><i aria-hidden="true"/><span>TIEMPO</span>
         </div>
 
         <div className="hydro-reading">
           <div className="hydro-level">
-            <span>Nivel</span>
+            <span>Nivel actual</span>
             <strong data-testid="hydro-current-level">
               {selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}
               {selected.currentMetres !== null && <small>m</small>}
@@ -185,22 +185,22 @@ export function HydrometricMonitoring({
             <time dateTime={selected.observedAt ?? undefined}>{formatLocalDateTime(selected.observedAt)}</time>
           </div>
           <dl className="hydro-metrics">
-            <div><dt>Tendencia</dt><dd>{trendLabel(selected)}</dd></div>
-            <div><dt aria-label="Cambio en 24 horas">Δ24h</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
+            <div><dt>Movimiento</dt><dd>{trendLabel(selected)}</dd></div>
+            <div><dt>Cambio reciente</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
           </dl>
         </div>
 
         <SourceLine buttonRef={sourcesButtonRef} onOpen={onSources}>
-          <span><b>{selectedSource?.organizationName ?? selected.sourceName}</b> · {sourceFamily(selectedSource, selected)}</span>
-          <span>{formatLocalDateTime(selected.fetchedAt)}</span>
-          <span>{corroboratingTransport ? `Mismo organismo · transporte: ${corroboratingTransport.feedName ?? corroboratingTransport.name}` : 'Sin corroboración'}</span>
+          <span><b>Datos del {selectedSource?.organizationName ?? selected.sourceName}</b></span>
+          <span>Recibidos {formatHumanAge(selected.fetchedAt, snapshot.generatedAt)}</span>
+          {corroboratingTransport && <span className="source-strip__technical">Otra vía del mismo organismo disponible</span>}
           {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
         </SourceLine>
 
         {selected.available && selected.currentMetres !== null
           ? <HydrometricChart system={selected} generatedAt={snapshot.generatedAt}/>
-          : <div className="data-caveat"><strong>Medición no disponible</strong><p>La estación no entregó una lectura utilizable.</p></div>}
-      </article> : <div className="data-caveat"><strong>Sin estaciones disponibles</strong><p>No se pudo construir la situación hidrométrica.</p></div>}
+          : <div className="data-caveat"><strong>No pudimos obtener una medición reciente</strong><p>La estación no entregó una lectura utilizable. La falta de dato no significa una emergencia.</p></div>}
+      </article> : <div className="data-caveat"><strong>No hay mediciones disponibles ahora</strong><p>No se pudo construir la situación hidrométrica. Probá actualizar o consultá las fuentes oficiales.</p></div>}
     </HydrometricHero>
   </section>;
 }
