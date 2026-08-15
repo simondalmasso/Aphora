@@ -9,11 +9,17 @@ const recentFetchAt = new Date(generatedMs - 30_000).toISOString();
 function staleSnapshot(): Snapshot {
   const baseSystem = stableHydrometricSnapshot.systems?.[0];
   const baseSource = stableHydrometricSnapshot.sources[0];
-  if (!baseSystem || !baseSource) throw new Error('Stable hydrometric fixture is incomplete');
+  if (!baseSystem || !baseSource || !baseSystem.observedAt) throw new Error('Stable hydrometric fixture is incomplete');
+  const shiftMs = Date.parse(baseSystem.observedAt) - Date.parse(staleObservedAt);
+  const shiftedPoints = baseSystem.points.map((point) => ({
+    ...point,
+    at: new Date(Date.parse(point.at) - shiftMs).toISOString(),
+  }));
   const system: HydrologicalSystem = {
     ...baseSystem,
     observedAt: staleObservedAt,
     fetchedAt: recentFetchAt,
+    points: shiftedPoints,
   };
   const source: Source = {
     ...baseSource,
@@ -30,6 +36,7 @@ function staleSnapshot(): Snapshot {
       ...stableHydrometricSnapshot.river,
       observedAt: staleObservedAt,
       fetchedAt: recentFetchAt,
+      points: shiftedPoints,
     },
   };
 }
