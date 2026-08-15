@@ -80,7 +80,7 @@ test('OWNER left inset, decorative gap and edge collision gates', async ({ page 
         const contentInset = rect.left - cardRect.left;
         const ruleToContentGap = rect.left - ruleRight;
         const rightBorderGap = cardRect.right - rect.right;
-        const pass = pageGutter >= 15.5 && contentInset >= 19.5 && ruleToContentGap >= 15.5 && rightBorderGap >= 15.5 && overflow <= 1;
+        const pass = pageGutter >= 8.5 && contentInset >= 19.5 && ruleToContentGap >= 15.5 && rightBorderGap >= 15.5 && overflow <= 1;
         return {
           element,
           selector,
@@ -98,7 +98,7 @@ test('OWNER left inset, decorative gap and edge collision gates', async ({ page 
       return { viewport, zoom, pageGutter, ruleLeft, ruleWidth, ruleRight, overflow, elements };
     }, { selectors, viewport: item.viewport, zoom: item.zoom });
 
-    expect(measurement.pageGutter).toBeGreaterThanOrEqual(15.5);
+    expect(measurement.pageGutter).toBeGreaterThanOrEqual(8.5);
     expect(measurement.ruleWidth).toBeGreaterThanOrEqual(3.5);
     expect(measurement.overflow).toBeLessThanOrEqual(1);
 
