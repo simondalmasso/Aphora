@@ -10,23 +10,7 @@ import { SecureMessagesPanel } from './features/messages/SecureMessagesPanel.tsx
 import { ReportDialog } from './features/reports/ReportDialog.tsx';
 import { useSnapshot } from './pwa/useSnapshot.ts';
 import './styles/app.css';
-import './styles/roast-019-density.css';
-import './styles/design-021.css';
-import './styles/design-021-density.css';
-import './styles/muni-021.css';
-import './styles/muni-021-tuning.css';
-import './styles/hovs-021.css';
-import './styles/hovs-021-polish.css';
-import './styles/hovs-021-density-final.css';
-import './styles/hovs-021-density-lock.css';
-import './styles/hovs-r2.css';
-import './styles/hovs-r2-density.css';
-import './styles/hovs-r2-density-final.css';
-import './styles/hovs-r2-desktop-final.css';
-import './styles/hovs-r2-terminal-lock.css';
-import './styles/owner-left-inset-002.css';
-import './styles/owner-final-corrective-003.css';
-import './styles/dual-river-021d.css';
+import './styles/final-product-023.css';
 
 function canonicalPath(): string {
   const path = window.location.pathname.replace(/\/+$/, '');
