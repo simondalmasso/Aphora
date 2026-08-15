@@ -1,0 +1,86 @@
+/* SOS-SF-024 — owner correction: serious civic hydrometric first viewport.
+   Keep the hydrometric reading visually dominant and make temporal semantics explicit. */
+.final-product-023 .hydrometric-hero__header {
+  align-items: start;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.final-product-023 .hydrometric-hero__intro {
+  max-width: 660px;
+}
+
+.final-product-023 .hydrometric-hero__header .section-kicker {
+  margin-bottom: 7px;
+  color: #3d7074;
+  font-size: .68rem;
+  font-weight: 780;
+  letter-spacing: .095em;
+}
+
+.final-product-023 .hydrometric-hero__header h1 {
+  max-width: 560px;
+  font-size: clamp(1.9rem, 3.4vw, 2.85rem);
+  line-height: 1.04;
+  letter-spacing: -.045em;
+  font-weight: 720;
+  text-wrap: pretty;
+}
+
+.final-product-023 .hydrometric-hero__lede {
+  max-width: 620px;
+  margin-top: 10px;
+  color: #5f7079;
+  font-size: .94rem;
+  line-height: 1.5;
+}
+
+.final-product-023 .hydro-level > span {
+  text-transform: none;
+  letter-spacing: .025em;
+}
+
+.final-product-023 .source-strip__copy > span {
+  min-width: 0;
+}
+
+.final-product-023 .source-strip__copy > span:nth-child(2),
+.final-product-023 .source-strip__copy > span:nth-child(3) {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .final-product-023 .muni-hydrometric-hero {
+    padding-top: 18px;
+  }
+
+  .final-product-023 .hydrometric-hero__header {
+    gap: 15px;
+    margin-bottom: 18px;
+  }
+
+  .final-product-023 .hydrometric-hero__header h1 {
+    max-width: 24rem;
+    font-size: 1.9rem;
+    line-height: 1.06;
+    letter-spacing: -.04em;
+  }
+
+  .final-product-023 .hydrometric-hero__lede {
+    margin-top: 8px;
+    font-size: .88rem;
+    line-height: 1.45;
+  }
+}
+
+@media (max-width: 390px) {
+  .final-product-023 .hydrometric-hero__header h1 {
+    font-size: 1.82rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .final-product-023 .hydrometric-hero__header h1 {
+    font-size: 1.7rem;
+  }
+}
