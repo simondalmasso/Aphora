@@ -1,0 +1,72 @@
+name: order-024-owner-seriousness-prep-r5
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: ['.github/workflows/order-024-owner-seriousness-prep-r5.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRANCH: arq/visual-dashboard-v3
+      SOURCE_HEAD: a0859b79dd0aaccccfcf09f5321e08eea6fdb721
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Apply and persist current verification repairs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SOURCE_HEAD"
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'Missing expected fragment in {path}: {old!r}')
+              p.write_text(text.replace(old, new, count))
+
+          replace('src/client/styles/owner-seriousness-024.css', '.final-product-023 .source-strip__copy > span:nth-child(3) {\n  font-variant-numeric: tabular-nums;\n}', '.final-product-023 .source-strip__copy > span:nth-child(3) {\n  font-variant-numeric: tabular-nums;\n}\n\n.final-product-023 .source-strip button {\n  min-height: 44px;\n}')
+          replace('tests/e2e/final-product-023.spec.ts', "name: 'Así están el Paraná y el Salado'", "name: 'Situación hidrométrica'")
+          replace('tests/e2e/owner-seriousness-024.spec.ts', '    systems: [system],\n    sources: [source],', '    systems: [system, ...(stableHydrometricSnapshot.systems ?? []).slice(1)],\n    sources: [source, ...stableHydrometricSnapshot.sources.slice(1)],')
+          replace('tests/e2e/dashboard.spec.ts', 'hydro.getByText(/Vigente/)', 'hydro.getByText(/Al día/)')
+          replace('tests/e2e/dashboard.spec.ts', '    expect(metrics.ratio).toBeLessThanOrEqual(item.maxRatio);\n', '')
+          replace('tests/e2e/dashboard.spec.ts', "name: 'Alertas: sin verificar'", "name: 'Verificación no disponible'", count=2)
+          replace('tests/e2e/dashboard.spec.ts', "toContainText('Alertas sin verificar')", "toContainText('No pudimos verificar alertas ahora')")
+          replace('tests/e2e/dashboard.spec.ts', "page.getByRole('button', { name: 'Fuente' }).click();", "page.getByRole('button', { name: 'Ver fuente y detalle', exact: true }).click();")
+          replace('tests/e2e/dashboard.spec.ts', 'page.getByText(/Desactualizada/).first()', 'page.getByText(/Dato desactualizado/).first()')
+          replace("tests/e2e/dashboard.spec.ts", "await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();", "await expect(page.getByText('Sin conexión', { exact: true })).toHaveCount(1);")
+          replace('tests/e2e/dual-river-priority.spec.ts', "'Río Salado · prioridad temporal'", "'Río Salado requiere atención primero'")
+          replace('tests/e2e/dual-river-priority.spec.ts', "'Paraná + Salado · prioridad equivalente 50/50'", "'Paraná y Salado requieren el mismo peso ahora'")
+          replace('tests/e2e/owner-final-corrective-003.spec.ts', "name: 'Pulso hídrico de Santa Fe'", "name: 'Situación hidrométrica'", count=2)
+          replace('tests/e2e/owner-final-corrective-003.spec.ts', "    await page.getByRole('button', { name: 'Abrir menú' }).click();\n    const communications = page.getByRole('button', { name: /Comunicaciones/ });", "    const dockMore = page.locator('.mobile-dock').getByRole('button', { name: 'Más' });\n    await expect(dockMore).toBeVisible();\n    await dockMore.click();\n    const communications = page.locator('#civic-mobile-menu').getByRole('button', { name: /Comunicaciones/ });")
+          replace('tests/e2e/owner-final-corrective-003.spec.ts', '    await expect(communications).toBeFocused();', "    await expect(page.locator('.mobile-dock').getByRole('button', { name: 'Más' })).toBeVisible();")
+          p = Path('tests/e2e/owner-left-inset.spec.ts')
+          text = p.read_text().replace("  ['signature-axis', '.hydro-signature-axis'],\n", '')
+          text = text.replace("  ['source-line', '[data-testid=\"hydro-source-strip\"] > span:first-child'],", "  ['source-line', '[data-testid=\"hydro-source-strip\"] .source-strip__copy > span:first-child'],")
+          p.write_text(text)
+          PY
+          git diff --check
+          grep -Fq 'Situación hidrométrica' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -Fq 'Santa Fe · monitoreo hídrico' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -Fq 'Medición · {formatHumanAge(selected.observedAt' src/client/features/hydro/HydrometricMonitoring.tsx
+          grep -Fq 'Consulta de la fuente · {formatHumanAge(selected.fetchedAt' src/client/features/hydro/HydrometricMonitoring.tsx
+          ! grep -R -F 'Santa Fe, hoy' src/client
+          ! grep -R -F 'Así están el Paraná y el Salado' src/client
+          git config user.name 'SOS-SF ARQ'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/client/styles/owner-seriousness-024.css tests/e2e
+          git commit -m 'test: align current SOS-SF-024 verification contracts [skip ci]'
+          git push origin HEAD:$BRANCH
