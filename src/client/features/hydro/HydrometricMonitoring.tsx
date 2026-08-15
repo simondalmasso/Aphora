@@ -33,10 +33,6 @@ function formatLevel(system: HydrologicalSystem): string {
   return system.currentMetres === null ? 'No disponible' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`;
 }
 
-function sourceFamily(source: Source | undefined, system: HydrologicalSystem): string {
-  return source?.feedName ?? source?.name ?? system.sourceName;
-}
-
 function sourceError(source: Source | undefined): string | null {
   if (!source) return 'La fuente no figura en el inventario de esta actualización.';
   if (source.classification === 'OPERATIONAL_FRESH' || source.classification === 'OPERATIONAL_STALE') return null;
