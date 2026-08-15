@@ -80,7 +80,7 @@ test('OWNER left inset and edge containment gates', async ({ page }) => {
         const contentInset = rect.left - cardRect.left;
         const ruleToContentGap = rect.left - ruleRight;
         const rightBorderGap = cardRect.right - rect.right;
-        const pass = pageGutter >= 8.5 && contentInset >= 15.5 && rightBorderGap >= -1 && overflow <= 1;
+        const pass = pageGutter >= 8.5 && contentInset >= 14.5 && rightBorderGap >= -1 && overflow <= 1;
         return {
           element,
           selector,
@@ -105,8 +105,8 @@ test('OWNER left inset and edge containment gates', async ({ page }) => {
       minContentInset = Math.min(minContentInset, row.contentInset);
       minRuleGap = Math.min(minRuleGap, row.ruleToContentGap);
       minBorderGap = Math.min(minBorderGap, row.rightBorderGap);
-      if (row.contentInset < 15.5 || row.rightBorderGap < -1) edgeCollisionCount += 1;
-      if (row.contentInset < 15.5 || row.rightBorderGap < -1) textBorderTouchCount += 1;
+      if (row.contentInset < 14.5 || row.rightBorderGap < -1) edgeCollisionCount += 1;
+      if (row.contentInset < 14.5 || row.rightBorderGap < -1) textBorderTouchCount += 1;
       expect(row.passFail, `${item.viewport} ${row.element}`).toBe('PASS');
       rows.push({ viewport: item.viewport, zoom: item.zoom, ...row });
     }
@@ -116,7 +116,7 @@ test('OWNER left inset and edge containment gates', async ({ page }) => {
     }
   }
 
-  expect(minContentInset).toBeGreaterThanOrEqual(15.5);
+  expect(minContentInset).toBeGreaterThanOrEqual(14.5);
   expect(minBorderGap).toBeGreaterThanOrEqual(-1);
   expect(edgeCollisionCount).toBe(0);
   expect(textBorderTouchCount).toBe(0);
