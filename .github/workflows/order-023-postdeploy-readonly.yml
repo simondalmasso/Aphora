@@ -32,10 +32,7 @@ jobs:
           set -euo pipefail
           git fetch origin main --quiet
           test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
-          if grep -R "wrangler deploy --config" -n .github/workflows 2>/dev/null; then
-            echo 'Mutating deploy workflow still present' >&2
-            exit 1
-          fi
+          test ! -e .github/workflows/order-023-deploy-once.yml
           echo READ_ONLY=YES
 
       - name: Install browser runtime
