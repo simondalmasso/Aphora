@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { DashboardPage } from '../../src/client/app/DashboardPage.tsx';
 import { unavailableSnapshot } from '../../src/data/unavailable-snapshot.ts';
 
-describe('hydrometric-first progressive rendering', () => {
-  it('renders hydrometric status first, four primary sections, emergency channels and no decorative canvas', () => {
+describe('final product 023 hydrometric-first progressive rendering', () => {
+  it('renders the calm hydrometric product first, preserves safety actions and avoids decorative canvas', () => {
     const html = renderToStaticMarkup(<DashboardPage
       snapshot={unavailableSnapshot}
       sourcesButtonRef={createRef<HTMLButtonElement>()}
@@ -17,20 +17,21 @@ describe('hydrometric-first progressive rendering', () => {
 
     expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section"/);
     expect(html).toContain('data-testid="hydrometric-situation"');
-    expect(html).toContain('Situación hidrométrica');
-    expect(html).toContain('Pulso hídrico de Santa Fe');
-    expect(html).not.toContain('<h1 id="hydrometric-title">Ríos de Santa Fe</h1>');
+    expect(html).toContain('Santa Fe, hoy');
+    expect(html).toContain('Así están el Paraná y el Salado');
+    expect(html).toContain('Mediciones públicas, tendencia y vigencia explicadas sin vueltas.');
     expect(html).toContain('Río Paraná');
     expect(html).toContain('Río Salado');
-    expect(html).toContain('Alertas sin verificar');
-    expect(html).toContain('Canales esenciales');
+    expect(html).toContain('No pudimos obtener una medición reciente');
+    expect(html).toContain('La falta de dato no significa una emergencia.');
+    expect(html).toContain('Alertas, ayuda y reportes');
     expect(html).toContain('Reportar una situación');
-    expect(html).toContain('Fuentes y transparencia');
-    expect(html).toContain('Salud de los datos');
-    expect(html.match(/<section\b/g)).toHaveLength(4);
-    expect(html).not.toContain('Lo importante en Santa Fe');
-    expect(html).not.toContain('Sistema Paraná');
-    expect(html).not.toContain('Sistema Salado');
+    expect(html).toContain('De dónde salen los datos');
+    expect(html).toContain('911');
+    expect(html).toContain('103');
+    expect(html).toContain('107');
+    expect(html).not.toContain('Pulso hídrico de Santa Fe');
+    expect(html).not.toContain('Situación hidrométrica');
     expect(html).not.toContain('Datos en vivo');
     expect(html).not.toContain('<canvas');
   });
