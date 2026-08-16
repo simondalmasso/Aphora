@@ -205,6 +205,7 @@ function sourceBase(input: {
   latencyMinutes?: number;
   resolution?: string;
   uncertainty?: string;
+  instantRateMmPerHour?: number;
   official?: boolean;
 }): Source {
   const preliminary: Source = {
@@ -232,6 +233,7 @@ function sourceBase(input: {
     latencyMinutes: input.latencyMinutes,
     resolution: input.resolution,
     uncertainty: input.uncertainty,
+    instantRateMmPerHour: input.instantRateMmPerHour,
   };
   return Object.freeze({ ...preliminary, classification: preliminary.classification ?? classificationForSource(preliminary) });
 }
@@ -469,7 +471,7 @@ async function smnAlertFeed(url: string, now: Date): Promise<{ source: Source; a
 
 async function nasaSource(now: Date): Promise<Source> {
   const result: ProviderResult<NasaGpmReading> = await fetchNasaGpm(NASA_GPM_URL);
-  const connected = result.value !== null && Number.isFinite(result.value.value) && Number.isFinite(Date.parse(result.value.observedAt));
+  const connected = result.value !== null && Number.isFinite(result.value.value) && result.value.value >= 0 && Number.isFinite(Date.parse(result.value.observedAt));
   const observedAt = connected ? result.value!.observedAt : result.fetchedAt;
   const freshness = connected ? freshnessFor(observedAt, now, 3 * 60 * 60_000, 12 * 60 * 60_000) : 'NO_DISPONIBLE';
   return sourceBase({
@@ -493,6 +495,7 @@ async function nasaSource(now: Date): Promise<Source> {
     latencyMinutes: connected ? result.value!.latencyMinutes : undefined,
     resolution: connected ? result.value!.resolution : '0,1° / 30 minutos',
     uncertainty: connected ? result.value!.uncertainty : 'Sin muestra válida; no aporta un dato local.',
+    instantRateMmPerHour: connected ? result.value!.value : undefined,
     official: false,
   });
 }

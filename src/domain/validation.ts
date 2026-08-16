@@ -94,6 +94,7 @@ function source(value: unknown, index: number): Source {
   if (row.freshness !== undefined && !['ACTUALIZADO', 'ACTUALIZACION_DEMORADA', 'DESACTUALIZADO', 'NO_DISPONIBLE'].includes(String(row.freshness))) throw new TypeError(`snapshot.sources[${index}].freshness inválida`);
   if (row.fetchedAt !== undefined) iso(row.fetchedAt, `snapshot.sources[${index}].fetchedAt`);
   if (row.lastCheckedAt !== undefined) iso(row.lastCheckedAt, `snapshot.sources[${index}].lastCheckedAt`);
+  if (row.instantRateMmPerHour !== undefined && finite(row.instantRateMmPerHour, `snapshot.sources[${index}].instantRateMmPerHour`) < 0) throw new TypeError(`snapshot.sources[${index}].instantRateMmPerHour inválido`);
   if (row.determinesPrimaryState !== undefined && typeof row.determinesPrimaryState !== 'boolean') throw new TypeError(`snapshot.sources[${index}].determinesPrimaryState inválido`);
   if ((row.classification === 'BLOCKED_CREDENTIAL' || row.classification === 'BLOCKED_NO_MACHINE_ENDPOINT' || row.classification === 'REJECTED_UNSAFE') && row.connected !== false) throw new TypeError(`snapshot.sources[${index}] bloqueada no puede figurar conectada`);
   return value as Source;

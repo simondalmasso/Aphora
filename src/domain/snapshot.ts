@@ -29,6 +29,7 @@ export interface Source {
   readonly latencyMinutes?: number;
   readonly resolution?: string;
   readonly uncertainty?: string;
+  readonly instantRateMmPerHour?: number;
   readonly qualityNote?: string;
   readonly connected?: boolean;
   readonly organizationId?: string;
