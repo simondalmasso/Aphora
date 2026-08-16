@@ -1,0 +1,1138 @@
+/* SOS-SF-027 — Smooth Civic River Product
+   One active product layer: visual-first hydrometry, compact civic identity, honest data. */
+
+:root {
+  --027-canvas: #f4f6f3;
+  --027-surface: #fbfcfa;
+  --027-surface-strong: #ffffff;
+  --027-navy: #102f3c;
+  --027-navy-2: #173f4d;
+  --027-water: #20a8a6;
+  --027-water-soft: #dff3f0;
+  --027-cyan: #65d7d1;
+  --027-ink: #18343d;
+  --027-muted: #667b80;
+  --027-line: rgba(16, 47, 60, .10);
+  --027-warn: #a76b2e;
+}
+
+.final-product-023 {
+  background: var(--027-canvas);
+  color: var(--027-ink);
+}
+
+.final-product-023 .dashboard {
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: clamp(12px, 3vw, 30px);
+}
+
+.final-product-023 .smooth-civic-hydrometry {
+  margin-top: 0;
+  padding-top: 10px;
+}
+
+.final-product-023 .smooth-civic-hydrometry .muni-hydrometric-hero {
+  margin: 0;
+  padding: 14px 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.final-product-023 .hydro-product-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.final-product-023 .hydro-product-header .hydrometric-hero__intro {
+  min-width: 0;
+}
+
+.final-product-023 .hydro-product-header .section-kicker {
+  margin: 0 0 2px;
+  color: #688086;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .095em;
+  text-transform: uppercase;
+}
+
+.final-product-023 .hydro-product-header h1 {
+  margin: 0;
+  color: var(--027-navy);
+  font-size: clamp(1.18rem, 4vw, 1.55rem);
+  line-height: 1.06;
+  letter-spacing: -.035em;
+  font-weight: 760;
+}
+
+.final-product-023 .hydro-product__strapline {
+  margin: 3px 0 0;
+  color: var(--027-muted);
+  font-size: .76rem;
+  line-height: 1.25;
+}
+
+.final-product-023 .smooth-civic-hydrometry .hydro-refresh-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--027-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .76);
+  color: var(--027-navy-2);
+  box-shadow: 0 3px 14px rgba(24, 57, 67, .045);
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.final-product-023 .smooth-civic-hydrometry .hydro-refresh-button:active {
+  transform: scale(.96);
+}
+
+.final-product-023 .river-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.final-product-023 .river-switch button {
+  position: relative;
+  min-width: 0;
+  min-height: 92px;
+  padding: 10px 11px 9px;
+  border: 1px solid rgba(19, 65, 76, .09);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .62);
+  color: var(--027-muted);
+  text-align: left;
+  box-shadow: 0 4px 18px rgba(22, 55, 65, .035);
+  overflow: hidden;
+  transition: transform 210ms ease, border-color 210ms ease, background-color 210ms ease, box-shadow 210ms ease;
+}
+
+.final-product-023 .river-switch button + button {
+  border-left-color: rgba(19, 65, 76, .09);
+}
+
+.final-product-023 .river-switch button[aria-selected="true"] {
+  border-color: rgba(32, 168, 166, .36);
+  background: var(--027-surface-strong);
+  color: var(--027-navy);
+  box-shadow: 0 8px 24px rgba(16, 47, 60, .07);
+  transform: translateY(-1px);
+}
+
+.final-product-023 .river-switch button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--027-water);
+}
+
+.final-product-023 .river-switch__name,
+.final-product-023 .river-switch small,
+.final-product-023 .river-switch em {
+  display: block;
+}
+
+.final-product-023 .river-switch__name {
+  font-size: .9rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.final-product-023 .river-switch__trace {
+  display: block;
+  height: 27px;
+  margin: 2px 0 1px;
+}
+
+.final-product-023 .mini-river-trace {
+  display: block;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+}
+
+.final-product-023 .mini-river-trace path {
+  fill: none;
+  stroke: #759396;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.final-product-023 .mini-river-trace circle {
+  fill: #759396;
+}
+
+.final-product-023 .river-switch button[aria-selected="true"] .mini-river-trace path {
+  stroke: var(--027-water);
+  stroke-width: 2.5;
+}
+
+.final-product-023 .river-switch button[aria-selected="true"] .mini-river-trace circle {
+  fill: var(--027-water);
+}
+
+.final-product-023 .river-switch small {
+  margin-top: 1px;
+  color: #788a8e;
+  font-size: .61rem;
+  line-height: 1.15;
+}
+
+.final-product-023 .river-switch em {
+  margin-top: 3px;
+  color: #476169;
+  font-size: .63rem;
+  font-style: normal;
+  line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.final-product-023 .river-product-card {
+  position: relative;
+  margin: 0;
+  padding: clamp(14px, 3vw, 22px);
+  border: 1px solid rgba(16, 47, 60, .075);
+  border-radius: clamp(22px, 4vw, 28px);
+  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(247,251,249,.95));
+  box-shadow: 0 16px 44px rgba(20, 51, 61, .07);
+  overflow: hidden;
+}
+
+.final-product-023 .station-identification--product {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 7px;
+  padding: 0;
+  border: 0;
+}
+
+.final-product-023 .station-identification--product > div > span,
+.final-product-023 .station-identification--product > div > strong,
+.final-product-023 .station-identification--product > div > small {
+  display: block;
+}
+
+.final-product-023 .station-identification--product > div > span {
+  color: var(--027-navy);
+  font-size: .86rem;
+  font-weight: 790;
+  letter-spacing: -.015em;
+}
+
+.final-product-023 .station-identification--product > div > strong {
+  margin-top: 1px;
+  color: var(--027-muted);
+  font-size: .68rem;
+  font-weight: 650;
+}
+
+.final-product-023 .station-identification--product > div > small {
+  margin-top: 3px;
+  color: #7d8d90;
+  font-size: .62rem;
+}
+
+.final-product-023 .station-identification--product .freshness-badge {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding-inline: 9px;
+  border-radius: 999px;
+  font-size: .62rem;
+}
+
+.final-product-023 .meaning-glance--product {
+  display: grid;
+  grid-template-columns: minmax(130px, .85fr) minmax(0, 1.15fr);
+  align-items: end;
+  gap: 16px;
+  padding: 8px 0 10px;
+}
+
+.final-product-023 .meaning-glance--product .hydro-level > span {
+  display: block;
+  color: #71858a;
+  font-size: .62rem;
+  font-weight: 760;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.final-product-023 .meaning-glance--product .hydro-level > strong {
+  display: block;
+  margin-top: 1px;
+  color: var(--027-navy);
+  font-size: clamp(3.45rem, 10vw, 6.25rem);
+  line-height: .88;
+  letter-spacing: -.08em;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.final-product-023 .meaning-glance--product .hydro-level > strong small {
+  margin-left: .12em;
+  color: #5f777d;
+  font-size: .23em;
+  letter-spacing: -.02em;
+}
+
+.final-product-023 .meaning-copy__movement--product {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 6px;
+  color: #567078;
+  font-size: .72rem;
+}
+
+.final-product-023 .meaning-copy__movement--product strong {
+  color: var(--027-water);
+  font-weight: 800;
+}
+
+.final-product-023 .meaning-glance--product .meaning-copy__primary {
+  max-width: 560px;
+  margin: 0;
+  color: var(--027-ink);
+  font-size: clamp(.86rem, 2vw, 1.05rem);
+  font-weight: 690;
+  line-height: 1.27;
+  letter-spacing: -.015em;
+}
+
+.final-product-023 .meaning-glance--product .meaning-explain {
+  min-height: 44px;
+  margin: 1px 0 -6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #397078;
+  font-size: .67rem;
+  font-weight: 740;
+  text-decoration: none;
+}
+
+.final-product-023 .hydro-chart--product {
+  position: relative;
+  margin: 4px 0 10px;
+  padding: 12px 12px 8px;
+  border: 0;
+  border-radius: 22px;
+  background: linear-gradient(150deg, #123845 0%, #0d2934 62%, #0b2530 100%);
+  color: #e8f5f3;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 14px 26px rgba(13,41,52,.13);
+  overflow: hidden;
+}
+
+.final-product-023 .hydro-chart__product-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 2px;
+}
+
+.final-product-023 .hydro-chart__trend-summary span,
+.final-product-023 .hydro-chart__trend-summary strong {
+  display: block;
+}
+
+.final-product-023 .hydro-chart__trend-summary span {
+  color: rgba(222, 242, 240, .6);
+  font-size: .58rem;
+  font-weight: 780;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.final-product-023 .hydro-chart__trend-summary strong {
+  margin-top: 2px;
+  color: #f4fbfa;
+  font-size: .84rem;
+  font-weight: 750;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__windows {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.06);
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__windows button {
+  min-width: 44px;
+  min-height: 38px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(231, 246, 244, .7);
+  font-size: .66rem;
+  font-weight: 740;
+  transition: background-color 200ms ease, color 200ms ease, transform 180ms ease;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__windows button[aria-pressed="true"] {
+  background: rgba(100, 215, 209, .16);
+  color: #adf0eb;
+  box-shadow: inset 0 0 0 1px rgba(101, 215, 209, .16);
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__windows button:disabled {
+  opacity: .32;
+}
+
+.final-product-023 .hydro-chart__meta--quiet {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0 2px;
+  color: rgba(223, 242, 240, .54);
+  font-size: .58rem;
+}
+
+.final-product-023 .hydro-chart__canvas-wrap {
+  position: relative;
+  margin-inline: -4px;
+}
+
+.final-product-023 .hydro-chart--product svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 188px;
+  touch-action: pan-y;
+  outline-offset: -3px;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__plot {
+  fill: rgba(255,255,255,.012);
+  stroke: rgba(213, 239, 237, .06);
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__grid {
+  stroke: rgba(218, 240, 239, .09);
+  stroke-width: 1;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__axis-label,
+.final-product-023 .hydro-chart--product .hydro-chart__unit {
+  fill: rgba(226, 244, 242, .5);
+  font-size: 10px;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__line {
+  fill: none;
+  stroke: #66d8d2;
+  stroke-width: 4.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 5px rgba(101,215,209,.18));
+}
+
+.final-product-023 .hydro-chart__area-stop--top { stop-color: #62d5cf; stop-opacity: .22; }
+.final-product-023 .hydro-chart__area-stop--bottom { stop-color: #62d5cf; stop-opacity: .015; }
+.final-product-023 .hydro-chart__area { stroke: none; }
+
+.final-product-023 .hydro-chart--product .hydro-chart__threshold {
+  stroke: #dbad72;
+  stroke-width: 1.3;
+  stroke-dasharray: 5 5;
+  opacity: .8;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__threshold--normal {
+  stroke: #9fb5b7;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__threshold-label {
+  fill: #e3c9a9;
+  font-size: 10px;
+}
+
+.final-product-023 .hydro-chart__current-halo {
+  fill: rgba(101, 215, 209, .16);
+  stroke: rgba(101, 215, 209, .24);
+  animation: chart-current-arrive 420ms cubic-bezier(.2,.7,.2,1) both;
+}
+
+.final-product-023 .hydro-chart__current-dot {
+  fill: #b5f3ef;
+  stroke: #123845;
+  stroke-width: 2;
+}
+
+.final-product-023 .hydro-chart__series-motion {
+  animation: chart-series-arrive 320ms ease-out both;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__tooltip line {
+  stroke: rgba(180, 236, 232, .34);
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__tooltip circle {
+  fill: #b5f3ef;
+  stroke: #123845;
+  stroke-width: 2;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__tooltip rect {
+  fill: rgba(7, 28, 36, .95);
+  stroke: rgba(180, 236, 232, .16);
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__tooltip text {
+  fill: #edf8f7;
+  font-size: 11px;
+}
+
+.final-product-023 .hydro-chart__now-chip {
+  position: absolute;
+  right: 9px;
+  top: 14px;
+  display: grid;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid rgba(101,215,209,.16);
+  border-radius: 10px;
+  background: rgba(9, 34, 43, .76);
+  color: #b8efec;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+}
+
+.final-product-023 .hydro-chart__now-chip span {
+  font-size: .51rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  opacity: .65;
+}
+
+.final-product-023 .hydro-chart__now-chip strong {
+  font-size: .68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__external-reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  margin: 2px 0 0;
+  padding: 7px 8px 2px;
+  color: rgba(229, 244, 242, .58);
+  font-size: .59rem;
+  line-height: 1.25;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__external-reference span {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__external-reference b {
+  color: rgba(238, 248, 247, .79);
+  font-weight: 700;
+}
+
+.final-product-023 .hydro-chart--product .hydro-chart__readout {
+  margin: 4px 6px 1px;
+  color: rgba(229, 244, 242, .61);
+  font-size: .6rem;
+  line-height: 1.3;
+}
+
+.final-product-023 .hydro-chart--product .data-table-disclosure {
+  margin: 2px 4px 0;
+  border: 0;
+  color: rgba(231, 245, 244, .64);
+  font-size: .62rem;
+}
+
+.final-product-023 .hydro-chart--product .data-table-disclosure summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.final-product-023 .hydro-chart--product .data-table-disclosure[open] {
+  padding-bottom: 8px;
+}
+
+.final-product-023 .hydro-chart--product .table-scroll {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.final-product-023 .hydro-chart--product table {
+  color: #e7f4f3;
+  background: transparent;
+}
+
+.final-product-023 .hydro-chart--unavailable.hydro-chart--product {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  align-items: center;
+  min-height: 126px;
+}
+
+.final-product-023 .hydro-chart__empty-icon {
+  grid-row: 1 / span 3;
+  font-size: 2rem;
+  color: #76d8d3;
+}
+
+.final-product-023 .context-scale--product {
+  margin: 3px 0 0;
+  padding: 10px 1px 8px;
+  border-top: 1px solid var(--027-line);
+  border-bottom: 0;
+}
+
+.final-product-023 .context-scale--product figcaption,
+.final-product-023 .context-scale--unavailable > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 7px;
+}
+
+.final-product-023 .context-scale--product figcaption strong,
+.final-product-023 .context-scale--unavailable strong {
+  color: #365761;
+  font-size: .66rem;
+  font-weight: 770;
+}
+
+.final-product-023 .context-scale--product figcaption span,
+.final-product-023 .context-scale--unavailable span {
+  color: #809094;
+  font-size: .59rem;
+  text-align: right;
+}
+
+.final-product-023 .context-scale__track {
+  position: relative;
+  height: 18px;
+  margin: 0 5px;
+}
+
+.final-product-023 .context-scale__track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(73, 111, 116, .14), rgba(32, 168, 166, .32));
+}
+
+.final-product-023 .context-scale__reference,
+.final-product-023 .context-scale__current {
+  position: absolute;
+  top: 1px;
+  width: 2px;
+  height: 16px;
+  transform: translateX(-1px);
+  background: #91a3a5;
+}
+
+.final-product-023 .context-scale__reference--protection { background: #ba814a; }
+.final-product-023 .context-scale__current { width: 3px; background: var(--027-water); }
+.final-product-023 .context-scale__current i {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--027-water);
+  transform: translate(-50%, -1px);
+}
+
+.final-product-023 .context-scale__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  color: #708388;
+  font-size: .58rem;
+  line-height: 1.25;
+}
+
+.final-product-023 .context-scale__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.final-product-023 .context-scale__legend i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--027-water);
+}
+
+.final-product-023 .context-scale__legend i.statistical { background: #91a3a5; }
+.final-product-023 .context-scale__legend i.protection { background: #ba814a; border-radius: 1px; }
+
+.final-product-023 .meaning-horizons--secondary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.final-product-023 .smooth-civic-hydrometry .source-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0 0;
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid rgba(16,47,60,.08);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.final-product-023 .smooth-civic-hydrometry .source-strip__copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  color: #718589;
+  font-size: .58rem;
+  line-height: 1.25;
+}
+
+.final-product-023 .smooth-civic-hydrometry .source-strip__copy b {
+  color: #48676f;
+  font-weight: 760;
+}
+
+.final-product-023 .smooth-civic-hydrometry .source-strip__technical {
+  display: none;
+}
+
+.final-product-023 .smooth-civic-hydrometry .source-strip__error {
+  flex-basis: 100%;
+  color: #8e683f;
+}
+
+.final-product-023 .smooth-civic-hydrometry .source-strip button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 9px;
+  border: 1px solid var(--027-line);
+  border-radius: 12px;
+  background: transparent;
+  color: #376870;
+  font-size: .62rem;
+  font-weight: 730;
+}
+
+.final-product-023 .rain-context {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(22,72,82,.075);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(226,244,241,.86), rgba(248,251,248,.95));
+  color: var(--027-ink);
+}
+
+.final-product-023 .rain-context__icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.72);
+  color: #317b82;
+}
+
+.final-product-023 .rain-context__icon svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.final-product-023 .rain-context__main span,
+.final-product-023 .rain-context__main strong,
+.final-product-023 .rain-context__main small,
+.final-product-023 .rain-context__meta span {
+  display: block;
+}
+
+.final-product-023 .rain-context__main span {
+  color: #5f797f;
+  font-size: .6rem;
+  font-weight: 760;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+
+.final-product-023 .rain-context__main strong {
+  margin-top: 1px;
+  color: var(--027-navy);
+  font-size: .96rem;
+  letter-spacing: -.02em;
+}
+
+.final-product-023 .rain-context__main small {
+  margin-top: 2px;
+  color: #70868a;
+  font-size: .59rem;
+  line-height: 1.25;
+}
+
+.final-product-023 .rain-context__meta {
+  display: grid;
+  gap: 2px;
+  color: #6e8589;
+  font-size: .56rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.final-product-023 .rain-context__alert {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: #93602d;
+  font-weight: 760;
+}
+
+.final-product-023 .river-priority {
+  margin: 8px 0 10px;
+  padding: 12px;
+  border-radius: 20px;
+}
+
+.final-product-023 .river-priority__masthead {
+  gap: 12px;
+}
+
+.final-product-023 .river-priority__masthead h2 {
+  font-size: 1rem;
+}
+
+.final-product-023 .river-priority__river--product {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 16px;
+}
+
+.final-product-023 .river-priority__river--product .mini-river-trace {
+  margin: 6px 0;
+}
+
+.final-product-023 .river-priority__metric-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.final-product-023 .river-priority__metric-row strong {
+  font-size: 1.35rem;
+  letter-spacing: -.04em;
+}
+
+.final-product-023 .river-priority__metric-row span,
+.final-product-023 .river-priority__source,
+.final-product-023 .river-priority__status {
+  font-size: .62rem;
+}
+
+.final-product-023 .context-discovery--product {
+  margin: 13px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.final-product-023 .context-discovery--product > details {
+  border: 1px solid var(--027-line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.56);
+  overflow: hidden;
+}
+
+.final-product-023 .context-discovery--product > details > summary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px;
+  color: #385961;
+  font-size: .73rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.final-product-023 .context-discovery--product > details > summary small {
+  color: #819195;
+  font-size: .59rem;
+  font-weight: 650;
+}
+
+.final-product-023 .context-discovery--product .context-discovery__principles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.final-product-023 .context-discovery--product .context-discovery__principles article {
+  padding: 10px;
+  border: 0;
+  border-radius: 13px;
+  background: rgba(239,246,244,.72);
+}
+
+.final-product-023 .context-discovery--product .context-discovery__principles strong {
+  font-size: .66rem;
+}
+
+.final-product-023 .context-discovery--product .context-discovery__principles p {
+  margin-top: 3px;
+  font-size: .61rem;
+  line-height: 1.3;
+}
+
+.final-product-023 .context-discovery--product .civic-quick-grid {
+  margin-top: 10px;
+}
+
+.final-product-023 .context-discovery--product .civic-campaign {
+  margin-top: 10px;
+}
+
+@keyframes chart-series-arrive {
+  from { opacity: .35; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chart-current-arrive {
+  from { opacity: 0; transform: scale(.55); transform-origin: center; }
+  to { opacity: 1; transform: scale(1); transform-origin: center; }
+}
+
+@media (max-width: 720px) {
+  .final-product-023 .dashboard {
+    padding-inline: 10px;
+  }
+
+  .final-product-023 .smooth-civic-hydrometry .muni-hydrometric-hero {
+    padding-top: 9px;
+  }
+
+  .final-product-023 .hydro-product-header {
+    margin-bottom: 9px;
+  }
+
+  .final-product-023 .river-switch {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .final-product-023 .river-switch button {
+    min-height: 82px;
+    padding: 8px 9px 7px;
+    border-radius: 16px;
+  }
+
+  .final-product-023 .river-switch__trace {
+    height: 23px;
+  }
+
+  .final-product-023 .mini-river-trace {
+    height: 24px;
+  }
+
+  .final-product-023 .river-product-card {
+    padding: 12px;
+    border-radius: 23px;
+  }
+
+  .final-product-023 .meaning-glance--product {
+    grid-template-columns: minmax(112px, .82fr) minmax(0, 1.18fr);
+    gap: 10px;
+    padding-top: 5px;
+    padding-bottom: 7px;
+  }
+
+  .final-product-023 .meaning-glance--product .hydro-level > strong {
+    font-size: clamp(3.25rem, 15vw, 4.35rem);
+  }
+
+  .final-product-023 .hydro-chart--product {
+    margin: 2px 0 8px;
+    padding: 10px 7px 7px;
+    border-radius: 19px;
+  }
+
+  .final-product-023 .hydro-chart--product svg {
+    min-height: 184px;
+  }
+
+  .final-product-023 .hydro-chart__product-head {
+    padding-inline: 3px;
+  }
+
+  .final-product-023 .hydro-chart__now-chip {
+    right: 5px;
+    top: 11px;
+  }
+
+  .final-product-023 .smooth-civic-hydrometry .source-strip {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .final-product-023 .smooth-civic-hydrometry .source-strip__copy > span:nth-child(1),
+  .final-product-023 .smooth-civic-hydrometry .source-strip__copy > span:nth-child(2),
+  .final-product-023 .smooth-civic-hydrometry .source-strip__copy > span:nth-child(3) {
+    display: inline;
+  }
+
+  .final-product-023 .rain-context {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+    border-radius: 18px;
+  }
+
+  .final-product-023 .rain-context__meta {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .final-product-023 .rain-context__alert {
+    justify-content: flex-start;
+  }
+
+  .final-product-023 .context-discovery--product .context-discovery__principles {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .final-product-023 .dashboard { padding-inline: 7px; }
+  .final-product-023 .river-switch button { min-height: 78px; padding-inline: 8px; }
+  .final-product-023 .river-switch em { font-size: .58rem; }
+  .final-product-023 .station-identification--product > div > small { font-size: .56rem; }
+  .final-product-023 .meaning-glance--product { grid-template-columns: minmax(100px, .78fr) minmax(0, 1.22fr); gap: 7px; }
+  .final-product-023 .meaning-glance--product .hydro-level > strong { font-size: 3.15rem; }
+  .final-product-023 .meaning-glance--product .meaning-copy__primary { font-size: .76rem; }
+  .final-product-023 .hydro-chart--product { padding-inline: 4px; }
+  .final-product-023 .hydro-chart--product .hydro-chart__windows button { min-width: 42px; padding-inline: 6px; }
+}
+
+@media (min-width: 768px) {
+  .final-product-023 .smooth-civic-hydrometry .muni-hydrometric-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .final-product-023 .hydro-product-header {
+    margin-bottom: 14px;
+  }
+
+  .final-product-023 .river-switch {
+    max-width: 620px;
+  }
+
+  .final-product-023 .river-product-card {
+    padding: 20px;
+  }
+
+  .final-product-023 .rain-context {
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .final-product-023 .smooth-civic-hydrometry .muni-hydrometric-hero {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-areas:
+      "header rail"
+      "card rail"
+      "priority priority";
+    column-gap: 18px;
+    align-items: start;
+  }
+
+  .final-product-023 .hydro-product-header { grid-area: header; }
+  .final-product-023 .river-switch { grid-area: rail; max-width: none; margin: 0; }
+  .final-product-023 .river-product-card { grid-area: card; }
+  .final-product-023 .rain-context { grid-area: rail; align-self: end; margin-top: 112px; }
+  .final-product-023 .river-priority { grid-area: priority; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .final-product-023 .hydro-chart__series-motion,
+  .final-product-023 .hydro-chart__current-halo {
+    animation: none !important;
+  }
+
+  .final-product-023 .river-switch button,
+  .final-product-023 .hydro-refresh-button,
+  .final-product-023 .hydro-chart__windows button {
+    transition: none !important;
+  }
+}
