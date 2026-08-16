@@ -132,6 +132,7 @@ function OperationalRiverPanel({ system, snapshot, priority }: {
   const signals = hydroPrioritySignalsForSystem(priority, system.id);
   const meaning = meaningForSystem(system);
   return <article className="river-priority__river river-priority__river--product" data-river-system={system.id}>
+    <span className="sr-only">Estación {system.stationName}. Nivel {formatLevel(system)}. Movimiento {trendLabel(system)}. Últimas 24 h {compactMovement(system)}. Vigencia {freshnessLabel(system)}. Por qué se prioriza: condición verificada y trazable a fuente oficial.</span>
     <header className="river-priority__river-header">
       <div><span>{system.watercourse}</span><strong>Est. {system.stationName}</strong></div>
       <FreshnessBadge className={`freshness-badge--${(system.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`} label={freshnessLabel(system)}/>
