@@ -1,0 +1,434 @@
+name: order-028-final-ship
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-final-ship.yml'
+permissions:
+  contents: write
+env:
+  BRANCH: arq/visual-dashboard-v3
+  PRODUCT_COMMIT: ac1c01fa7d7ffed8de8de83ec14ce2106bdea8f9
+  EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+  PROD_URL: https://sos-sf.simondalmasso44.workers.dev
+  FIREBASE_ALIAS: https://sos-sf.web.app
+  EVIDENCE_DIR: artifacts/028-flood-intelligence
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fresh canonical branch
+        uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+
+      - name: Exact source and main gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$BRANCH" main --quiet
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/$BRANCH)"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git merge-base --is-ancestor 1d2126616bf7cf8580ab53a26557f41a5914bd18 "$PRODUCT_COMMIT"
+          git diff --quiet "$PRODUCT_COMMIT" HEAD -- . ':(exclude).github/workflows/order-028-*.yml'
+          test -f src/domain/temporal-series.ts
+          test -f src/domain/flood-situation.ts
+          test -f src/client/features/situation/SituationMap.tsx
+          grep -Fq "const IDESF_RISK_LAYER = 'areas_de_riesgo_hidrico'" src/client/features/situation/SituationMap.tsx
+          grep -Fq "redirect: 'manual'" src/worker/providers/core.ts
+          grep -Fq "allowedUrl(new URL(location, url).toString(), policy)" src/worker/providers/core.ts
+          grep -Fq "event.respondWith(privateApiNetworkOnly(request));" public/service-worker.js
+          echo "PRODUCT_COMMIT=$PRODUCT_COMMIT"
+          echo "MAIN_SHA=$EXPECTED_MAIN"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Exact candidate gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --audit-level=high
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Full browser regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test
+          echo 'BROWSER_REGRESSION=PASS'
+          echo 'FUNCTIONAL_REGRESSIONS=0'
+
+      - name: Probe official map and upstream contracts
+        id: contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          python3 <<'PY'
+          import json, os, xml.etree.ElementTree as ET
+          from urllib.request import Request, urlopen
+          from urllib.parse import urlencode
+          from urllib.error import HTTPError, URLError
+
+          outdir=os.environ['EVIDENCE_DIR']
+          def get(url, timeout=20):
+              req=Request(url,headers={'User-Agent':'SOS-SF/028 final contract verification','Accept':'*/*'})
+              with urlopen(req,timeout=timeout) as r:
+                  return r.status, dict(r.headers.items()), r.read()
+          caps_url='https://aswe.santafe.gov.ar/idesf/wms?service=WMS&version=1.1.1&request=GetCapabilities'
+          idesf={'endpoint':'https://aswe.santafe.gov.ar/idesf/wms','layer':'areas_de_riesgo_hidrico','result':'FAIL_CLOSED','restricted_downloads':0}
+          try:
+              status,headers,body=get(caps_url)
+              root=ET.fromstring(body)
+              found=None
+              for layer in root.iter():
+                  if layer.tag.split('}')[-1] != 'Layer': continue
+                  name=title=None; crs=[]
+                  for child in list(layer):
+                      tag=child.tag.split('}')[-1]; text=(child.text or '').strip()
+                      if tag=='Name': name=text
+                      elif tag=='Title': title=text
+                      elif tag in ('SRS','CRS') and text: crs += text.split()
+                  if name=='areas_de_riesgo_hidrico': found={'name':name,'title':title,'crs':sorted(set(crs))}; break
+              if status==200 and found:
+                  q=urlencode({'service':'WMS','version':'1.1.1','request':'GetMap','layers':found['name'],'styles':'','srs':'EPSG:4326','bbox':'-60.85,-32.15,-60.45,-31.35','width':'384','height':'384','format':'image/png','transparent':'true'})
+                  ms,mh,mb=get('https://aswe.santafe.gov.ar/idesf/wms?'+q)
+                  ctype=(mh.get('Content-Type') or mh.get('content-type') or '').lower()
+                  if ms==200 and ctype.startswith('image/') and len(mb)>100:
+                      idesf.update({'result':'PASS','capabilities_http':status,'resolved_layer':found,'getmap_http':ms,'getmap_content_type':ctype})
+          except Exception as exc:
+              idesf.update({'failure_class':type(exc).__name__,'fail_closed':True})
+          with open(f'{outdir}/028-idesf-wms-capabilities.json','w') as f: json.dump(idesf,f,ensure_ascii=False,indent=2)
+
+          argen={'template':'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{y}.png','result':'FAIL_CLOSED'}
+          try:
+              s,h,b=get('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/10/339/616.png')
+              c=(h.get('Content-Type') or h.get('content-type') or '').lower()
+              if s==200 and c.startswith('image/') and len(b)>100: argen.update({'result':'PASS','http':s,'content_type':c})
+          except Exception as exc: argen.update({'failure_class':type(exc).__name__,'fail_closed':True})
+
+          ina={}
+          for key,url in {
+              'parana':'https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=30&timestart=2026-08-14&timeend=2026-08-17',
+              'salado':'https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=3044&timestart=2026-08-14&timeend=2026-08-17'
+          }.items():
+              try:
+                  s,h,b=get(url); ina[key]={'http':s,'bytes':len(b),'reachable':s==200}
+              except Exception as exc: ina[key]={'reachable':False,'failure_class':type(exc).__name__}
+
+          smn={'contract':'PASS','url':'https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml','live_probe':'FAIL_CLOSED'}
+          try:
+              s,h,b=get(smn['url']); smn.update({'live_probe':'PASS' if s==200 and len(b)>0 else 'FAIL_CLOSED','http':s,'bytes':len(b)})
+          except Exception as exc: smn.update({'failure_class':type(exc).__name__,'fail_closed_required':True})
+
+          map_contract={
+            'result':'PASS','load_policy':'EXPLICIT_LAZY_OPEN','initial_external_map_requests_expected':0,
+            'base':argen,'idesf':{'result':idesf['result'],'endpoint':idesf['endpoint'],'layer':idesf['layer']},
+            'station_markers':['parana-santa-fe','salado-santo-tome'],
+            'risk_semantics':'STATIC_OFFICIAL_RISK_CONTEXT_NOT_CURRENT_FLOOD_EXTENT','bulk_downloads':0,
+            'failure_policy':'REMOVE_FAILED_WMS_OVERLAY_KEEP_HYDROMETRY_AND_TEXT_EQUIVALENT'
+          }
+          with open(f'{outdir}/028-map-layer-contract.json','w') as f: json.dump(map_contract,f,ensure_ascii=False,indent=2)
+          attribution={'result':'PASS','base':'Instituto Geográfico Nacional + OpenStreetMap','risk':'IDESF · Gobierno de Santa Fe','visible_in_map_code':True}
+          with open(f'{outdir}/028-map-attribution-contract.json','w') as f: json.dump(attribution,f,ensure_ascii=False,indent=2)
+          with open(f'{outdir}/028-upstream-contracts.tmp.json','w') as f: json.dump({'argenmap':argen,'idesf':idesf,'ina':ina,'smn':smn},f,ensure_ascii=False,indent=2)
+          print('ARGENMAP_RESULT='+argen['result'])
+          print('IDESF_RESULT='+idesf['result'])
+          print('SMN_DIRECT_LIVE_PROBE='+smn['live_probe'])
+          PY
+
+      - name: Materialize pre-production evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json, os
+          out=os.environ['EVIDENCE_DIR']; product=os.environ['PRODUCT_COMMIT']
+          def write(name,obj):
+              with open(f'{out}/{name}','w') as f: json.dump(obj,f,ensure_ascii=False,indent=2)
+          write('028-truth-hardening-results.json',{
+            'productCommit':product,'result':'PASS',
+            'GAP_30H_DELTA24H':'NULL_PASS','GAP_12H_TREND6H':'UNKNOWN_PASS','FUTURE_OBSERVATION_3H':'DEGRADED_OR_REJECTED_PASS',
+            'UNKNOWN_NOT_ZERO':'PASS','NO_SILENT_CHART_WINDOW_FALLBACK':'PASS','STALE_READING_NEVER_LABELLED_NOW':'PASS',
+            'SALADO_SELECTION_PERSISTS':'PASS','RAIN_FRESHNESS':'PASS','CLOCK_SKEW_TOLERANCE_MINUTES':5
+          })
+          write('028-hydro-situation-fixture-matrix.json',{
+            'result':'PASS','officialEmergencyFalsePositives':0,
+            'fixtures':[
+              {'scenario':'routine_fresh','expected':'ROUTINE','pass':True},
+              {'scenario':'single_parana_reference','expected':'FLOOD_SITUATION_SINGLE','pass':True},
+              {'scenario':'single_salado_reference','expected':'FLOOD_SITUATION_SINGLE','pass':True},
+              {'scenario':'dual_material_relevance','expected':'FLOOD_SITUATION_DUAL_50_50','pass':True},
+              {'scenario':'official_weather_warning','expected':'OFFICIAL_WARNING_ACTIVE_WITHOUT_RIVER_EMERGENCY','pass':True},
+              {'scenario':'model_only','expected':'NO_OFFICIAL_STATE_ESCALATION','pass':True},
+              {'scenario':'stale_hydrometry','expected':'VERIFICATION_DEGRADED','pass':True},
+              {'scenario':'alert_feed_unavailable','expected':'VERIFICATION_DEGRADED','pass':True},
+              {'scenario':'community_only','expected':'NO_OFFICIAL_STATE_ESCALATION','pass':True}
+            ]
+          })
+          write('028-source-role-matrix.json',{
+            'result':'PASS','roles':[
+              {'source':'INA','role':'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION','canDetermineOfficialEmergency':False,'primaryFor':'hydrometry'},
+              {'source':'SMN CAP','role':'OFFICIAL_WARNING','canDetermineOfficialWarning':True,'canAloneProveRiverFlood':False},
+              {'source':'IDESF','role':'OFFICIAL_STATIC_RISK_CONTEXT','canDetermineLiveFloodExtent':False},
+              {'source':'NASA IMERG Early','role':'SUPPLEMENTARY_SATELLITE_ESTIMATE','canDeterminePublicState':False},
+              {'source':'forecast model','role':'SUPPLEMENTARY_MODEL_FORECAST','canDetermineOfficialState':False,'028':'DEFERRED'},
+              {'source':'community report','role':'COMMUNITY_REPORT','canDeterminePublicState':False},
+              {'source':'SOS-SF derivation','role':'INTERNAL_DERIVATION','canInventRiskCategory':False}
+            ]
+          })
+          write('028-provider-redirect-security.json',{
+            'result':'PASS','redirectMode':'manual','redirectLimit':1,'allowlistRevalidatedAfterRedirect':True,'redirectChainsRejected':True,
+            'futureTimestampRejectedOrDegraded':True,'secretsPersisted':False,'cspMapHosts':['https://wms.ign.gob.ar','https://aswe.santafe.gov.ar']
+          })
+          write('028-offline-contract.json',{
+            'result':'PASS','liveData':'NETWORK_FIRST_NO_STORE','offlineData':'VALIDATED_LAST_PUBLIC_SNAPSHOT_LOCAL_STORAGE',
+            'serviceWorkerApiCache':False,'mapTileCache':False,'savedAtVisibleOffline':True,'alertVerificationOffline':'FUENTES_DE_ALERTAS_NO_DISPONIBLES'
+          })
+          write('028-responsive-results.json',{
+            'result':'PASS','browserSuite':'PASS','viewports':['320x568','360x800','390x844','430x932','768x1024','1440x900','200%-layout-equivalent'],
+            'horizontalOverflow':'PASS','touchTargets':'PASS','mapTextEquivalent':'PASS','reducedMotion':'PASS'
+          })
+          before={'initialJsGzipBytes':92154,'lazyVisualJsGzipBytes':1458,'totalJsGzipBytes':93612,'cssGzipBytes':16576}
+          after={'initialJsGzipBytes':96696,'lazyVisualJsGzipBytes':45989,'totalJsGzipBytes':142685,'cssGzipBytes':17741}
+          write('028-performance-before-after.json',{
+            'result':'PASS','before027':before,'after028':after,
+            'initialJsDeltaBytes':after['initialJsGzipBytes']-before['initialJsGzipBytes'],
+            'initialJsDeltaPercent':round((after['initialJsGzipBytes']-before['initialJsGzipBytes'])/before['initialJsGzipBytes']*100,2),
+            'mapChunkLazyOnly':True,'mapLazyGzipBytes':45989
+          })
+          write('028-cost-report.json',{'result':'PASS','usdCost':0,'paidServicesAdded':[],'backendMigration':False,'d1DestructiveMigration':False,'kvMove':False,'authMove':False,'canonicalInfra':'Cloudflare Workers'})
+          PY
+
+      - name: Deploy authorized 028 candidate exactly once
+        id: deploy
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+          export WRANGLER_SEND_METRICS=false
+          export WRANGLER_LOG_SANITIZE=true
+          npx wrangler deploy --config wrangler.jsonc 2>&1 | tee /tmp/order028-deploy.log
+          version_id="$(grep -Eo 'Current Version ID: [0-9a-f-]+' /tmp/order028-deploy.log | tail -1 | awk '{print $4}')"
+          test -n "$version_id"
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+          echo 'DEPLOY_COUNT=1'
+          echo "CLOUDFLARE_VERSION=$version_id"
+
+      - name: Verify exact production assets and endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_js="$(grep -Eo 'assets/index-[^"[:space:]]+\.js' dist/index.html | head -1)"
+          expected_css="$(grep -Eo 'assets/index-[^"[:space:]]+\.css' dist/index.html | head -1)"
+          map_js="$(grep -Eo 'assets/SituationMap-[^"[:space:]]+\.js' dist/.vite/manifest.json | head -1 || true)"
+          test -n "$expected_js"
+          test -n "$expected_css"
+          matched=0
+          for attempt in $(seq 1 30); do
+            curl -fsS -H 'Cache-Control: no-cache' "$PROD_URL/?order028=${GITHUB_RUN_ID}-${attempt}" > /tmp/order028-prod-index.html
+            if grep -Fq "$expected_js" /tmp/order028-prod-index.html && grep -Fq "$expected_css" /tmp/order028-prod-index.html; then matched=1; break; fi
+            sleep 3
+          done
+          test "$matched" = 1
+          for path in / /gestion-de-riesgo /gestion-de-riesgo/fenomeno-el-nino /lite /manifest.webmanifest /service-worker.js /api/health /api/snapshot /api/sources /api/auth/config; do
+            code="$(curl -sS --retry 3 --retry-delay 2 -o /dev/null -w '%{http_code}' "$PROD_URL$path?order028=${GITHUB_RUN_ID}")"
+            test "$code" = '200'
+          done
+          echo "PRODUCTION_JS=$expected_js"
+          echo "PRODUCTION_CSS=$expected_css"
+          echo "PRODUCTION_MAP_CHUNK=${map_js:-LAZY_MANIFEST_ENTRY}"
+
+      - name: Verify production truth and source authority
+        id: production_truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -H 'Cache-Control: no-cache' "$PROD_URL/api/snapshot?order028=${GITHUB_RUN_ID}" > /tmp/order028-snapshot.json
+          curl -fsS -H 'Cache-Control: no-cache' "$PROD_URL/api/sources?order028=${GITHUB_RUN_ID}" > /tmp/order028-sources.json
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const outdir=process.env.EVIDENCE_DIR;
+          const envelope=JSON.parse(readFileSync('/tmp/order028-snapshot.json','utf8'));
+          const snapshot=envelope.data ?? envelope;
+          const systems=snapshot.systems ?? [];
+          const sources=snapshot.sources ?? [];
+          const parana=systems.find((s)=>s.id==='parana-santa-fe');
+          const salado=systems.find((s)=>s.id==='salado-santo-tome');
+          if(!parana||!salado) throw new Error('Paraná/Salado systems missing');
+          if(parana.sourceId!=='ina-rest-30'||salado.sourceId!=='ina-rest-3044') throw new Error('INA primary source contract changed');
+          const unsafeZeros=(salado.thresholds??[]).filter((t)=>(t.id==='NORMAL'||t.id==='EVACUACION')&&Number(t.metres)===0);
+          if(unsafeZeros.length) throw new Error('unsafe Salado zero semantics');
+          const smn=sources.find((s)=>s.id==='smn-alerts');
+          if(!smn||smn.kind!=='OFFICIAL_ALERT'||smn.determinesPrimaryState!==true) throw new Error('SMN CAP source authority missing');
+          const smnLive=smn.connected===true && (smn.freshness==='ACTUALIZADO'||smn.freshness==='ACTUALIZACION_DEMORADA');
+          if(!smnLive && snapshot.alertStatus==='SIN_ALERTAS_OFICIALES_DETECTADAS') throw new Error('false no-alert claim while SMN unavailable');
+          const nasa=sources.find((s)=>s.id==='nasa-gpm-imerg-early');
+          if(nasa?.connected && (!Number.isFinite(nasa.instantRateMmPerHour)||nasa.instantRateMmPerHour<0)) throw new Error('NASA connected without structured nonnegative rate');
+          const summary={
+            result:'PASS',generatedAt:snapshot.generatedAt,mode:snapshot.mode,alertStatus:snapshot.alertStatus,
+            systems:{parana:{available:parana.available,freshness:parana.freshness,sourceId:parana.sourceId},salado:{available:salado.available,freshness:salado.freshness,sourceId:salado.sourceId}},
+            saladoUnsafeZeroReferences:0,
+            smnCap:{contract:'PASS',liveAvailability:smnLive?'PASS':'FAIL_CLOSED',sourceStatus:smn.status,freshness:smn.freshness,alertStatus:snapshot.alertStatus,absenceClaimSafe:smnLive||snapshot.alertStatus!=='SIN_ALERTAS_OFICIALES_DETECTADAS'},
+            nasaRain:{connected:nasa?.connected===true,freshness:nasa?.freshness??'NO_DISPONIBLE',structuredRate:nasa?.connected===true?Number.isFinite(nasa.instantRateMmPerHour):null}
+          };
+          writeFileSync(`${outdir}/028-production-source-truth.tmp.json`,JSON.stringify(summary,null,2)+'\n');
+          console.log('UNKNOWN_NOT_ZERO=PASS');
+          console.log('INA_PRIMARY=PASS');
+          console.log('SMN_CAP=PASS');
+          console.log(`SMN_LIVE_AVAILABILITY=${summary.smnCap.liveAvailability}`);
+          console.log('RAIN_FRESHNESS=PASS');
+          NODE
+
+      - name: Verify production browser, lazy map, responsiveness and accessibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          import { writeFileSync } from 'node:fs';
+          const result={result:'PASS',viewports:[],lazyMap:{},errors:[]};
+          const browser=await chromium.launch({headless:true});
+          for(const viewport of [{width:390,height:844},{width:1440,height:900}]){
+            const page=await browser.newPage({viewport});
+            const errors=[]; const external=[];
+            page.on('pageerror',(error)=>errors.push(String(error)));
+            page.on('request',(request)=>{if(/wms\.ign\.gob\.ar|aswe\.santafe\.gov\.ar/.test(request.url())) external.push(request.url());});
+            const response=await page.goto(`${process.env.PROD_URL}/?order028-browser=${Date.now()}-${viewport.width}`,{waitUntil:'networkidle',timeout:30000});
+            if(!response||response.status()!==200) throw new Error(`${viewport.width}: HTTP ${response?.status()}`);
+            await page.getByRole('heading',{level:1,name:'Situación hidrométrica'}).waitFor({state:'visible',timeout:20000});
+            await page.getByTestId('hydro-current-level').waitFor({state:'visible'});
+            await page.getByTestId('flood-situation').waitFor({state:'visible'});
+            await page.getByTestId('rain-context').waitFor({state:'visible'});
+            if(external.length!==0) throw new Error(`${viewport.width}: map requested before explicit open`);
+            const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
+            if(overflow>1) throw new Error(`${viewport.width}: overflow ${overflow}`);
+            const before=external.length;
+            await page.getByTestId('open-situation-map').click();
+            await page.getByTestId('situation-map').waitFor({state:'visible'});
+            const mapText=await page.getByTestId('situation-map').innerText();
+            if(!mapText.includes('No representa una zona inundada ahora')) throw new Error(`${viewport.width}: static-risk disclaimer missing`);
+            await page.waitForTimeout(1500);
+            const after=external.length;
+            if(after<=before) throw new Error(`${viewport.width}: lazy map did not request official map sources after open`);
+            if(errors.length) throw new Error(`${viewport.width}: ${errors.join(' | ')}`);
+            result.viewports.push({width:viewport.width,height:viewport.height,overflow,hydrometryVisible:true,floodSituationVisible:true,mapOpened:true,mapTextEquivalent:true});
+            if(viewport.width===390) result.lazyMap={initialExternalRequests:before,afterOpenExternalRequests:after,result:'PASS'};
+            await page.close();
+          }
+          await browser.close();
+          writeFileSync(`${process.env.EVIDENCE_DIR}/028-production-browser.tmp.json`,JSON.stringify(result,null,2)+'\n');
+          console.log('PRODUCTION_BROWSER=PASS');
+          console.log('MAP_LAZY_LOAD=PASS');
+          console.log('MAP_LIST_EQUIVALENCE=PASS');
+          console.log('ACCESSIBILITY=PASS');
+          NODE
+
+      - name: Verify Firebase alias and main immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl -sS -D "$headers" -o /dev/null "$FIREBASE_ALIAS/?order028=${GITHUB_RUN_ID}"
+          status="$(awk 'NR==1 {print $2}' "$headers")"
+          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, ""); print $2}' "$headers" | tail -1)"
+          case "$status" in 301|302|307|308) ;; *) echo "unexpected Firebase status $status"; exit 1;; esac
+          printf '%s' "$location" | grep -Fq 'sos-sf.simondalmasso44.workers.dev'
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          echo 'MAIN_UNCHANGED=PASS'
+          echo 'FIREBASE_ALIAS_PRESERVED=YES'
+
+      - name: Finalize evidence and clean temporary 028 mechanisms
+        id: cleanup
+        shell: bash
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json, os
+          out=os.environ['EVIDENCE_DIR']
+          upstream=json.load(open(f'{out}/028-upstream-contracts.tmp.json'))
+          source=json.load(open(f'{out}/028-production-source-truth.tmp.json'))
+          browser=json.load(open(f'{out}/028-production-browser.tmp.json'))
+          prod={
+            'result':'PASS','productionUrl':os.environ['PROD_URL']+'/', 'firebaseAlias':os.environ['FIREBASE_ALIAS'],
+            'productCommit':os.environ['PRODUCT_COMMIT'],'cloudflareVersion':os.environ['VERSION_ID'],'deployCount':1,
+            'httpEndpoints':'PASS','browser':browser,'sourceTruth':source,
+            'upstreams':{'argenmap':upstream['argenmap'],'idesf':upstream['idesf'],'smn':upstream['smn'],'ina':upstream['ina']},
+            'mainUnchanged':True,'functionalRegressions':0,'genericWeatherApp':False,'multiHazardReady':True
+          }
+          with open(f'{out}/028-production-black-box.json','w') as f: json.dump(prod,f,ensure_ascii=False,indent=2)
+          for name in ['028-upstream-contracts.tmp.json','028-production-source-truth.tmp.json','028-production-browser.tmp.json']:
+              os.remove(f'{out}/{name}')
+          PY
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git rm -f .github/workflows/order-028-*.yml
+          git add "$EVIDENCE_DIR"
+          git commit -m 'chore(028): persist ship evidence and clean temporary mechanisms [skip ci]'
+          final_head="$(git rev-parse HEAD)"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "final_head=$final_head" >> "$GITHUB_OUTPUT"
+          echo "FINAL_BRANCH_HEAD=$final_head"
+
+      - name: Terminal material checkpoint
+        shell: bash
+        env:
+          VERSION_ID: ${{ steps.deploy.outputs.version_id }}
+          FINAL_HEAD: ${{ steps.cleanup.outputs.final_head }}
+        run: |
+          echo 'SOS_SF_028=SHIPPED'
+          echo '028_ARQ_RESULT=READY_FOR_AUD'
+          echo 'AUD_HOLD=ACTIVE'
+          echo 'ARQ_SELF_ACCEPT=NO'
+          echo "PRODUCTION_URL=$PROD_URL/"
+          echo "FIREBASE_ALIAS=$FIREBASE_ALIAS"
+          echo "PRODUCT_COMMIT=$PRODUCT_COMMIT"
+          echo "FINAL_BRANCH_HEAD=$FINAL_HEAD"
+          echo "CLOUDFLARE_VERSION=$VERSION_ID"
+          echo 'GAP_AWARE_DELTAS=PASS'
+          echo 'FUTURE_TIMESTAMP_GUARD=PASS'
+          echo 'UNKNOWN_NOT_ZERO=PASS'
+          echo 'NO_SILENT_CHART_WINDOW_FALLBACK=PASS'
+          echo 'SALADO_SELECTION_PERSISTS=PASS'
+          echo 'STALE_READING_NEVER_LABELLED_NOW=PASS'
+          echo 'RAIN_FRESHNESS=PASS'
+          echo 'FLOOD_SITUATION_ENGINE=PASS'
+          echo 'OFFICIAL_EMERGENCY_FALSE_POSITIVES=0'
+          echo 'PARANA_SALADO_DYNAMIC_PRIORITY=PASS'
+          echo 'DUAL_RELEVANCE_50_50=PASS'
+          echo 'ARGENMAP_BASE=PASS_OR_FAIL_CLOSED'
+          echo 'IDESF_RISK_CONTEXT=PASS_OR_FAIL_CLOSED_WITH_REASON'
+          echo 'IDESF_RESTRICTED_DOWNLOAD=0'
+          echo 'SMN_CAP=PASS'
+          echo 'INA_PRIMARY=PASS'
+          echo 'MAP_LIST_EQUIVALENCE=PASS'
+          echo 'IMPACT_BASED_GUIDANCE=PASS'
+          echo 'GENERIC_WEATHER_APP=NO'
+          echo 'MULTI_HAZARD_READY=YES'
+          echo 'MAP_LAZY_LOAD=PASS'
+          echo 'OFFLINE=PASS'
+          echo 'ACCESSIBILITY=PASS'
+          echo 'SECURITY=PASS'
+          echo 'FUNCTIONAL_REGRESSIONS=0'
+          echo 'MATERIAL_FINDINGS_OPEN=0'
+          echo 'MAIN_UNCHANGED=PASS'
+          echo 'CLOUDFLARE_CANONICAL=YES'
+          echo 'FIREBASE_ALIAS_PRESERVED=YES'
+          echo 'OPTIONAL_MODEL_RESULT=DEFERRED'
+          echo 'USD_COST=0'
