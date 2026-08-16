@@ -71,7 +71,7 @@ test('024 first viewport is civic, calm and measurement-dominant', async ({ page
   await expect(page.getByText('Santa Fe · monitoreo hídrico', { exact: true })).toBeVisible();
   const h1 = page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' });
   await expect(h1).toBeVisible();
-  await expect(page.getByText('Niveles, tendencia y vigencia de las últimas mediciones disponibles.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.', { exact: true })).toBeVisible();
   await expect(page.getByText('Santa Fe, hoy', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Así están el Paraná y el Salado', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Último nivel disponible', { exact: true })).toBeVisible();
