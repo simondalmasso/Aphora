@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { changeCopy, changeForSystem, safeStationThresholds } from '../../../domain/hydrometric-context.ts';
+import { changeForSystem, safeStationThresholds } from '../../../domain/hydrometric-context.ts';
 import type { HydrologicalSystem, RiverPoint } from '../../../domain/snapshot.ts';
 import { formatHumanAge, formatLocalDateTime, isPublicTimestamp, LOCAL_TIME_ZONE } from '../../../domain/public-safety.ts';
 
