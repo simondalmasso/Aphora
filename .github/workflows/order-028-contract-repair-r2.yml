@@ -1,0 +1,60 @@
+name: order-028-contract-repair-r2
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-contract-repair-r2.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Apply authority-consistent fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          p=Path('tests/e2e/context-first-026.spec.ts'); s=p.read_text()
+          old="await expect(page.getByTestId('hydro-meaning')).toContainText('por debajo del nivel de alerta de referencia');"
+          new="await expect(page.getByTestId('hydro-meaning')).toContainText('por encima de la referencia de aguas bajas');"
+          if s.count(old) != 1: raise SystemExit(f'context expectation count={s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('tests/e2e/dashboard.spec.ts'); s=p.read_text()
+          old='expect(metrics.sections).toBe(4);'
+          new='expect(metrics.sections).toBe(5);'
+          if s.count(old) != 1: raise SystemExit(f'density expectation count={s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('src/client/features/hydro/HydrometricMonitoring.tsx'); s=p.read_text()
+          old="const [selectedId, setSelectedId] = useState(() => operationalDefaultId ?? '');"
+          new="const [selectedId, setSelectedId] = useState('');"
+          if s.count(old) != 1: raise SystemExit(f'selection init count={s.count(old)}')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint -- --max-warnings=0
+      - run: npm run test:unit
+      - run: npm run test:contract
+      - run: npm run build
+      - run: npm run test:worker
+      - run: npx playwright install --with-deps chromium
+      - name: Full browser suite fail-fast
+        run: npx playwright test --max-failures=1 --workers=1
+      - name: Commit repaired candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add src/client/features/hydro/HydrometricMonitoring.tsx tests/e2e/context-first-026.spec.ts tests/e2e/dashboard.spec.ts
+          git commit -m 'fix(028): preserve user river choice while honoring priority defaults [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
