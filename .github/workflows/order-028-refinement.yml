@@ -1,0 +1,138 @@
+name: order-028-refinement
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-refinement.yml'
+permissions:
+  contents: write
+jobs:
+  refine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Guard product head and main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main arq/visual-dashboard-v3 --quiet
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 3d1f8a3 HEAD
+      - name: Refine offline truth, contacts, docs and E2E contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          p=Path('src/domain/essential-contacts.ts'); s=p.read_text()
+          s=s.replace("    Object.freeze({ id: 'medical-107', label: 'Emergencias médicas', number: '107', href: 'tel:107', purpose: 'Urgencia médica' }),\n", "    Object.freeze({ id: 'medical-107', label: 'Emergencias médicas', number: '107', href: 'tel:107', purpose: 'Urgencia médica' }),\n    Object.freeze({ id: 'fire-100', label: 'Bomberos', number: '100', href: 'tel:100', purpose: 'Incendios y rescate' }),\n    Object.freeze({ id: 'nautical-106', label: 'Emergencias náuticas', number: '106', href: 'tel:106', purpose: 'Emergencias en el agua' }),\n")
+          p.write_text(s)
+
+          p=Path('src/client/features/actions/SafetyActions.tsx'); s=p.read_text()
+          s=s.replace("import type { Snapshot } from '../../../domain/snapshot.ts';\n\nconst CONTACTS = Object.freeze([\n  { number: '911', label: 'Emergencias', href: 'tel:911', primary: true },\n  { number: '103', label: 'COBEM', href: 'tel:103', primary: false },\n  { number: '107', label: 'Emergencias médicas', href: 'tel:107', primary: false },\n  { number: '100', label: 'Bomberos', href: 'tel:100', primary: false },\n  { number: '106', label: 'Náutica', href: 'tel:106', primary: false },\n]);", "import type { Snapshot } from '../../../domain/snapshot.ts';\nimport { ESSENTIAL_CONTACTS } from '../../../domain/essential-contacts.ts';")
+          s=s.replace("{CONTACTS.map((contact) => <a className={contact.primary ? 'contact-grid__primary' : undefined} href={contact.href} key={contact.number}><strong>{contact.number}</strong><span>{contact.label}</span></a>)}", "{ESSENTIAL_CONTACTS.map((contact, index) => <a className={index === 0 ? 'contact-grid__primary' : undefined} href={contact.href} key={contact.id}><strong>{contact.number}</strong><span>{contact.label}</span></a>)}")
+          p.write_text(s)
+
+          p=Path('src/client/app/AppShell.tsx'); s=p.read_text()
+          s=s.replace("import type { AlertVerificationState } from '../../domain/snapshot.ts';", "import type { AlertVerificationState } from '../../domain/snapshot.ts';\nimport { formatLocalDateTime } from '../../domain/public-safety.ts';")
+          s=s.replace("  readonly alertStatus?: AlertVerificationState;\n", "  readonly alertStatus?: AlertVerificationState;\n  readonly savedAt?: string | null;\n")
+          s=s.replace("  alertStatus,\n", "  alertStatus,\n  savedAt,\n")
+          marker="""    <span className={online ? 'connection-chip' : 'connection-chip connection-chip--offline'}>\n      <i aria-hidden=\"true\"/>{online ? 'Datos conectados' : 'Sin conexión'}\n    </span>"""
+          replacement="""    <span className={online ? 'connection-chip' : 'connection-chip connection-chip--offline'}>\n      <i aria-hidden=\"true\"/>{online ? 'Datos conectados' : 'Sin conexión'}\n    </span>\n    {!online && savedAt && <span className=\"offline-saved-chip\" data-testid=\"offline-saved-at\">Copia guardada · {formatLocalDateTime(savedAt)}</span>}"""
+          if marker not in s: raise SystemExit('connection chip marker missing')
+          s=s.replace(marker,replacement,1)
+          p.write_text(s)
+
+          p=Path('src/client/App.tsx'); s=p.read_text()
+          s=s.replace("const { snapshot, online, refresh, refreshing } = useSnapshot();", "const { snapshot, online, savedAt, refresh, refreshing } = useSnapshot();")
+          s=s.replace("    alertStatus={snapshot.alertStatus}\n", "    alertStatus={snapshot.alertStatus}\n    savedAt={savedAt}\n")
+          p.write_text(s)
+
+          p=Path('src/client/styles/flood-intelligence-028.css'); s=p.read_text()
+          s += "\n.offline-saved-chip{font-size:.72rem;color:var(--muted,#66757c);white-space:nowrap}\n@media(max-width:560px){.offline-saved-chip{display:none}}\n"
+          p.write_text(s)
+
+          p=Path('tests/e2e/smooth-civic-027.spec.ts'); s=p.read_text().replace('Estimación satelital instantánea · NASA IMERG Early','Estimación satelital reciente · NASA IMERG Early')
+          p.write_text(s)
+
+          p=Path('README.md'); s=p.read_text()
+          section="""\n\n## Flood intelligence foundation (028)\n\nLa rama canónica incorpora una capa de **inteligencia de inundaciones** sin convertir SOS-SF en una app meteorológica genérica. La lectura diaria sigue empezando por Paraná y Salado; sobre esa base se separan observaciones oficiales, referencias de protección, alertas oficiales, lluvia satelital suplementaria y contexto territorial estático.\n\nPrincipios operativos:\n\n- los huecos temporales producen `null`/`UNKNOWN`, nunca cambios inventados en cero;\n- timestamps significativamente futuros se rechazan o degradan;\n- una referencia de alerta alcanzada no equivale a una emergencia declarada;\n- lluvia, modelos y reportes comunitarios no crean por sí solos un estado oficial;\n- el mapa es secundario y lazy: Argenmap como base y `Áreas de Riesgo Hídrico` de IDESF como contexto territorial estático, nunca como mapa de inundación en tiempo real;\n- sin conexión, la PWA conserva únicamente el último snapshot público validado en almacenamiento local y deja explícito que la verificación de alertas no es actual;\n- Cloudflare Workers continúa siendo la infraestructura canónica y no se introducen servicios pagos.\n"""
+          if '## Flood intelligence foundation (028)' not in s: s += section
+          p.write_text(s)
+          PY
+
+          cat > tests/unit/provider-redirect-security-028.test.ts <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          import { describe, expect, it } from 'vitest';
+          describe('028 provider redirect security',()=>{
+            it('uses manual redirects, revalidates allowlists and rejects chains',async()=>{
+              const source=await readFile('src/worker/providers/core.ts','utf8');
+              expect(source).toContain("redirect: 'manual'");
+              expect(source).toContain('allowedUrl(new URL(location, url).toString(), policy)');
+              expect(source).toContain('PROVIDER_REDIRECT_CHAIN_REJECTED');
+              expect(source).toContain('PROVIDER_FUTURE_TIMESTAMP');
+            });
+          });
+          EOF
+
+          cat > tests/unit/offline-contract-028.test.ts <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          import { describe, expect, it } from 'vitest';
+          describe('028 offline single-truth contract',()=>{
+            it('stores a validated public snapshot with savedAt and degrades alert verification offline',async()=>{
+              const source=await readFile('src/client/pwa/useSnapshot.ts','utf8');
+              expect(source).toContain('interface StoredSnapshot { readonly snapshot: Snapshot; readonly savedAt: string }');
+              expect(source).toContain("alertStatus: 'FUENTES_DE_ALERTAS_NO_DISPONIBLES'");
+              expect(source).toContain("fetch(path, { headers: { Accept: 'application/json' }, cache: 'no-store' })");
+            });
+            it('surfaces the saved-copy time when offline',async()=>{
+              const shell=await readFile('src/client/app/AppShell.tsx','utf8');
+              expect(shell).toContain('Copia guardada ·');
+              expect(shell).toContain('offline-saved-at');
+            });
+          });
+          EOF
+
+          cat > tests/e2e/flood-intelligence-028.spec.ts <<'EOF'
+          import { expect, test, type Page } from '@playwright/test';
+          import type { HydrologicalSystem, Snapshot, Source } from '../../src/domain/snapshot.ts';
+          import { stableHydrometricSnapshot } from './fixtures/stable-hydrometric.ts';
+
+          const generatedAt=stableHydrometricSnapshot.generatedAt;
+          const validUntil=new Date(Date.parse(generatedAt)+24*60*60_000).toISOString();
+          function sourceFor(system: HydrologicalSystem): Source { return { id:system.sourceId,name:`INA REST · ${system.watercourse}`,kind:'OFFICIAL_OBSERVATION',status:'FRESH',observedAt:generatedAt,fetchedAt:generatedAt,lastCheckedAt:generatedAt,validUntil,contribution:'fixture 028',official:true,connected:true,organizationId:'ina',organizationName:'Instituto Nacional del Agua',feedId:system.sourceId,feedName:system.sourceName,classification:'OPERATIONAL_FRESH',freshness:'ACTUALIZADO',determinesPrimaryState:true,url:'https://alerta.ina.gob.ar/' }; }
+          function salado(current=3.42): HydrologicalSystem { const points=Array.from({length:190},(_,i)=>({at:new Date(Date.parse(generatedAt)-(189-i)*3600000).toISOString(),metres:current-(189-i)*.001,measured:true,quality:'PUBLISHED_OPERATIONAL' as const})); return {id:'salado-santo-tome',label:'Río Salado — Santo Tomé',watercourse:'Río Salado',stationName:'Santo Tomé',stationCode:'3044',available:true,dataStatus:'LIVE',freshness:'ACTUALIZADO',currentMetres:current,observedAt:generatedAt,fetchedAt:generatedAt,validUntil,sourceId:'ina-rest-3044',sourceName:'Instituto Nacional del Agua · INA REST',points,thresholds:[{id:'ALERTA',label:'Nivel de alerta de referencia',metres:4.7}],trend:'RISING_SLOWLY',delta1h:.001,delta6h:.006,delta24h:.024,delta72h:.072,delta7d:.168}; }
+          function parana(): HydrologicalSystem { const base=stableHydrometricSnapshot.systems![0]!; const points=Array.from({length:190},(_,i)=>({at:new Date(Date.parse(generatedAt)-(189-i)*3600000).toISOString(),metres:3.2-(189-i)*.002,measured:true,quality:'PUBLISHED_OPERATIONAL' as const})); return {...base,points,validUntil,delta72h:.144,delta7d:.336}; }
+          function data(id='028-e2e',saladoLevel=3.42): Snapshot { const p=parana(),s=salado(saladoLevel); return {...stableHydrometricSnapshot,id,generatedAt,validUntil,systems:[p,s],sources:[sourceFor(p),sourceFor(s)],river:{...stableHydrometricSnapshot.river,systemId:p.id,stationName:p.stationName,currentMetres:p.currentMetres,delta1h:p.delta1h,delta6h:p.delta6h,delta24h:p.delta24h,trend:p.trend,observedAt:p.observedAt!,fetchedAt:p.fetchedAt!,validUntil,sourceId:p.sourceId,points:p.points,thresholds:p.thresholds}}; }
+          async function baseRoutes(page: Page, snapshots: Snapshot[]) { let index=0; await page.route('**/api/snapshot*',route=>{ const snapshot=snapshots[Math.min(index++,snapshots.length-1)]!; return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,data:snapshot})});}); await page.route('**/api/auth/config*',route=>route.fulfill({json:{ok:true,data:{enabled:false,reportingEnabled:true,googleClientId:null}}})); await page.route('**/api/session*',route=>route.fulfill({json:{ok:true,data:{enabled:false,authenticated:false,principal:null}}})); }
+
+          test('028 keeps hydrometry primary and does not load external map sources until explicit open',async({page},testInfo)=>{ test.skip(testInfo.project.name!=='desktop'); await page.setViewportSize({width:390,height:844}); const external:string[]=[]; page.on('request',request=>{ if(/wms\.ign\.gob\.ar|aswe\.santafe\.gov\.ar/.test(request.url())) external.push(request.url()); }); await baseRoutes(page,[data()]); await page.goto('/'); await expect(page.getByRole('heading',{level:1,name:'Situación hidrométrica'})).toBeVisible(); await expect(page.getByTestId('flood-situation')).toHaveAttribute('data-flood-state','ROUTINE'); await expect(page.getByTestId('main-hydro-chart')).toHaveAttribute('data-window-sufficient','true'); expect(external).toHaveLength(0); await expect(page.getByTestId('situation-map')).toHaveCount(0); await page.route('https://wms.ign.gob.ar/**',route=>route.fulfill({status:204})); await page.route('https://aswe.santafe.gov.ar/**',route=>route.fulfill({status:500})); await page.getByTestId('open-situation-map').click(); await expect(page.getByTestId('situation-map')).toBeVisible(); await expect(page.getByTestId('situation-map')).toContainText('No representa una zona inundada ahora'); await expect.poll(()=>external.length).toBeGreaterThan(0); await expect(page.getByTestId('hydro-current-level')).toBeVisible(); });
+
+          test('028 selected Salado persists across a fresh snapshot refresh',async({page},testInfo)=>{ test.skip(testInfo.project.name!=='desktop'); const first=data('028-before',3.42),second=data('028-after',3.43); await baseRoutes(page,[first,second]); await page.goto('/'); await expect(page.locator('main')).toHaveAttribute('data-snapshot-id','028-before'); await page.getByRole('tab',{name:'Salado'}).click(); await expect(page.getByTestId('hydro-current-level')).toContainText('3,42'); await page.getByRole('button',{name:'Actualizar información'}).first().click(); await expect(page.locator('main')).toHaveAttribute('data-snapshot-id','028-after'); await expect(page.getByRole('tab',{name:'Salado'})).toHaveAttribute('aria-selected','true'); await expect(page.getByTestId('hydro-current-level')).toContainText('3,43'); });
+
+          test('028 sparse 24h data never falls back to older points',async({page},testInfo)=>{ test.skip(testInfo.project.name!=='desktop'); const snapshot=data('028-gap'); const p=snapshot.systems![0]!; const latest=p.points.at(-1)!; const old={...p.points[0]!,at:new Date(Date.parse(latest.at)-30*3600000).toISOString()}; const sparse={...p,points:[old,latest],delta1h:null,delta6h:null,delta24h:null,trend:'UNKNOWN' as const}; const gap:Snapshot={...snapshot,systems:[sparse,snapshot.systems![1]!],river:{...snapshot.river,points:sparse.points,delta1h:null,delta6h:null,delta24h:null,trend:'UNKNOWN'}}; await baseRoutes(page,[gap]); await page.goto('/'); const chart=page.getByTestId('main-hydro-chart'); await expect(chart).toHaveAttribute('data-window-sufficient','false'); await expect(chart).toContainText('No hay cobertura suficiente en 24 h'); await expect(chart).toContainText('No se completan huecos'); });
+          EOF
+      - name: Validate refinement
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm audit --audit-level=high
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+      - name: Commit refinement
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add src tests README.md
+          git commit -m 'test(028): lock offline truth and flood intelligence browser contracts [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
