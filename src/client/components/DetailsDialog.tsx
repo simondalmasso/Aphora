@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { referencesForSystem, stationDatumExplanation } from '../../domain/hydrometric-context.ts';
 import type { Snapshot, Source } from '../../domain/snapshot.ts';
 import { formatHumanAge, formatLocalDateTime } from '../../domain/public-safety.ts';
 
@@ -49,7 +50,7 @@ function SourceInventory({ snapshot }: { readonly snapshot: Snapshot }) {
       <h3 id={`source-group-${functionName.replaceAll(' ', '-').toLowerCase()}`}>{functionName}</h3>
       {Object.entries(organizations).map(([organization, feeds]) => <div className="source-organization" key={organization}>
         <h4>{organization}</h4>
-        <div className="table-scroll"><table><caption>Feeds y canales de {organization}</caption><thead><tr><th>Feed o canal</th><th>Observación</th><th>Recepción</th><th>Vigencia</th><th>Estado y función</th><th>Acceso</th></tr></thead><tbody>{feeds.map((source) => <tr key={source.id}>
+        <div className="table-scroll"><table><caption>Feeds y canales de {organization}</caption><thead><tr><th>Feed o canal</th><th>Observación</th><th>Consulta</th><th>Vigencia</th><th>Estado y función</th><th>Acceso</th></tr></thead><tbody>{feeds.map((source) => <tr key={source.id}>
           <td><strong>{source.feedName ?? source.name}</strong></td>
           <td>{formatLocalDateTime(source.observedAt)}<small>{formatHumanAge(source.observedAt, snapshot.generatedAt)}</small></td>
           <td>{formatLocalDateTime(source.fetchedAt ?? source.lastCheckedAt)}</td>
@@ -62,6 +63,24 @@ function SourceInventory({ snapshot }: { readonly snapshot: Snapshot }) {
   })}</>;
 }
 
+function StationMethodology({ snapshot }: { readonly snapshot: Snapshot }) {
+  return <section><h3>Mediciones por estación</h3><div className="detail-list detail-list--hydrometric">{(snapshot.systems ?? []).map((system) => {
+    const references = referencesForSystem(system).filter((reference) => reference.kind !== 'UNAVAILABLE');
+    return <article key={system.id}>
+      <strong>{system.label}</strong>
+      <p className="detail-list__datum">{stationDatumExplanation(system)}</p>
+      <dl>
+        <div><dt>Altura de escala</dt><dd>{system.currentMetres === null ? 'No disponible' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`}</dd></div>
+        <div><dt>Serie / estación</dt><dd>{system.id === 'parana-santa-fe' ? 'Serie 30 · estación Santa Fe' : system.id === 'salado-santo-tome' ? 'Serie 3044 · estación Santo Tomé' : system.stationCode}</dd></div>
+        <div><dt>Medición</dt><dd>{formatLocalDateTime(system.observedAt)}<small>{formatHumanAge(system.observedAt, snapshot.generatedAt)}</small></dd></div>
+        <div><dt>Consulta de fuente</dt><dd>{formatLocalDateTime(system.fetchedAt)}<small>{formatHumanAge(system.fetchedAt, snapshot.generatedAt)}</small></dd></div>
+        <div><dt>Válida hasta</dt><dd>{formatLocalDateTime(system.validUntil)}</dd></div>
+      </dl>
+      <div className="station-reference-detail"><h4>Referencias verificadas de esta estación</h4>{references.length ? <ul>{references.map((reference) => <li key={reference.id}><strong>{reference.label}</strong>{reference.metres !== null ? ` · ${reference.metres.toFixed(2).replace('.', ',')} m` : ''}<small>{reference.kind.replaceAll('_', ' ')} · {reference.sourceLabel}{reference.period ? ` · ${reference.period}` : ''}</small>{reference.methodology && <small>{reference.methodology}</small>}<a href={reference.sourceUrl} target="_blank" rel="noreferrer">Ver metadata oficial</a></li>)}</ul> : <p>Sin una referencia oficial suficiente. SOS-SF conserva la lectura sin inventar un rango habitual.</p>}</div>
+    </article>;
+  })}</div></section>;
+}
+
 export function DetailsDialog({ snapshot, open, onClose }: { readonly snapshot: Snapshot; readonly open: boolean; readonly onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { const dialog = ref.current; if (!dialog) return; if (open && !dialog.open) dialog.showModal(); if (!open && dialog.open) dialog.close(); }, [open]);
@@ -69,14 +88,14 @@ export function DetailsDialog({ snapshot, open, onClose }: { readonly snapshot: 
   return <dialog ref={ref} className="details-dialog" aria-labelledby="details-title" onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="dialog-surface">
       <header className="dialog-head"><div><p className="section-kicker">Transparencia pública</p><h2 id="details-title">Datos y fuentes</h2></div><button className="icon-close" type="button" onClick={onClose} aria-label="Cerrar Datos y fuentes">×</button></header>
-      <p className="dialog-lead">SOS Santa Fe separa la hora observada por el organismo, la hora de recepción del integrador y el período de vigencia. Dos transportes del mismo organismo no cuentan como corroboraciones independientes.</p>
-      <section><h3>Mediciones por estación</h3><div className="detail-list">{(snapshot.systems ?? []).map((system) => <article key={system.id}><strong>{system.label}</strong><dl><div><dt>Nivel</dt><dd>{system.currentMetres === null ? 'No disponible' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`}</dd></div><div><dt>Observada</dt><dd>{formatLocalDateTime(system.observedAt)}<small>{formatHumanAge(system.observedAt, snapshot.generatedAt)}</small></dd></div><div><dt>Recibida</dt><dd>{formatLocalDateTime(system.fetchedAt)}</dd></div><div><dt>Válida hasta</dt><dd>{formatLocalDateTime(system.validUntil)}</dd></div></dl></article>)}</div></section>
+      <p className="dialog-lead">La altura se interpreta en la escala de su propia estación. SOS-SF separa cuándo fue medida, cuándo consultó la fuente y qué referencia oficial respalda el contexto. Dos transportes del mismo organismo no cuentan como corroboraciones independientes.</p>
+      <StationMethodology snapshot={snapshot}/>
       <SourceInventory snapshot={snapshot}/>
       <details className="technical-disclosure"><summary>Estado técnico y limitaciones</summary>
         <div className="technical-grid"><div><h3>API pública</h3><p>{snapshot.serviceStatus?.api === 'OPERATIONAL' ? 'Disponible en la última verificación técnica.' : 'No disponible en la última verificación técnica.'}</p><small>Verificada {formatLocalDateTime(snapshot.serviceStatus?.checkedAt ?? snapshot.generatedAt)}.</small></div><div><h3>Limitaciones conocidas</h3><ul>{snapshot.sources.filter((source) => source.limitations).map((source) => <li key={source.id}><strong>{source.organizationName ?? source.name}:</strong> {source.limitations}</li>)}</ul></div></div>
         {technicalEvents.length > 0 && <div><h3>Historial técnico del integrador</h3><ol className="technical-timeline">{technicalEvents.map((event) => <li key={event.id}><time dateTime={event.at}>{formatLocalDateTime(event.at)}</time><div><strong>{event.title}</strong><p>{event.detail}</p></div></li>)}</ol></div>}
       </details>
-      <details className="technical-disclosure"><summary>Metodología de interpretación</summary><ul><li>Una medición por encima de un umbral no constituye una orden de evacuación.</li><li>INA REST e INA WaterML pertenecen al mismo organismo y no se presentan como confirmaciones independientes.</li><li>La información satelital o de modelos se utiliza sólo como contexto cuando existe una muestra válida.</li><li>Los canales humanos oficiales se enlazan para verificación y no se simulan como feeds automáticos.</li></ul></details>
+      <details className="technical-disclosure"><summary>Metodología de interpretación</summary><ul><li>La altura de escala no se presenta como profundidad total del río ni se compara en bruto entre estaciones.</li><li>Un cero no publicado o no demostrado se trata como referencia ausente, no como 0,00 m real.</li><li>Una medición por encima de un umbral no constituye una orden de evacuación.</li><li>Las referencias estadísticas sólo se muestran cuando pertenecen a la misma estación y tienen período/metodología verificables.</li><li>INA REST e INA WaterML pertenecen al mismo organismo y no se presentan como confirmaciones independientes.</li><li>La información satelital o de modelos se utiliza sólo como contexto cuando existe una muestra válida.</li></ul></details>
       <section><h3>Acceso técnico</h3><p><a href="/api/sources">Matriz JSON de fuentes</a> · <a href="/api/health">Estado técnico de la API</a></p></section>
       <button className="button button--primary" type="button" onClick={onClose}>Cerrar</button>
     </div>
