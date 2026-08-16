@@ -1,0 +1,70 @@
+name: order-028-product-repair
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-product-repair.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Rebuild product working tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --save-exact leaflet@1.9.4
+          npm install --save-dev --save-exact @types/leaflet@1.9.20
+          python3 <<'PY'
+          from pathlib import Path
+          s=Path('.github/workflows/order-028-product-apply.yml').read_text()
+          start=s.index('      - name: Apply 028 product foundation')
+          run=s.index('        run: |\n',start)+len('        run: |\n')
+          end=s.index('      - name: Validate product tranche',run)
+          body=s[run:end]
+          lines=[line[10:] if line.startswith('          ') else line for line in body.splitlines()]
+          Path('/tmp/product.sh').write_text('\n'.join(lines)+'\n')
+          PY
+          bash /tmp/product.sh
+      - name: Repair Leaflet type boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/types
+          cat > src/types/leaflet-css.d.ts <<'EOF'
+          declare module 'leaflet/dist/leaflet.css';
+          EOF
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('src/client/features/situation/SituationMap.tsx'); s=p.read_text()
+          old="""const STATION_COORDS: Readonly<Record<string, readonly [number, number]>> = Object.freeze({\n  'parana-santa-fe': Object.freeze([-31.6505, -60.7012]),\n  'salado-santo-tome': Object.freeze([-31.6688, -60.7654]),\n});"""
+          new="""const STATION_COORDS = Object.freeze({\n  'parana-santa-fe': [-31.6505, -60.7012] as const,\n  'salado-santo-tome': [-31.6688, -60.7654] as const,\n}) satisfies Readonly<Record<string, readonly [number, number]>>;"""
+          if old not in s: raise SystemExit('station tuple marker missing')
+          s=s.replace(old,new,1).replace(', keyboard: true }).addTo(map)', ' }).addTo(map)')
+          p.write_text(s)
+          PY
+      - name: Validate repaired product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+          npm audit --audit-level=high
+          grep -Fq 'SituationMap' dist/.vite/manifest.json
+      - name: Commit repaired product
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add package.json package-lock.json src public tests/unit index.html
+          git commit -m 'feat(028): add flood intelligence and lazy official map foundation [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
