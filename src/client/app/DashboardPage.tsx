@@ -1,8 +1,8 @@
 import type { RefObject } from 'react';
 import type { Snapshot } from '../../domain/snapshot.ts';
-import { CivicDiscovery } from '../components/civic/CivicSystem.tsx';
 import { SafetyActions } from '../features/actions/SafetyActions.tsx';
 import { VerifiedAlertBanner } from '../features/alerts/OfficialAlertPanel.tsx';
+import { ContextDiscovery } from '../features/discovery/ContextDiscovery.tsx';
 import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';
 import { SourceTransparency } from '../features/sources/SourceTransparency.tsx';
 
@@ -27,7 +27,7 @@ export function DashboardPage(props: Props) {
       onRefresh={props.onRefresh ?? (() => undefined)}
       onSources={props.onSources}
     />
-    <CivicDiscovery snapshot={props.snapshot}/>
+    <ContextDiscovery/>
     <SafetyActions
       snapshot={props.snapshot}
       reportButtonRef={props.reportButtonRef}
