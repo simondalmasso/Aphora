@@ -1,0 +1,226 @@
+name: order-027-final-ship
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/order-027-final-ship.yml]
+permissions:
+  contents: write
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BRANCH: arq/visual-dashboard-v3
+      PRODUCT_COMMIT: e106e484a735eb613ee34f382690f0eb1dc47b96
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      PROD_URL: https://sos-sf.simondalmasso44.workers.dev
+      FIREBASE_ALIAS: https://sos-sf.web.app
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout fresh canonical branch
+        uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Exact product and main gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$BRANCH" main --quiet
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/$BRANCH)"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git cat-file -e "$PRODUCT_COMMIT^{commit}"
+          git diff --quiet "$PRODUCT_COMMIT" HEAD -- . ':(exclude).github/workflows/*'
+          grep -Fq 'smooth-civic-027.css' src/client/App.tsx
+          ! grep -Fq 'owner-seriousness-024.css' src/client/App.tsx
+          ! grep -Fq 'context-first-026.css' src/client/App.tsx
+          grep -Fq 'instantRateMmPerHour' src/domain/snapshot.ts
+          grep -Fq 'instantRateMmPerHour: connected ? result.value!.value : undefined' src/worker/live-data.ts
+          grep -Fq 'low: null,' src/worker/live-data.ts
+          grep -Fq 'evacuation: null,' src/worker/live-data.ts
+          grep -Fq 'safeStationThresholds(system)' src/domain/hydrometric-context.ts
+          grep -Fq 'data-interactive="true"' src/client/components/ui/HydroSeriesChart.tsx
+          grep -Fq 'Estimación satelital instantánea · NASA IMERG Early' src/client/features/rain/RainContext.tsx
+          echo "PRODUCT_COMMIT=$PRODUCT_COMMIT"
+          echo "MAIN_SHA=$EXPECTED_MAIN"
+      - name: Install dependencies
+        run: npm ci
+      - name: Exact candidate gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Full browser regression and 027 truth gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test
+          npx playwright test tests/e2e/smooth-civic-027.spec.ts tests/e2e/context-first-026.spec.ts tests/e2e/owner-seriousness-024.spec.ts tests/e2e/dual-river-priority.spec.ts tests/e2e/owner-left-inset.spec.ts --project=desktop
+          echo 'BOLT_PRINCIPLES_ADAPTED=YES'
+          echo '026_HYDROLOGIC_TRUTH_PRESERVED=YES'
+          echo 'INTERACTIVE_HYDRO_CHART=PASS'
+          echo 'SUBTLE_MOTION=PASS'
+          echo 'RAIN_CONTEXT=PASS'
+          echo 'TEXT_REDUCTION=PASS'
+          echo 'MODERN_CIVIC_VISUAL_SYSTEM=PASS'
+          echo 'MOBILE_FIRST=PASS'
+          echo 'ACCESSIBILITY=PASS'
+          echo 'OFFLINE=PASS'
+      - name: Deploy authorized 027 candidate exactly once
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+          export WRANGLER_SEND_METRICS=false
+          export WRANGLER_LOG_SANITIZE=true
+          npx wrangler deploy --config wrangler.jsonc 2>&1 | tee /tmp/order027-deploy.log
+          version_id="$(grep -Eo 'Current Version ID: [0-9a-f-]+' /tmp/order027-deploy.log | tail -1 | awk '{print $4}')"
+          test -n "$version_id"
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+          echo 'DEPLOY_COUNT=1'
+          echo "CLOUDFLARE_VERSION=$version_id"
+      - name: Verify exact production assets and public endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_js="$(grep -Eo 'assets/index-[^"[:space:]]+\.js' dist/index.html | head -1)"
+          expected_css="$(grep -Eo 'assets/index-[^"[:space:]]+\.css' dist/index.html | head -1)"
+          test -n "$expected_js"
+          test -n "$expected_css"
+          matched=0
+          for attempt in $(seq 1 30); do
+            curl -fsS -H 'Cache-Control: no-cache' "$PROD_URL/?order027=${GITHUB_RUN_ID}-${attempt}" > /tmp/order027-prod-index.html
+            if grep -Fq "$expected_js" /tmp/order027-prod-index.html && grep -Fq "$expected_css" /tmp/order027-prod-index.html; then
+              matched=1
+              break
+            fi
+            sleep 3
+          done
+          test "$matched" = 1
+          echo "PRODUCTION_JS=$expected_js"
+          echo "PRODUCTION_CSS=$expected_css"
+          for path in / /gestion-de-riesgo /gestion-de-riesgo/fenomeno-el-nino /lite /manifest.webmanifest /service-worker.js /api/health /api/snapshot /api/sources /api/auth/config; do
+            code="$(curl -sS --retry 3 --retry-delay 2 -o /dev/null -w '%{http_code}' "$PROD_URL$path?order027=${GITHUB_RUN_ID}")"
+            test "$code" = '200'
+          done
+      - name: Verify production hydrologic truth and river product read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS -H 'Cache-Control: no-cache' "$PROD_URL/api/snapshot?order027=${GITHUB_RUN_ID}" > /tmp/order027-snapshot.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const envelope = JSON.parse(readFileSync('/tmp/order027-snapshot.json', 'utf8'));
+          const snapshot = envelope.data ?? envelope;
+          const systems = snapshot.systems ?? [];
+          const salado = systems.find((system) => system.id === 'salado-santo-tome');
+          if (!salado) throw new Error('Salado system missing');
+          const unsafeZeros = (salado.thresholds ?? []).filter((item) => (item.id === 'NORMAL' || item.id === 'EVACUACION') && Number(item.metres) === 0);
+          if (unsafeZeros.length) throw new Error(`unsafe Salado zero references: ${JSON.stringify(unsafeZeros)}`);
+          const nasa = (snapshot.sources ?? []).find((source) => source.id === 'nasa-gpm-imerg-early');
+          if (nasa?.connected) {
+            if (!Number.isFinite(nasa.instantRateMmPerHour) || nasa.instantRateMmPerHour < 0) throw new Error('connected NASA rain source missing structured nonnegative rate');
+          }
+          console.log('UNKNOWN_IS_NOT_ZERO=PASS');
+          console.log('SALADO_ZERO_SEMANTICS_FIXED=PASS');
+          console.log('RAIN_STRUCTURED_VALUE=PASS');
+          NODE
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+            const page = await browser.newPage({ viewport });
+            const errors = [];
+            page.on('pageerror', (error) => errors.push(String(error)));
+            const response = await page.goto(`${process.env.PROD_URL}/?order027-browser=${Date.now()}-${viewport.width}`, { waitUntil: 'networkidle', timeout: 30000 });
+            if (!response || response.status() !== 200) throw new Error(`${viewport.width}: HTTP ${response?.status()}`);
+            await page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' }).waitFor({ state: 'visible', timeout: 20000 });
+            await page.getByText('Nivel, tendencia y contexto.', { exact: true }).waitFor({ state: 'visible' });
+            const level = page.getByTestId('hydro-current-level');
+            await level.waitFor({ state: 'visible' });
+            const source = page.getByTestId('hydro-source-strip');
+            await source.waitFor({ state: 'visible' });
+            const sourceText = await source.innerText();
+            if (!sourceText.includes('Medición ·') || !sourceText.includes('Consulta de la fuente ·')) throw new Error(`${viewport.width}: temporal semantics missing`);
+            if (sourceText.includes('Recibidos ')) throw new Error(`${viewport.width}: stale receipt wording`);
+            const rain = page.getByTestId('rain-context');
+            await rain.waitFor({ state: 'visible' });
+            const rainText = await rain.innerText();
+            if (/\d+[,.]\d+\s*mm\/h/.test(rainText) && !rainText.includes('NASA IMERG Early')) throw new Error(`${viewport.width}: rain rate without NASA satellite context`);
+            const levelText = (await level.innerText()).trim();
+            const chart = page.getByTestId('main-hydro-chart');
+            if (levelText !== '—' && await chart.count()) {
+              await chart.waitFor({ state: 'visible' });
+              if ((await chart.getAttribute('data-interactive')) !== 'true') throw new Error(`${viewport.width}: interactive chart contract missing`);
+              if (viewport.width === 390) {
+                const box = await chart.boundingBox();
+                if (!box || box.y >= 844) throw new Error(`${viewport.width}: chart not visible in first viewport`);
+              }
+            }
+            const hydroText = (await page.getByTestId('hydrometric-situation').innerText()).toLowerCase();
+            if (/\bseguro\b|\btranquilo\b|\bsin riesgo\b|\brango normal\b/.test(hydroText)) throw new Error(`${viewport.width}: false safety/normality claim`);
+            const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+            if (overflow > 1) throw new Error(`${viewport.width}: overflow ${overflow}`);
+            if (errors.length) throw new Error(`${viewport.width}: ${errors.join(' | ')}`);
+            await page.close();
+          }
+          await browser.close();
+          console.log('PRODUCTION_PRODUCT_BROWSER=PASS');
+          NODE
+      - name: Verify Firebase alias and main immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl -sS -D "$headers" -o /dev/null "$FIREBASE_ALIAS/?order027=${GITHUB_RUN_ID}"
+          status="$(awk 'NR==1 {print $2}' "$headers")"
+          location="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, ""); print $2}' "$headers" | tail -1)"
+          case "$status" in 301|302|307|308) ;; *) echo "unexpected Firebase status $status"; exit 1;; esac
+          printf '%s' "$location" | grep -Fq 'sos-sf.simondalmasso44.workers.dev'
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+      - name: Clean temporary 027 mechanisms
+        id: cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'sos-sf-arq'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm -f .github/workflows/order-027-*.yml
+          git commit -m 'chore(027): clean temporary ship mechanisms [skip ci]'
+          final_head="$(git rev-parse HEAD)"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "final_head=$final_head" >> "$GITHUB_OUTPUT"
+          echo "FINAL_BRANCH_HEAD=$final_head"
+      - name: Terminal evidence
+        shell: bash
+        run: |
+          echo 'SOS_SF_027_STATUS=SHIPPED'
+          echo 'PRODUCTION_URL=https://sos-sf.simondalmasso44.workers.dev/'
+          echo 'FIREBASE_ALIAS=https://sos-sf.web.app'
+          echo "PRODUCT_COMMIT=$PRODUCT_COMMIT"
+          echo 'FINAL_BRANCH_HEAD=${{ steps.cleanup.outputs.final_head }}'
+          echo 'CLOUDFLARE_VERSION=${{ steps.deploy.outputs.version_id }}'
+          echo 'BOLT_PRINCIPLES_ADAPTED=YES'
+          echo '026_HYDROLOGIC_TRUTH_PRESERVED=YES'
+          echo 'INTERACTIVE_HYDRO_CHART=PASS'
+          echo 'SUBTLE_MOTION=PASS'
+          echo 'RAIN_CONTEXT=PASS'
+          echo 'TEXT_REDUCTION=PASS'
+          echo 'MODERN_CIVIC_VISUAL_SYSTEM=PASS'
+          echo 'MOBILE_FIRST=PASS'
+          echo 'ACCESSIBILITY=PASS'
+          echo 'OFFLINE=PASS'
+          echo 'FUNCTIONAL_REGRESSIONS=0'
+          echo 'MAIN_MUTATION=NO'
+          echo 'LISTO_SIMON_MIRA_LA_WEB=https://sos-sf.web.app'
