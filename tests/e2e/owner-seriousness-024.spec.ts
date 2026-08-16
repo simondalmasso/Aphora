@@ -11,33 +11,15 @@ function staleSnapshot(): Snapshot {
   const baseSource = stableHydrometricSnapshot.sources[0];
   if (!baseSystem || !baseSource || !baseSystem.observedAt) throw new Error('Stable hydrometric fixture is incomplete');
   const shiftMs = Date.parse(baseSystem.observedAt) - Date.parse(staleObservedAt);
-  const shiftedPoints = baseSystem.points.map((point) => ({
-    ...point,
-    at: new Date(Date.parse(point.at) - shiftMs).toISOString(),
-  }));
-  const system: HydrologicalSystem = {
-    ...baseSystem,
-    observedAt: staleObservedAt,
-    fetchedAt: recentFetchAt,
-    points: shiftedPoints,
-  };
-  const source: Source = {
-    ...baseSource,
-    observedAt: staleObservedAt,
-    fetchedAt: recentFetchAt,
-    lastCheckedAt: recentFetchAt,
-  };
+  const shiftedPoints = baseSystem.points.map((point) => ({ ...point, at: new Date(Date.parse(point.at) - shiftMs).toISOString() }));
+  const system: HydrologicalSystem = { ...baseSystem, observedAt: staleObservedAt, fetchedAt: recentFetchAt, points: shiftedPoints };
+  const source: Source = { ...baseSource, observedAt: staleObservedAt, fetchedAt: recentFetchAt, lastCheckedAt: recentFetchAt };
   return {
     ...stableHydrometricSnapshot,
     id: '024-stale-measurement-recent-source-check',
     systems: [system, ...(stableHydrometricSnapshot.systems ?? []).slice(1)],
     sources: [source, ...stableHydrometricSnapshot.sources.slice(1)],
-    river: {
-      ...stableHydrometricSnapshot.river,
-      observedAt: staleObservedAt,
-      fetchedAt: recentFetchAt,
-      points: shiftedPoints,
-    },
+    river: { ...stableHydrometricSnapshot.river, observedAt: staleObservedAt, fetchedAt: recentFetchAt, points: shiftedPoints },
   };
 }
 
@@ -64,14 +46,14 @@ async function open(page: Page, snapshot: Snapshot = stableHydrometricSnapshot) 
   await expect(page.getByTestId('hydrometric-situation')).toBeVisible();
 }
 
-test('024 first viewport is civic, calm and measurement-dominant', async ({ page }, testInfo) => {
+test('024 first viewport remains civic, calm and measurement-dominant under 027', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Explicit viewport check runs once.');
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page);
   await expect(page.getByText('Santa Fe · monitoreo hídrico', { exact: true })).toBeVisible();
   const h1 = page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' });
   await expect(h1).toBeVisible();
-  await expect(page.getByText('Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Nivel, tendencia y contexto.', { exact: true })).toBeVisible();
   await expect(page.getByText('Santa Fe, hoy', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Así están el Paraná y el Salado', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Último nivel disponible', { exact: true })).toBeVisible();
@@ -87,12 +69,12 @@ test('024 first viewport is civic, calm and measurement-dominant', async ({ page
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });
 
-test('024 distinguishes measurement age from source consultation age', async ({ page }, testInfo) => {
+test('024 temporal contract still distinguishes measurement age from source consultation age', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Temporal semantics check runs once.');
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, staleSnapshot());
   const station = page.locator('.station-identification');
-  await expect(station).toContainText('Última medición · hace 42 horas');
+  await expect(station).toContainText('Medición · hace 42 horas');
   const source = page.getByTestId('hydro-source-strip');
   await expect(source).toContainText('Fuente · Instituto Nacional del Agua');
   await expect(source).toContainText('Medición · hace 42 horas');
@@ -100,7 +82,7 @@ test('024 distinguishes measurement age from source consultation age', async ({ 
   await expect(source).not.toContainText('Recibidos');
 });
 
-test('024 required responsive matrix has zero overflow and preserves touch targets', async ({ page }, testInfo) => {
+test('024 responsive matrix still has zero overflow and preserves touch targets', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'Explicit matrix runs once.');
   const cases = [[320, 568], [360, 800], [390, 844], [430, 932], [768, 1024], [1440, 900]] as const;
   for (const [width, height] of cases) {
