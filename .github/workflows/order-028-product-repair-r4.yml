@@ -1,0 +1,61 @@
+name: order-028-product-repair-r4
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-product-repair-r4.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Rebuild exact r3 product tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          s=Path('.github/workflows/order-028-product-repair-r3.yml').read_text()
+          for start_name,end_name,out in [
+            ('Rebuild product working tree','Apply final product repairs','/tmp/rebuild.sh'),
+            ('Apply final product repairs','Validate exact product','/tmp/repairs.sh'),
+          ]:
+            start=s.index(f'      - name: {start_name}')
+            run=s.index('        run: |\n',start)+len('        run: |\n')
+            end=s.index(f'      - name: {end_name}',run)
+            lines=[line[10:] if line.startswith('          ') else line for line in s[run:end].splitlines()]
+            Path(out).write_text('\n'.join(lines)+'\n')
+          PY
+          bash /tmp/rebuild.sh
+          bash /tmp/repairs.sh
+      - name: Remediate transitive audit issue fail-closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit fix --package-lock-only
+          npm ci
+          npm audit --audit-level=high
+      - name: Validate exact product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+          grep -Fq 'SituationMap' dist/.vite/manifest.json
+      - name: Commit exact product
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add package.json package-lock.json src public tests/unit index.html
+          git commit -m 'feat(028): add flood intelligence and lazy official map foundation [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
