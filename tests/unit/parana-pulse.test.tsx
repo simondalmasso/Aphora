@@ -15,7 +15,7 @@ describe('final product 023 hydrometric-first progressive rendering', () => {
       onReport={() => undefined}
     />);
 
-    expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section context-first-hydrometry"/);
+    expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section context-first-hydrometry smooth-civic-hydrometry"/);
     expect(html).toContain('data-testid="hydrometric-situation"');
     expect(html).toContain('Santa Fe · monitoreo hídrico');
     expect(html).toContain('Situación hidrométrica');
