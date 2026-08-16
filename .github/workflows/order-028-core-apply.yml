@@ -1,0 +1,539 @@
+name: order-028-core-apply
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-core-apply.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Guard authority and base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main arq/visual-dashboard-v3 --quiet
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 1d2126616bf7cf8580ab53a26557f41a5914bd18 HEAD
+      - name: Apply P0 temporal truth and flood situation domain
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > src/domain/temporal-series.ts <<'EOF'
+          import type { HydrologicalSystem, RiverPoint } from './snapshot.ts';
+
+          export const CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
+          const EARLIEST_PUBLIC_TIMESTAMP = Date.UTC(2000, 0, 1);
+          const HOUR_MS = 3_600_000;
+
+          export type TemporalAvailability = 'OK' | 'NOT_ENOUGH_DATA' | 'FUTURE_DATA_REJECTED';
+
+          export interface TemporalDeltaResult {
+            readonly value: number | null;
+            readonly status: TemporalAvailability;
+            readonly latestAt: string | null;
+            readonly referenceAt: string | null;
+            readonly typicalIntervalMs: number | null;
+          }
+
+          export interface TemporalWindowResult {
+            readonly points: readonly RiverPoint[];
+            readonly sufficient: boolean;
+            readonly status: TemporalAvailability;
+            readonly typicalIntervalMs: number | null;
+          }
+
+          export function parseObservationTime(value: string | null | undefined): number | null {
+            if (!value) return null;
+            const parsed = Date.parse(value);
+            return Number.isFinite(parsed) && parsed >= EARLIEST_PUBLIC_TIMESTAMP ? parsed : null;
+          }
+
+          export function isObservationTimestampUsable(value: string | null | undefined, now: Date | string): boolean {
+            const parsed = parseObservationTime(value);
+            const anchor = typeof now === 'string' ? Date.parse(now) : now.getTime();
+            return parsed !== null && Number.isFinite(anchor) && parsed <= anchor + CLOCK_SKEW_TOLERANCE_MS;
+          }
+
+          export function hasSignificantFutureTimestamp(value: string | null | undefined, now: Date | string): boolean {
+            const parsed = parseObservationTime(value);
+            const anchor = typeof now === 'string' ? Date.parse(now) : now.getTime();
+            return parsed !== null && Number.isFinite(anchor) && parsed > anchor + CLOCK_SKEW_TOLERANCE_MS;
+          }
+
+          export function sanitizeMeasuredRiverPoints(points: readonly RiverPoint[], now: Date | string): readonly RiverPoint[] {
+            const anchor = typeof now === 'string' ? Date.parse(now) : now.getTime();
+            if (!Number.isFinite(anchor)) return Object.freeze([]);
+            const ordered = points
+              .filter((point) => point.measured === true && Number.isFinite(point.metres) && isObservationTimestampUsable(point.at, anchorToDate(anchor)))
+              .slice()
+              .sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+            const deduped: RiverPoint[] = [];
+            for (const point of ordered) {
+              if (deduped.length && deduped.at(-1)!.at === point.at) deduped[deduped.length - 1] = point;
+              else deduped.push(point);
+            }
+            return Object.freeze(deduped);
+          }
+
+          function anchorToDate(anchor: number): Date { return new Date(anchor); }
+
+          export function medianIntervalMs(points: readonly RiverPoint[]): number | null {
+            const intervals = points.slice(1)
+              .map((point, index) => Date.parse(point.at) - Date.parse(points[index]!.at))
+              .filter((value) => Number.isFinite(value) && value > 0);
+            if (!intervals.length) return null;
+            const ordered = intervals.sort((a, b) => a - b);
+            const middle = Math.floor(ordered.length / 2);
+            return ordered.length % 2 ? ordered[middle]! : (ordered[middle - 1]! + ordered[middle]!) / 2;
+          }
+
+          function horizonToleranceMs(hours: number, typicalIntervalMs: number | null): number {
+            const capHours = hours <= 1 ? .6 : hours <= 6 ? 1.5 : hours <= 24 ? 3 : hours <= 72 ? 6 : 12;
+            const typical = typicalIntervalMs ?? Math.min(HOUR_MS, hours * HOUR_MS);
+            return Math.min(capHours * HOUR_MS, Math.max(10 * 60_000, typical * 1.75));
+          }
+
+          function internalCoverageIsPlausible(points: readonly RiverPoint[], typicalIntervalMs: number | null, toleranceMs: number, horizonMs: number): boolean {
+            if (points.length < 2) return false;
+            const typical = typicalIntervalMs ?? HOUR_MS;
+            const gapLimit = Math.max(typical * 4, toleranceMs * 2, 2 * HOUR_MS);
+            const materialHorizonGap = Math.max(gapLimit, horizonMs * .45);
+            for (let index = 1; index < points.length; index += 1) {
+              const gap = Date.parse(points[index]!.at) - Date.parse(points[index - 1]!.at);
+              if (gap > materialHorizonGap) return false;
+            }
+            return true;
+          }
+
+          export function temporalDelta(points: readonly RiverPoint[], hours: number, now: Date | string): TemporalDeltaResult {
+            const futureRejected = points.some((point) => point.measured === true && hasSignificantFutureTimestamp(point.at, now));
+            const usable = sanitizeMeasuredRiverPoints(points, now);
+            const latest = usable.at(-1);
+            if (!latest || hours <= 0) return Object.freeze({ value: null, status: futureRejected ? 'FUTURE_DATA_REJECTED' : 'NOT_ENOUGH_DATA', latestAt: latest?.at ?? null, referenceAt: null, typicalIntervalMs: null });
+            const typicalIntervalMs = medianIntervalMs(usable);
+            const horizonMs = hours * HOUR_MS;
+            const target = Date.parse(latest.at) - horizonMs;
+            const candidates = usable.slice(0, -1);
+            let reference: RiverPoint | null = null;
+            let distance = Number.POSITIVE_INFINITY;
+            for (const point of candidates) {
+              const currentDistance = Math.abs(Date.parse(point.at) - target);
+              if (currentDistance < distance) { reference = point; distance = currentDistance; }
+            }
+            const toleranceMs = horizonToleranceMs(hours, typicalIntervalMs);
+            if (!reference || distance > toleranceMs) return Object.freeze({ value: null, status: futureRejected ? 'FUTURE_DATA_REJECTED' : 'NOT_ENOUGH_DATA', latestAt: latest.at, referenceAt: reference?.at ?? null, typicalIntervalMs });
+            const segment = usable.filter((point) => Date.parse(point.at) >= Date.parse(reference!.at) && Date.parse(point.at) <= Date.parse(latest.at));
+            if (!internalCoverageIsPlausible(segment, typicalIntervalMs, toleranceMs, horizonMs)) return Object.freeze({ value: null, status: futureRejected ? 'FUTURE_DATA_REJECTED' : 'NOT_ENOUGH_DATA', latestAt: latest.at, referenceAt: reference.at, typicalIntervalMs });
+            return Object.freeze({ value: latest.metres - reference.metres, status: 'OK', latestAt: latest.at, referenceAt: reference.at, typicalIntervalMs });
+          }
+
+          export function strictTimeWindow(points: readonly RiverPoint[], hours: number, now: Date | string): TemporalWindowResult {
+            const futureRejected = points.some((point) => point.measured === true && hasSignificantFutureTimestamp(point.at, now));
+            const usable = sanitizeMeasuredRiverPoints(points, now);
+            const latest = usable.at(-1);
+            if (!latest || hours <= 0) return Object.freeze({ points: Object.freeze([]), sufficient: false, status: futureRejected ? 'FUTURE_DATA_REJECTED' : 'NOT_ENOUGH_DATA', typicalIntervalMs: null });
+            const horizonMs = hours * HOUR_MS;
+            const start = Date.parse(latest.at) - horizonMs;
+            const selected = usable.filter((point) => Date.parse(point.at) >= start && Date.parse(point.at) <= Date.parse(latest.at));
+            const typicalIntervalMs = medianIntervalMs(usable);
+            const toleranceMs = horizonToleranceMs(hours, typicalIntervalMs);
+            const span = selected.length > 1 ? Date.parse(selected.at(-1)!.at) - Date.parse(selected[0]!.at) : 0;
+            const startDistance = selected.length ? Math.abs(Date.parse(selected[0]!.at) - start) : Number.POSITIVE_INFINITY;
+            const sufficient = selected.length >= 2
+              && span >= horizonMs * .7
+              && startDistance <= Math.max(toleranceMs, horizonMs * .3)
+              && internalCoverageIsPlausible(selected, typicalIntervalMs, toleranceMs, horizonMs);
+            return Object.freeze({ points: Object.freeze(selected), sufficient, status: sufficient ? 'OK' : futureRejected ? 'FUTURE_DATA_REJECTED' : 'NOT_ENOUGH_DATA', typicalIntervalMs });
+          }
+
+          export function hasTemporalCoverage(points: readonly RiverPoint[], hours: number, now: Date | string): boolean {
+            return strictTimeWindow(points, hours, now).sufficient;
+          }
+
+          export function deriveHydrometricTrend(points: readonly RiverPoint[], now: Date | string): HydrologicalSystem['trend'] {
+            const delta = temporalDelta(points, 6, now).value;
+            if (delta === null) return 'UNKNOWN';
+            if (delta >= .12) return 'RISING';
+            if (delta >= .02) return 'RISING_SLOWLY';
+            if (delta <= -.02) return 'FALLING';
+            return 'STABLE';
+          }
+          EOF
+
+          cat > src/domain/flood-situation.ts <<'EOF'
+          import { safeStationThresholds } from './hydrometric-context.ts';
+          import { isObservationTimestampUsable } from './temporal-series.ts';
+          import type { FreshnessState, HydrologicalSystem, Snapshot, Source } from './snapshot.ts';
+
+          export type HazardKind = 'RIVERINE_FLOOD' | 'PLUVIAL_HEAVY_RAIN';
+          export type HazardSourceRole =
+            | 'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION'
+            | 'OFFICIAL_WARNING'
+            | 'OFFICIAL_STATIC_RISK_CONTEXT'
+            | 'SUPPLEMENTARY_SATELLITE_ESTIMATE'
+            | 'SUPPLEMENTARY_MODEL_FORECAST'
+            | 'COMMUNITY_REPORT'
+            | 'INTERNAL_DERIVATION';
+          export type HydroSituationSignalKind =
+            | 'OFFICIAL_HYDROMETRIC_OBSERVATION'
+            | 'OFFICIAL_PROTECTION_REFERENCE_REACHED'
+            | 'RAPID_CHANGE_OBSERVED'
+            | 'OFFICIAL_WEATHER_ALERT'
+            | 'OFFICIAL_FLOOD_OR_CIVIL_PROTECTION_ALERT'
+            | 'MODEL_FLOOD_SIGNAL'
+            | 'HEAVY_RAIN_CONTEXT'
+            | 'OFFICIAL_RISK_AREA_CONTEXT'
+            | 'SOURCE_DEGRADED'
+            | 'COMMUNITY_REPORT_CONTEXT';
+          export type FloodSituationState = 'ROUTINE' | 'ELEVATED_HYDRO_SITUATION' | 'FLOOD_SITUATION' | 'OFFICIAL_WARNING_ACTIVE' | 'VERIFICATION_DEGRADED' | 'UNKNOWN';
+
+          export interface HydroSituationSignal {
+            readonly id: string;
+            readonly kind: HydroSituationSignalKind;
+            readonly hazardKind: HazardKind;
+            readonly sourceRole: HazardSourceRole;
+            readonly sourceId: string;
+            readonly organization: string;
+            readonly observedAt: string | null;
+            readonly fetchedAt: string | null;
+            readonly freshness: FreshnessState;
+            readonly systemOrArea: string;
+            readonly semanticRole: string;
+            readonly canDeterminePublicState: boolean;
+            readonly confidenceClass?: 'OFFICIAL' | 'OBSERVED' | 'DERIVED' | 'SUPPLEMENTARY';
+            readonly explanation: string;
+            readonly active: boolean;
+          }
+
+          export interface FloodSituationDecision {
+            readonly state: FloodSituationState;
+            readonly displayLabel: string;
+            readonly explanation: string;
+            readonly affectedSystemIds: readonly string[];
+            readonly signals: readonly HydroSituationSignal[];
+            readonly officialWarningActive: boolean;
+            readonly officialEmergencyDeclared: false;
+          }
+
+          function sourceFor(snapshot: Snapshot, system: HydrologicalSystem): Source | undefined {
+            return snapshot.sources.find((source) => source.id === system.sourceId);
+          }
+          function validFreshness(value: FreshnessState | undefined): value is Extract<FreshnessState, 'ACTUALIZADO' | 'ACTUALIZACION_DEMORADA'> {
+            return value === 'ACTUALIZADO' || value === 'ACTUALIZACION_DEMORADA';
+          }
+          function usableOfficialHydrometry(snapshot: Snapshot, system: HydrologicalSystem, source: Source | undefined): boolean {
+            if (!source || !source.official || source.kind !== 'OFFICIAL_OBSERVATION' || !source.determinesPrimaryState) return false;
+            if (source.status !== 'FRESH' && source.status !== 'STALE') return false;
+            if (!system.available || system.currentMetres === null || !validFreshness(system.freshness)) return false;
+            if (!isObservationTimestampUsable(system.observedAt, snapshot.generatedAt)) return false;
+            if (!system.validUntil || Date.parse(system.validUntil) < Date.parse(snapshot.generatedAt)) return false;
+            return true;
+          }
+          function normalize(value: string): string { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+          function floodWarningText(value: string): boolean { return /inund|crecida|desborde|evacua|desbordamiento/.test(normalize(value)); }
+          function weatherFloodRelevantText(value: string): boolean { return /lluv|torment|precipit|inund|aneg|crecida|desborde/.test(normalize(value)); }
+          function organization(source: Source | undefined): string { return source?.organizationName ?? source?.name ?? 'Fuente no identificada'; }
+
+          export function deriveFloodSituation(snapshot: Snapshot): FloodSituationDecision {
+            const systems = snapshot.systems ?? Object.freeze([]);
+            const signals: HydroSituationSignal[] = [];
+            const materiallyRelevant = new Set<string>();
+            let rapidChange = false;
+            let criticalDegraded = systems.length === 0;
+
+            for (const system of systems) {
+              const source = sourceFor(snapshot, system);
+              const usable = usableOfficialHydrometry(snapshot, system, source);
+              if (usable) {
+                signals.push(Object.freeze({
+                  id: `hydrometry:${system.id}`,
+                  kind: 'OFFICIAL_HYDROMETRIC_OBSERVATION', hazardKind: 'RIVERINE_FLOOD', sourceRole: 'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION',
+                  sourceId: system.sourceId, organization: organization(source), observedAt: system.observedAt, fetchedAt: system.fetchedAt ?? source?.fetchedAt ?? null,
+                  freshness: system.freshness ?? 'NO_DISPONIBLE', systemOrArea: system.id, semanticRole: 'Observación hidrométrica primaria', canDeterminePublicState: false,
+                  confidenceClass: 'OFFICIAL', explanation: `Lectura oficial de ${system.watercourse}, estación ${system.stationName}.`, active: true,
+                }));
+                const reached = [...safeStationThresholds(system)]
+                  .filter((threshold) => threshold.id === 'ALERTA' || threshold.id === 'EVACUACION')
+                  .filter((threshold) => system.currentMetres! >= threshold.metres)
+                  .sort((left, right) => right.metres - left.metres)[0];
+                if (reached) {
+                  materiallyRelevant.add(system.id);
+                  signals.push(Object.freeze({
+                    id: `protection-reference:${system.id}:${reached.id}`,
+                    kind: 'OFFICIAL_PROTECTION_REFERENCE_REACHED', hazardKind: 'RIVERINE_FLOOD', sourceRole: 'INTERNAL_DERIVATION', sourceId: system.sourceId,
+                    organization: organization(source), observedAt: system.observedAt, fetchedAt: system.fetchedAt ?? source?.fetchedAt ?? null, freshness: system.freshness ?? 'NO_DISPONIBLE',
+                    systemOrArea: system.id, semanticRole: 'Comparación con referencia oficial de protección', canDeterminePublicState: false, confidenceClass: 'DERIVED',
+                    explanation: `La lectura oficial alcanzó ${reached.label.toLowerCase()}. Esto vuelve materialmente relevante al río, pero no constituye una emergencia ni una orden oficial.`, active: true,
+                  }));
+                }
+                const delta6 = system.delta6h;
+                const delta24 = system.delta24h;
+                if ((delta6 !== null && delta6 >= .12) || (delta24 !== null && delta24 >= .25)) {
+                  rapidChange = true;
+                  signals.push(Object.freeze({
+                    id: `rapid-change:${system.id}`,
+                    kind: 'RAPID_CHANGE_OBSERVED', hazardKind: 'RIVERINE_FLOOD', sourceRole: 'INTERNAL_DERIVATION', sourceId: system.sourceId,
+                    organization: organization(source), observedAt: system.observedAt, fetchedAt: system.fetchedAt ?? source?.fetchedAt ?? null, freshness: system.freshness ?? 'NO_DISPONIBLE',
+                    systemOrArea: system.id, semanticRole: 'Cambio observado derivado de serie oficial', canDeterminePublicState: false, confidenceClass: 'DERIVED',
+                    explanation: 'La serie oficial muestra un cambio material en una ventana con cobertura suficiente. Es observación de tendencia, no pronóstico.', active: true,
+                  }));
+                }
+              } else {
+                criticalDegraded = true;
+                signals.push(Object.freeze({
+                  id: `source-degraded:${system.id}`,
+                  kind: 'SOURCE_DEGRADED', hazardKind: 'RIVERINE_FLOOD', sourceRole: 'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION', sourceId: system.sourceId,
+                  organization: organization(source), observedAt: system.observedAt, fetchedAt: system.fetchedAt ?? source?.fetchedAt ?? null, freshness: system.freshness ?? 'NO_DISPONIBLE',
+                  systemOrArea: system.id, semanticRole: 'Disponibilidad de observación hidrométrica', canDeterminePublicState: false, confidenceClass: 'OFFICIAL',
+                  explanation: `No hay una lectura oficial suficientemente vigente y utilizable para ${system.watercourse}, estación ${system.stationName}.`, active: true,
+                }));
+              }
+            }
+
+            const alertSource = snapshot.sources.find((source) => source.kind === 'OFFICIAL_ALERT' && source.determinesPrimaryState);
+            const activeAlerts = (snapshot.alerts ?? []).filter((alert) => alert.appliesToSantaFe && (alert.lifecycle === 'ACTIVE' || alert.lifecycle === 'UPDATED'));
+            let officialWarningActive = false;
+            for (const alert of activeAlerts) {
+              const text = [alert.event, alert.headline, alert.description, alert.instruction, alert.area].join(' ');
+              if (!weatherFloodRelevantText(text)) continue;
+              officialWarningActive = true;
+              const isFlood = floodWarningText(text);
+              signals.push(Object.freeze({
+                id: `official-warning:${alert.identifier}`,
+                kind: isFlood ? 'OFFICIAL_FLOOD_OR_CIVIL_PROTECTION_ALERT' : 'OFFICIAL_WEATHER_ALERT', hazardKind: isFlood ? 'RIVERINE_FLOOD' : 'PLUVIAL_HEAVY_RAIN', sourceRole: 'OFFICIAL_WARNING',
+                sourceId: alertSource?.id ?? 'official-alert', organization: alertSource?.organizationName ?? alert.sender, observedAt: alert.sent, fetchedAt: alertSource?.fetchedAt ?? null,
+                freshness: alertSource?.freshness ?? 'NO_DISPONIBLE', systemOrArea: alert.area, semanticRole: 'Advertencia oficial', canDeterminePublicState: true, confidenceClass: 'OFFICIAL',
+                explanation: `${alert.headline || alert.event}. Es una advertencia oficial; no implica que toda el área esté inundada ni que exista una emergencia declarada.`, active: true,
+              }));
+            }
+            if (snapshot.alertStatus === 'FUENTES_DE_ALERTAS_NO_DISPONIBLES' || snapshot.alertStatus === 'VERIFICACION_DE_ALERTAS_DEGRADADA') {
+              criticalDegraded = true;
+              signals.push(Object.freeze({
+                id: 'source-degraded:official-alerts', kind: 'SOURCE_DEGRADED', hazardKind: 'PLUVIAL_HEAVY_RAIN', sourceRole: 'OFFICIAL_WARNING', sourceId: alertSource?.id ?? 'smn-alerts',
+                organization: organization(alertSource), observedAt: alertSource?.observedAt ?? null, fetchedAt: alertSource?.fetchedAt ?? null, freshness: alertSource?.freshness ?? 'NO_DISPONIBLE',
+                systemOrArea: 'Santa Fe', semanticRole: 'Verificación de alertas oficiales', canDeterminePublicState: false, confidenceClass: 'OFFICIAL',
+                explanation: 'La verificación automática de alertas oficiales no está suficientemente vigente; no se puede inferir ausencia de advertencias.', active: true,
+              }));
+            }
+
+            const nasa = snapshot.sources.find((source) => source.id === 'nasa-gpm-imerg-early');
+            if (nasa?.connected && nasa.freshness === 'ACTUALIZADO' && typeof nasa.instantRateMmPerHour === 'number' && Number.isFinite(nasa.instantRateMmPerHour)) {
+              signals.push(Object.freeze({
+                id: 'rain:nasa-gpm-imerg-early', kind: 'HEAVY_RAIN_CONTEXT', hazardKind: 'PLUVIAL_HEAVY_RAIN', sourceRole: 'SUPPLEMENTARY_SATELLITE_ESTIMATE', sourceId: nasa.id,
+                organization: organization(nasa), observedAt: nasa.observedAt, fetchedAt: nasa.fetchedAt ?? null, freshness: nasa.freshness, systemOrArea: 'Santa Fe', semanticRole: 'Estimación satelital suplementaria',
+                canDeterminePublicState: false, confidenceClass: 'SUPPLEMENTARY', explanation: 'Estimación satelital reciente de precipitación. No demuestra anegamiento ni explica por sí sola un cambio del río.', active: true,
+              }));
+            }
+            for (const model of snapshot.sources.filter((source) => source.kind === 'FORECAST_MODEL')) {
+              signals.push(Object.freeze({
+                id: `model:${model.id}`, kind: 'MODEL_FLOOD_SIGNAL', hazardKind: 'RIVERINE_FLOOD', sourceRole: 'SUPPLEMENTARY_MODEL_FORECAST', sourceId: model.id, organization: organization(model),
+                observedAt: model.observedAt, fetchedAt: model.fetchedAt ?? null, freshness: model.freshness ?? 'NO_DISPONIBLE', systemOrArea: 'Santa Fe', semanticRole: 'Pronóstico/modelo suplementario',
+                canDeterminePublicState: false, confidenceClass: 'SUPPLEMENTARY', explanation: 'Señal de modelo suplementario. Nunca reemplaza observación INA ni una advertencia oficial.', active: model.connected === true,
+              }));
+            }
+            for (const report of snapshot.sources.filter((source) => source.kind === 'COMMUNITY_REPORT')) {
+              signals.push(Object.freeze({
+                id: `community:${report.id}`, kind: 'COMMUNITY_REPORT_CONTEXT', hazardKind: 'PLUVIAL_HEAVY_RAIN', sourceRole: 'COMMUNITY_REPORT', sourceId: report.id, organization: organization(report),
+                observedAt: report.observedAt, fetchedAt: report.fetchedAt ?? null, freshness: report.freshness ?? 'NO_DISPONIBLE', systemOrArea: 'Santa Fe', semanticRole: 'Reporte comunitario no oficial',
+                canDeterminePublicState: false, confidenceClass: 'SUPPLEMENTARY', explanation: 'Contexto comunitario sujeto a revisión; no cambia automáticamente el estado público.', active: report.connected === true,
+              }));
+            }
+
+            let state: FloodSituationState;
+            let displayLabel: string;
+            let explanation: string;
+            if (officialWarningActive) {
+              state = 'OFFICIAL_WARNING_ACTIVE'; displayLabel = 'Alerta oficial vigente'; explanation = 'Hay una advertencia oficial relevante para lluvia o inundación. La evidencia hidrométrica se mantiene separada.';
+            } else if (materiallyRelevant.size > 0) {
+              state = 'FLOOD_SITUATION'; displayLabel = 'Situación hídrica relevante'; explanation = materiallyRelevant.size > 1 ? 'Ambos ríos tienen condiciones hidrométricas materialmente relevantes verificadas.' : 'Un río alcanzó una referencia oficial de protección y requiere seguimiento reforzado.';
+            } else if (rapidChange) {
+              state = 'ELEVATED_HYDRO_SITUATION'; displayLabel = 'Seguimiento reforzado'; explanation = 'Existe un cambio hidrométrico material observado con cobertura temporal suficiente; no es un pronóstico ni una emergencia declarada.';
+            } else if (criticalDegraded) {
+              state = systems.length ? 'VERIFICATION_DEGRADED' : 'UNKNOWN'; displayLabel = systems.length ? 'Verificación limitada' : 'Situación no disponible'; explanation = 'Falta evidencia crítica suficientemente vigente para describir toda la situación como rutinaria.';
+            } else {
+              state = 'ROUTINE'; displayLabel = 'Seguimiento habitual'; explanation = 'Las observaciones disponibles no activan una condición hídrica material ni una advertencia oficial relevante.';
+            }
+            return Object.freeze({ state, displayLabel, explanation, affectedSystemIds: Object.freeze([...materiallyRelevant]), signals: Object.freeze(signals), officialWarningActive, officialEmergencyDeclared: false });
+          }
+          EOF
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          p=Path('src/domain/snapshot.ts'); s=p.read_text()
+          s=s.replace("  readonly delta24h: number | null;\n}", "  readonly delta24h: number | null;\n  readonly delta72h?: number | null;\n  readonly delta7d?: number | null;\n}")
+          s=s.replace("    readonly currentMetres: number;\n    readonly delta1h: number;\n    readonly delta6h: number;\n    readonly delta24h: number;", "    readonly currentMetres: number | null;\n    readonly delta1h: number | null;\n    readonly delta6h: number | null;\n    readonly delta24h: number | null;")
+          p.write_text(s)
+
+          p=Path('src/domain/public-safety.ts'); s=p.read_text()
+          s=s.replace("import type { AlertVerificationState, DataStatus, FeedClassification, FreshnessState, HydrologicalSystem, OfficialAlert, Source, TimelineEvent } from './snapshot.ts';", "import type { AlertVerificationState, DataStatus, FeedClassification, FreshnessState, HydrologicalSystem, OfficialAlert, Source, TimelineEvent } from './snapshot.ts';\nimport { CLOCK_SKEW_TOLERANCE_MS, isObservationTimestampUsable } from './temporal-series.ts';")
+          s=s.replace("  if (!observedAt || !Number.isFinite(Date.parse(observedAt))) return 'NO_DISPONIBLE';\n  const age = Math.max(0, now.getTime() - Date.parse(observedAt));", "  if (!observedAt || !Number.isFinite(Date.parse(observedAt)) || !isObservationTimestampUsable(observedAt, now)) return 'NO_DISPONIBLE';\n  const age = Math.max(0, now.getTime() - Date.parse(observedAt));")
+          s=s.replace("  if (!isPublicTimestamp(value) || !isPublicTimestamp(now)) return null;\n  return Math.max(0, Math.floor((Date.parse(now) - Date.parse(value)) / 60_000));", "  if (!isPublicTimestamp(value) || !isPublicTimestamp(now)) return null;\n  const valueTime = Date.parse(value);\n  const nowTime = Date.parse(now);\n  if (valueTime > nowTime + CLOCK_SKEW_TOLERANCE_MS) return null;\n  return Math.max(0, Math.floor((nowTime - valueTime) / 60_000));")
+          p.write_text(s)
+
+          p=Path('src/domain/hydrometric-context.ts'); s=p.read_text()
+          s=s.replace("import type { HydrologicalSystem, RiverPoint, RiverThreshold } from './snapshot.ts';", "import type { HydrologicalSystem, RiverThreshold } from './snapshot.ts';\nimport { temporalDelta } from './temporal-series.ts';")
+          start=s.index("function median(values: readonly number[]): number {")
+          end=s.index("export function changeCopy", start)
+          replacement="""export function deltaAtHours(points: HydrologicalSystem['points'], hours: number, now?: Date | string): number | null {\n  const anchor = now ?? points.at(-1)?.at ?? new Date().toISOString();\n  return temporalDelta(points, hours, anchor).value;\n}\n\n"""
+          s=s[:start]+replacement+s[end:]
+          s=s.replace("export function changeForSystem(system: HydrologicalSystem, hours: 24 | 72 | 168): number | null {\n  if (hours === 24 && system.delta24h !== null) return system.delta24h;\n  return deltaAtHours(system.points, hours);\n}", "export function changeForSystem(system: HydrologicalSystem, hours: 24 | 72 | 168): number | null {\n  if (hours === 24) return system.delta24h;\n  if (hours === 72 && system.delta72h !== undefined) return system.delta72h;\n  if (hours === 168 && system.delta7d !== undefined) return system.delta7d;\n  return deltaAtHours(system.points, hours, system.observedAt ?? undefined);\n}")
+          # Prefer ordinary statistical context unless a protection threshold is actually reached.
+          marker="""  const references = referencesForSystem(system);\n  const alert = references.find((reference) => reference.kind === 'OFFICIAL_PROTECTION_THRESHOLD' && reference.label.includes('alerta') && reference.metres !== null);\n  if (alert?.metres !== null && alert?.metres !== undefined) {"""
+          if marker not in s: raise SystemExit('meaning marker missing')
+          replacement="""  const references = referencesForSystem(system);\n  const alert = references.find((reference) => reference.kind === 'OFFICIAL_PROTECTION_THRESHOLD' && reference.label.includes('alerta') && reference.metres !== null);\n  const statistical = references.find((reference) => reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' && reference.metres !== null);\n  const alertReached = alert?.metres !== null && alert?.metres !== undefined && system.currentMetres >= alert.metres;\n  if (statistical?.metres !== null && statistical?.metres !== undefined && !alertReached) {\n    const difference = system.currentMetres - statistical.metres;\n    return Object.freeze({\n      headline: `${formatMetres(Math.abs(difference))} ${difference >= 0 ? 'por encima' : 'por debajo'} de la ${statistical.label.toLowerCase()} · ${formatMetres(statistical.metres)}`,\n      detail: statistical.period ? `Referencia estadística oficial · período ${statistical.period}.` : 'Referencia estadística oficial de esta estación.',\n      reference: statistical,\n    });\n  }\n  if (alert?.metres !== null && alert?.metres !== undefined) {"""
+          s=s.replace(marker,replacement,1)
+          # remove now-duplicated later statistical branch
+          duplicate="""  const statistical = references.find((reference) => reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' && reference.metres !== null);\n  if (statistical?.metres !== null && statistical?.metres !== undefined) {\n    const difference = system.currentMetres - statistical.metres;\n    return Object.freeze({\n      headline: `${formatMetres(Math.abs(difference))} ${difference >= 0 ? 'por encima' : 'por debajo'} de la ${statistical.label.toLowerCase()} · ${formatMetres(statistical.metres)}`,\n      detail: statistical.period ? `Referencia estadística oficial · período ${statistical.period}.` : 'Referencia estadística oficial de esta estación.',\n      reference: statistical,\n    });\n  }\n"""
+          # only remove second occurrence after alert branch
+          pos=s.find(duplicate, s.find("if (alert?.metres"))
+          if pos!=-1: s=s[:pos]+s[pos+len(duplicate):]
+          p.write_text(s)
+
+          p=Path('src/worker/live-data.ts'); s=p.read_text()
+          s=s.replace("import { providerHealth, publishProviderBlock, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core.ts';", "import { providerHealth, publishProviderBlock, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core.ts';\nimport { deriveHydrometricTrend, sanitizeMeasuredRiverPoints, temporalDelta } from '../domain/temporal-series.ts';")
+          start=s.index("function deltaAt(points: readonly RiverPoint[], hours: number): number | null {")
+          end=s.index("function thresholds", start)
+          s=s[:start]+s[end:]
+          s=s.replace("  const points = result.value ?? Object.freeze([]);\n  const latest = points.at(-1);", "  const points = sanitizeMeasuredRiverPoints(result.value ?? Object.freeze([]), now);\n  const latest = points.at(-1);")
+          s=s.replace("    trend: trend(points),\n    delta1h: deltaAt(points, 1),\n    delta6h: deltaAt(points, 6),\n    delta24h: deltaAt(points, 24),", "    trend: deriveHydrometricTrend(points, now),\n    delta1h: temporalDelta(points, 1, now).value,\n    delta6h: temporalDelta(points, 6, now).value,\n    delta24h: temporalDelta(points, 24, now).value,\n    delta72h: temporalDelta(points, 72, now).value,\n    delta7d: temporalDelta(points, 168, now).value,")
+          s=s.replace("  const delta24h = primary.delta24h ?? 0;\n  const direction: ChangeItem['direction'] = primary.delta24h === null ? 'UNKNOWN' : delta24h > 0.01 ? 'UP' : delta24h < -0.01 ? 'DOWN' : 'SAME';", "  const delta24h = primary.delta24h;\n  const direction: ChangeItem['direction'] = delta24h === null ? 'UNKNOWN' : delta24h > 0.01 ? 'UP' : delta24h < -0.01 ? 'DOWN' : 'SAME';")
+          s=s.replace("detail: primary.delta24h === null ? 'Sin comparación de 24 horas' : `${delta24h >= 0 ? '+' : ''}${delta24h.toFixed(2)} m en 24 horas`", "detail: delta24h === null ? 'Sin comparación de 24 horas' : `${delta24h >= 0 ? '+' : ''}${delta24h.toFixed(2)} m en 24 horas`")
+          s=s.replace("      currentMetres: primary.currentMetres ?? 0,\n      delta1h: primary.delta1h ?? 0,\n      delta6h: primary.delta6h ?? 0,\n      delta24h,", "      currentMetres: primary.currentMetres,\n      delta1h: primary.delta1h,\n      delta6h: primary.delta6h,\n      delta24h,")
+          p.write_text(s)
+
+          p=Path('src/worker/providers/core.ts'); s=p.read_text()
+          s=s.replace("export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'CIRCUIT_OPEN' | 'NETWORK' | 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE' | 'CREDENTIAL_REQUIRED' | null;", "export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'REDIRECT' | 'FUTURE_TIMESTAMP' | 'CIRCUIT_OPEN' | 'NETWORK' | 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE' | 'CREDENTIAL_REQUIRED' | null;")
+          s=s.replace("  if (message.includes('ALLOWLIST')) return 'ALLOWLIST';", "  if (message.includes('ALLOWLIST')) return 'ALLOWLIST';\n  if (message.includes('REDIRECT')) return 'REDIRECT';\n  if (message.includes('FUTURE_TIMESTAMP')) return 'FUTURE_TIMESTAMP';")
+          s=s.replace("const CIRCUIT_OPEN_MS = 5 * 60_000;", "const CIRCUIT_OPEN_MS = 5 * 60_000;\nconst FUTURE_TOLERANCE_MS = 5 * 60_000;")
+          old="""    const response = await fetch(url, { signal: controller.signal, headers: { Accept: policy.contentTypes.join(', ') } });\n    if (!response.ok) throw new Error(`PROVIDER_HTTP_${response.status}`);"""
+          new="""    const requestInit: RequestInit = { signal: controller.signal, redirect: 'manual', headers: { Accept: policy.contentTypes.join(', ') } };\n    let response = await fetch(url, requestInit);\n    if ([301, 302, 303, 307, 308].includes(response.status)) {\n      const location = response.headers.get('Location');\n      if (!location) throw new Error('PROVIDER_REDIRECT_MISSING_LOCATION');\n      const redirected = allowedUrl(new URL(location, url).toString(), policy);\n      response = await fetch(redirected, requestInit);\n      if ([301, 302, 303, 307, 308].includes(response.status)) throw new Error('PROVIDER_REDIRECT_CHAIN_REJECTED');\n    }\n    if (!response.ok) throw new Error(`PROVIDER_HTTP_${response.status}`);"""
+          if old not in s: raise SystemExit('provider fetch marker missing')
+          s=s.replace(old,new,1)
+          s=s.replace("    if (!Number.isFinite(Date.parse(parsed.observedAt))) throw new Error('PROVIDER_PARSE_FAILED');", "    if (!Number.isFinite(Date.parse(parsed.observedAt))) throw new Error('PROVIDER_PARSE_FAILED');\n    if (Date.parse(parsed.observedAt) > now.getTime() + FUTURE_TOLERANCE_MS) throw new Error('PROVIDER_FUTURE_TIMESTAMP');")
+          s=s.replace("  if (cached && cachedAge <= refreshMs) {\n    const observationStatus", "  if (cached && Date.parse(cached.observedAt) > now.getTime() + FUTURE_TOLERANCE_MS) {\n    await cacheWrite(payloadKey, { value: cached.value, fetchedAt: cached.fetchedAt, observedAt: new Date(0).toISOString() }, 1);\n  } else if (cached && cachedAge <= refreshMs) {\n    const observationStatus")
+          p.write_text(s)
+
+          p=Path('src/domain/validation.ts'); s=p.read_text()
+          s=s.replace("import { validateCriticalMessage } from './zungun-compat/validation.ts';", "import { validateCriticalMessage } from './zungun-compat/validation.ts';\nimport { CLOCK_SKEW_TOLERANCE_MS } from './temporal-series.ts';")
+          s=s.replace("function points(value: unknown, label: string): readonly RiverPoint[] {", "function points(value: unknown, label: string, maximumAt?: string): readonly RiverPoint[] {")
+          s=s.replace("    const time = Date.parse(at);\n    if (time <= previous)", "    const time = Date.parse(at);\n    if (maximumAt && time > Date.parse(maximumAt) + CLOCK_SKEW_TOLERANCE_MS) throw new TypeError(`${label}[${index}].at está significativamente en el futuro`);\n    if (time <= previous)")
+          s=s.replace("function source(value: unknown, index: number): Source {", "function source(value: unknown, index: number, generatedAt?: string): Source {")
+          s=s.replace("  iso(row.observedAt, `snapshot.sources[${index}].observedAt`); iso(row.validUntil, `snapshot.sources[${index}].validUntil`);", "  const sourceObservedAt = iso(row.observedAt, `snapshot.sources[${index}].observedAt`); iso(row.validUntil, `snapshot.sources[${index}].validUntil`);\n  if (generatedAt && Date.parse(sourceObservedAt) > Date.parse(generatedAt) + CLOCK_SKEW_TOLERANCE_MS) throw new TypeError(`snapshot.sources[${index}].observedAt está significativamente en el futuro`);")
+          s=s.replace("function system(value: unknown, index: number, sourceIds: ReadonlySet<string>): HydrologicalSystem {", "function system(value: unknown, index: number, sourceIds: ReadonlySet<string>, generatedAt?: string): HydrologicalSystem {")
+          s=s.replace("  const observations = points(row.points, `snapshot.systems[${index}].points`); thresholds", "  const observations = points(row.points, `snapshot.systems[${index}].points`, generatedAt); thresholds")
+          s=s.replace("  for (const field of ['delta1h', 'delta6h', 'delta24h'] as const) if (row[field] !== null) finite(row[field], `snapshot.systems[${index}].${field}`);", "  for (const field of ['delta1h', 'delta6h', 'delta24h', 'delta72h', 'delta7d'] as const) if (row[field] !== undefined && row[field] !== null) finite(row[field], `snapshot.systems[${index}].${field}`);")
+          s=s.replace("  const sources = record.sources.map(source); const sourceIds", "  const sources = record.sources.map((item, index) => source(item, index, generatedAt)); const sourceIds")
+          s=s.replace("  const systems = rawSystems.map((item, index) => system(item, index, sourceIds));", "  const systems = rawSystems.map((item, index) => system(item, index, sourceIds, generatedAt));")
+          s=s.replace("  text(river.stationName, 'snapshot.river.stationName', 160); finite(river.currentMetres, 'snapshot.river.currentMetres');\n  for (const field of ['delta1h', 'delta6h', 'delta24h'] as const) finite(river[field], `snapshot.river.${field}`);", "  text(river.stationName, 'snapshot.river.stationName', 160); finiteOrNull(river.currentMetres, 'snapshot.river.currentMetres');\n  for (const field of ['delta1h', 'delta6h', 'delta24h'] as const) finiteOrNull(river[field], `snapshot.river.${field}`);")
+          s=s.replace("points(river.points, 'snapshot.river.points');", "points(river.points, 'snapshot.river.points', generatedAt);")
+          p.write_text(s)
+
+          p=Path('src/data/unavailable-snapshot.ts'); s=p.read_text()
+          s=s.replace("    delta24h: null,\n  });", "    delta24h: null,\n    delta72h: null,\n    delta7d: null,\n  });")
+          s=s.replace("    currentMetres: 0,\n    delta1h: 0,\n    delta6h: 0,\n    delta24h: 0,", "    currentMetres: null,\n    delta1h: null,\n    delta6h: null,\n    delta24h: null,")
+          p.write_text(s)
+          PY
+
+          cat > tests/unit/temporal-series-028.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { deriveHydrometricTrend, strictTimeWindow, temporalDelta } from '../../src/domain/temporal-series.ts';
+          import type { RiverPoint } from '../../src/domain/snapshot.ts';
+
+          const now = new Date('2026-08-16T06:00:00.000Z');
+          const point = (hoursAgo: number, metres: number): RiverPoint => ({ at: new Date(now.getTime() - hoursAgo * 3_600_000).toISOString(), metres, measured: true, quality: 'PUBLISHED_OPERATIONAL' });
+
+          describe('028 temporal truth primitive', () => {
+            it('GAP_30H_DELTA24H=NULL', () => {
+              const points = [point(30, 3), point(0, 3.2)];
+              expect(temporalDelta(points, 24, now).value).toBeNull();
+            });
+            it('GAP_12H_TREND6H=UNKNOWN', () => {
+              const points = [point(12, 3), point(0, 3.2)];
+              expect(deriveHydrometricTrend(points, now)).toBe('UNKNOWN');
+            });
+            it('FUTURE_OBSERVATION_3H=DEGRADED_OR_REJECTED', () => {
+              const future: RiverPoint = { at: new Date(now.getTime() + 3 * 3_600_000).toISOString(), metres: 9, measured: true };
+              const result = temporalDelta([point(24, 3), point(0, 3.1), future], 24, now);
+              expect(result.status).toBe('FUTURE_DATA_REJECTED');
+              expect(result.value).toBeCloseTo(.1, 8);
+            });
+            it('24H_WITH_INSUFFICIENT_POINTS_NO_SILENT_FALLBACK=PASS', () => {
+              const points = [point(60, 2.8), point(2, 3.1), point(0, 3.2)];
+              const window = strictTimeWindow(points, 24, now);
+              expect(window.sufficient).toBe(false);
+              expect(window.points.map((item) => item.at)).not.toContain(points[0]!.at);
+            });
+            it('accepts hourly coverage for 72h and 7d', () => {
+              const points = Array.from({ length: 169 }, (_, i) => point(168 - i, 3 + i * .001));
+              expect(strictTimeWindow(points, 72, now).sufficient).toBe(true);
+              expect(strictTimeWindow(points, 168, now).sufficient).toBe(true);
+            });
+          });
+          EOF
+
+          cat > tests/unit/flood-situation-028.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { deriveFloodSituation } from '../../src/domain/flood-situation.ts';
+          import type { HydrologicalSystem, OfficialAlert, Snapshot, Source } from '../../src/domain/snapshot.ts';
+
+          const generatedAt='2026-08-16T06:00:00.000Z';
+          const validUntil='2026-08-16T18:00:00.000Z';
+          function system(id: 'parana-santa-fe'|'salado-santo-tome', current: number, alert: number, freshness: HydrologicalSystem['freshness']='ACTUALIZADO'): HydrologicalSystem {
+            const watercourse=id.startsWith('parana')?'Río Paraná':'Río Salado'; const station=id.startsWith('parana')?'Santa Fe':'Santo Tomé'; const code=id.startsWith('parana')?'30':'3044';
+            return { id,label:`${watercourse} — ${station}`,watercourse,stationName:station,stationCode:code,available:true,dataStatus:freshness==='ACTUALIZADO'?'LIVE':'STALE',freshness,currentMetres:current,observedAt:generatedAt,fetchedAt:generatedAt,validUntil,sourceId:`ina-rest-${code}`,sourceName:'INA',points:[{at:'2026-08-15T06:00:00.000Z',metres:current-.05,measured:true},{at:generatedAt,metres:current,measured:true}],thresholds:[{id:'ALERTA',label:'Nivel de alerta de referencia',metres:alert}],trend:'STABLE',delta1h:null,delta6h:null,delta24h:.05,delta72h:null,delta7d:null };
+          }
+          function source(s: HydrologicalSystem): Source { return {id:s.sourceId,name:'INA REST',kind:'OFFICIAL_OBSERVATION',status:'FRESH',observedAt:generatedAt,fetchedAt:generatedAt,validUntil,contribution:'fixture',official:true,connected:true,organizationId:'ina',organizationName:'Instituto Nacional del Agua',classification:'OPERATIONAL_FRESH',freshness:'ACTUALIZADO',determinesPrimaryState:true}; }
+          function alertSource(status: Source['status']='FRESH'): Source { return {id:'smn-alerts',name:'SMN CAP',kind:'OFFICIAL_ALERT',status,observedAt:generatedAt,fetchedAt:generatedAt,validUntil,contribution:'fixture',official:true,connected:status!=='UNAVAILABLE',organizationId:'smn',organizationName:'Servicio Meteorológico Nacional',classification:status==='UNAVAILABLE'?'DEGRADED':'OPERATIONAL_FRESH',freshness:status==='UNAVAILABLE'?'NO_DISPONIBLE':'ACTUALIZADO',determinesPrimaryState:true}; }
+          function base(systems: HydrologicalSystem[]): Snapshot {
+            const p=systems[0]!; return {schemaVersion:'1.0',id:'fixture',mode:'LIVE',generatedAt,previousSnapshotAt:generatedAt,state:'NORMAL',stateLabel:'fixture',summary:'fixture',dominantSourceId:p.sourceId,validUntil,recommendedAction:'fixture',emergencyDisclaimer:'fixture',alertStatus:'SIN_ALERTAS_OFICIALES_DETECTADAS',alerts:[],changes:[],systems,river:{systemId:p.id,available:true,stationName:p.stationName,currentMetres:p.currentMetres,delta1h:p.delta1h,delta6h:p.delta6h,delta24h:p.delta24h,trend:p.trend,observedAt:p.observedAt!,fetchedAt:p.fetchedAt!,validUntil,sourceId:p.sourceId,points:p.points,forecastPoints:[],thresholds:p.thresholds},rain:{accumulated1hMm:null,accumulated24hMm:null,forecast:'none',observedAt:generatedAt,fetchedAt:generatedAt,validUntil,sourceId:'rain-none',points:[]},sources:[...systems.map(source),alertSource()],contradictions:[],shelters:[],actions:[],messages:[]};
+          }
+          function officialAlert(headline='Alerta por lluvias intensas'): OfficialAlert { return {identifier:'a1',sender:'SMN',sent:generatedAt,status:'Actual',messageType:'Alert',scope:'Public',category:'Met',event:'Tormentas',urgency:'Expected',severity:'Moderate',certainty:'Likely',effective:generatedAt,onset:generatedAt,expires:validUntil,headline,description:'Lluvias intensas en Santa Fe',instruction:'Seguir indicaciones oficiales',area:'Santa Fe',sourceUrl:'https://www.smn.gob.ar/alertas',lifecycle:'ACTIVE',appliesToSantaFe:true}; }
+
+          describe('028 flood situation engine', () => {
+            it('routine fresh rivers stays routine', () => { const d=deriveFloodSituation(base([system('parana-santa-fe',3.2,5.3),system('salado-santo-tome',3.4,4.7)])); expect(d.state).toBe('ROUTINE'); expect(d.officialEmergencyDeclared).toBe(false); });
+            it('one protection reference produces relevant situation, never official emergency', () => { const d=deriveFloodSituation(base([system('parana-santa-fe',5.35,5.3),system('salado-santo-tome',3.4,4.7)])); expect(d.state).toBe('FLOOD_SITUATION'); expect(d.affectedSystemIds).toEqual(['parana-santa-fe']); expect(d.officialEmergencyDeclared).toBe(false); });
+            it('dual material relevance preserves both systems', () => { const d=deriveFloodSituation(base([system('parana-santa-fe',5.35,5.3),system('salado-santo-tome',4.75,4.7)])); expect(d.state).toBe('FLOOD_SITUATION'); expect(d.affectedSystemIds).toHaveLength(2); });
+            it('official heavy-rain warning does not fabricate river emergency', () => { const snap=base([system('parana-santa-fe',3.2,5.3),system('salado-santo-tome',3.4,4.7)]); snap.alertStatus='ALERTA_OFICIAL_ACTIVA'; snap.alerts=[officialAlert()]; const d=deriveFloodSituation(snap); expect(d.state).toBe('OFFICIAL_WARNING_ACTIVE'); expect(d.affectedSystemIds).toHaveLength(0); expect(d.officialEmergencyDeclared).toBe(false); });
+            it('model signal alone cannot create official warning or emergency', () => { const snap=base([system('parana-santa-fe',3.2,5.3),system('salado-santo-tome',3.4,4.7)]); snap.sources=[...snap.sources,{id:'model',name:'model',kind:'FORECAST_MODEL',status:'FRESH',observedAt:generatedAt,fetchedAt:generatedAt,validUntil,contribution:'fixture',official:false,connected:true,freshness:'ACTUALIZADO',determinesPrimaryState:false}]; const d=deriveFloodSituation(snap); expect(d.state).toBe('ROUTINE'); expect(d.officialWarningActive).toBe(false); expect(d.officialEmergencyDeclared).toBe(false); });
+            it('stale hydrometry cannot activate a material situation', () => { const stale=system('parana-santa-fe',6,5.3,'DESACTUALIZADO'); const snap=base([stale,system('salado-santo-tome',3.4,4.7)]); snap.sources=[source(stale),source(snap.systems![1]!),alertSource()]; const d=deriveFloodSituation(snap); expect(d.state).toBe('VERIFICATION_DEGRADED'); expect(d.affectedSystemIds).toHaveLength(0); });
+            it('unavailable alert verification never yields false normal', () => { const snap=base([system('parana-santa-fe',3.2,5.3),system('salado-santo-tome',3.4,4.7)]); snap.alertStatus='FUENTES_DE_ALERTAS_NO_DISPONIBLES'; snap.sources=[...snap.sources.filter(s=>s.id!=='smn-alerts'),alertSource('UNAVAILABLE')]; const d=deriveFloodSituation(snap); expect(d.state).toBe('VERIFICATION_DEGRADED'); expect(d.officialEmergencyDeclared).toBe(false); });
+            it('community report only never changes official state', () => { const snap=base([system('parana-santa-fe',3.2,5.3),system('salado-santo-tome',3.4,4.7)]); snap.sources=[...snap.sources,{id:'community',name:'Reporte',kind:'COMMUNITY_REPORT',status:'FRESH',observedAt:generatedAt,fetchedAt:generatedAt,validUntil,contribution:'fixture',official:false,connected:true,freshness:'ACTUALIZADO',determinesPrimaryState:false}]; const d=deriveFloodSituation(snap); expect(d.state).toBe('ROUTINE'); expect(d.officialEmergencyDeclared).toBe(false); });
+          });
+          EOF
+
+          cat > tests/unit/public-safety-future-028.test.ts <<'EOF'
+          import { describe, expect, it } from 'vitest';
+          import { ageMinutes, freshnessFor } from '../../src/domain/public-safety.ts';
+          describe('028 future timestamp guard', () => {
+            const now=new Date('2026-08-16T06:00:00.000Z');
+            it('FUTURE_POINT_NOT_FRESH=PASS',()=>expect(freshnessFor('2026-08-16T09:00:00.000Z',now,6*3600000,24*3600000)).toBe('NO_DISPONIBLE'));
+            it('future human age is unavailable',()=>expect(ageMinutes('2026-08-16T09:00:00.000Z',now.toISOString())).toBeNull());
+            it('small clock skew is tolerated',()=>expect(freshnessFor('2026-08-16T06:03:00.000Z',now,6*3600000,24*3600000)).toBe('ACTUALIZADO'));
+          });
+          EOF
+      - name: Install and validate core tranche
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+      - name: Commit core tranche
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add src tests/unit
+          git commit -m 'feat(028): harden temporal truth and add flood situation engine [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
