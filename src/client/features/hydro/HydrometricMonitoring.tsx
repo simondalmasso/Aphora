@@ -1,8 +1,16 @@
 import { useMemo, useState, type RefObject } from 'react';
+import {
+  changeCopy,
+  changeForSystem,
+  meaningForSystem,
+  referencesForSystem,
+  safeStationThresholds,
+  semanticMiniSummary,
+} from '../../../domain/hydrometric-context.ts';
 import { deriveHydroPriority, hydroPrioritySignalsForSystem, type HydroPriorityDecision } from '../../../domain/hydro-priority.ts';
 import type { HydrologicalSystem, Snapshot, Source } from '../../../domain/snapshot.ts';
 import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety.ts';
-import { FreshnessBadge, HydrometricChart, HydrometricHero, SourceLine, StationSwitcher } from '../../components/civic/CivicSystem.tsx';
+import { FreshnessBadge, HydrometricChart, HydrometricHero, SourceLine } from '../../components/civic/CivicSystem.tsx';
 
 const EMPTY_SYSTEMS: readonly HydrologicalSystem[] = Object.freeze([]);
 
@@ -21,22 +29,76 @@ function trendLabel(system: HydrologicalSystem): string {
   return 'Sin tendencia suficiente';
 }
 
-function formatDelta(value: number | null): string {
-  if (value === null) return 'Cambio no disponible';
-  const centimetres = Math.round(value * 100);
-  if (centimetres === 0) return 'Sin cambio en 24 h';
-  const amount = Math.abs(centimetres);
-  return `${centimetres > 0 ? 'Subió' : 'Bajó'} ${amount} cm en 24 h`;
-}
-
 function formatLevel(system: HydrologicalSystem): string {
   return system.currentMetres === null ? 'No disponible' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`;
+}
+
+function shortRiverName(system: HydrologicalSystem): string {
+  return system.watercourse.replace(/^Río\s+/i, '');
 }
 
 function sourceError(source: Source | undefined): string | null {
   if (!source) return 'La fuente no figura en el inventario de esta actualización.';
   if (source.classification === 'OPERATIONAL_FRESH' || source.classification === 'OPERATIONAL_STALE') return null;
   return source.limitations ?? 'La fuente no está operativa en esta actualización.';
+}
+
+function RiverContextSelector({
+  systems,
+  selectedId,
+  onSelect,
+}: {
+  readonly systems: readonly HydrologicalSystem[];
+  readonly selectedId?: string;
+  readonly onSelect: (id: string) => void;
+}) {
+  if (systems.length < 2) return null;
+  return <div className="station-selector station-selector--meaning" role="tablist" aria-label="Elegir río y estación">
+    {systems.map((system) => <button
+      key={system.id}
+      type="button"
+      role="tab"
+      aria-label={shortRiverName(system)}
+      aria-selected={system.id === selectedId}
+      onClick={() => onSelect(system.id)}
+    >
+      <span>{shortRiverName(system)}</span>
+      <small>Estación {system.stationName}</small>
+      <em>{semanticMiniSummary(system)}</em>
+    </button>)}
+  </div>;
+}
+
+function ContextualScale({ system }: { readonly system: HydrologicalSystem }) {
+  const current = system.currentMetres;
+  const references = referencesForSystem(system).filter((reference) => reference.metres !== null && reference.kind !== 'UNAVAILABLE');
+  if (current === null || references.length === 0) {
+    return <div className="context-scale context-scale--unavailable" data-testid="hydro-context-scale">
+      <div><strong>Escala contextual de la estación</strong><span>Sin una referencia oficial suficiente para dibujarla.</span></div>
+    </div>;
+  }
+  const values = [current, ...references.map((reference) => reference.metres!).filter(Number.isFinite)];
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const span = Math.max(.4, rawMax - rawMin);
+  const minimum = rawMin - span * .12;
+  const maximum = rawMax + span * .12;
+  const position = (value: number) => `${Math.max(0, Math.min(100, ((value - minimum) / Math.max(.01, maximum - minimum)) * 100))}%`;
+  return <figure className="context-scale" data-testid="hydro-context-scale" aria-label={`Escala contextual específica de ${system.label}`}>
+    <figcaption><strong>¿Respecto de qué?</strong><span>Escala contextual de esta estación, no profundidad física del río.</span></figcaption>
+    <div className="context-scale__track" aria-hidden="true">
+      {references.map((reference) => <span
+        key={reference.id}
+        className={`context-scale__reference context-scale__reference--${reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' ? 'statistical' : 'protection'}`}
+        style={{ left: position(reference.metres!) }}
+      />)}
+      <span className="context-scale__current" style={{ left: position(current) }}><i/></span>
+    </div>
+    <div className="context-scale__legend">
+      <span className="context-scale__legend-current"><i/>Ahora · {formatLevel(system)}</span>
+      {references.map((reference) => <span key={reference.id}><i className={reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' ? 'statistical' : 'protection'}/>{reference.label} · {reference.metres!.toFixed(2).replace('.', ',')} m</span>)}
+    </div>
+  </figure>;
 }
 
 function OperationalRiverPanel({ system, snapshot, priority }: {
@@ -46,21 +108,20 @@ function OperationalRiverPanel({ system, snapshot, priority }: {
 }) {
   const source = snapshot.sources.find((item) => item.id === system.sourceId);
   const signals = hydroPrioritySignalsForSystem(priority, system.id);
+  const meaning = meaningForSystem(system);
   return <article className="river-priority__river" data-river-system={system.id}>
     <header className="river-priority__river-header">
-      <div>
-        <span>{system.watercourse}</span>
-        <strong>Estación {system.stationName}</strong>
-      </div>
+      <div><span>{system.watercourse}</span><strong>Estación {system.stationName}</strong></div>
       <FreshnessBadge
         className={`freshness-badge--${(system.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}
         label={`${freshnessLabel(system)} · ${formatHumanAge(system.observedAt, snapshot.generatedAt)}`}
       />
     </header>
+    <p className="river-priority__meaning">{meaning.headline}</p>
     <dl className="river-priority__facts">
       <div className="river-priority__level"><dt>Nivel</dt><dd>{formatLevel(system)}</dd></div>
       <div><dt>Movimiento</dt><dd>{trendLabel(system)}</dd></div>
-      <div><dt>Últimas 24 h</dt><dd>{formatDelta(system.delta24h)}</dd></div>
+      <div><dt>Últimas 24 h</dt><dd>{changeCopy(changeForSystem(system, 24), 24)}</dd></div>
       <div><dt>Vigencia</dt><dd>{freshnessLabel(system)} · hasta {formatLocalDateTime(system.validUntil)}</dd></div>
       <div className="river-priority__source"><dt>Fuente</dt><dd>{source?.organizationName ?? system.sourceName}</dd></div>
       <div className="river-priority__status"><dt>Por qué se prioriza</dt><dd>{signals.map((signal) => <span key={`${signal.kind}-${signal.sourceId}-${signal.reason}`}>{signal.reason}</span>)}</dd></div>
@@ -88,14 +149,11 @@ export function HydrometricMonitoring({
     : snapshot.river.systemId ?? systems[0]?.id;
   const [selection, setSelection] = useState(() => ({ snapshotId: snapshot.id, id: operationalDefaultId ?? '' }));
   const requestedId = selection.snapshotId === snapshot.id ? selection.id : operationalDefaultId ?? '';
-  const validSelectedId = systems.some((system) => system.id === requestedId)
-    ? requestedId
-    : operationalDefaultId ?? systems[0]?.id ?? '';
+  const validSelectedId = systems.some((system) => system.id === requestedId) ? requestedId : operationalDefaultId ?? systems[0]?.id ?? '';
   const selected = systems.find((system) => system.id === validSelectedId) ?? systems[0];
   const prioritySystems = priority.affectedSystemIds
     .map((id) => systems.find((system) => system.id === id))
     .filter((system): system is HydrologicalSystem => Boolean(system));
-
   const selectedSource = useMemo(
     () => selected ? snapshot.sources.find((source) => source.id === selected.sourceId) : undefined,
     [selected, snapshot.sources],
@@ -107,9 +165,11 @@ export function HydrometricMonitoring({
       (source.id.includes('waterml') || source.feedName?.toLowerCase().includes('waterml'))) : undefined,
     [selected, selectedSource, snapshot.sources],
   );
+  const meaning = selected ? meaningForSystem(selected) : null;
+  const safeThresholds = selected ? safeStationThresholds(selected) : [];
 
   return <section
-    className="hydrometric-section"
+    className="hydrometric-section context-first-hydrometry"
     id="situacion-hidrica"
     aria-labelledby="hydrometric-title"
     data-testid="hydrometric-situation"
@@ -120,10 +180,10 @@ export function HydrometricMonitoring({
         <div className="hydrometric-hero__intro">
           <p className="section-kicker">Santa Fe · monitoreo hídrico</p>
           <h1 id="hydrometric-title">Situación hidrométrica</h1>
-          <p className="hydrometric-hero__lede">Niveles, tendencia y vigencia de las últimas mediciones disponibles.</p>
+          <p className="hydrometric-hero__lede">Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.</p>
         </div>
         <div className="hydrometric-hero__controls">
-          <StationSwitcher
+          <RiverContextSelector
             systems={systems}
             selectedId={selected?.id}
             onSelect={(id) => setSelection({ snapshotId: snapshot.id, id })}
@@ -158,7 +218,7 @@ export function HydrometricMonitoring({
         </div>
       </aside>}
 
-      {selected ? <article className={`primary-station${priority.mode === 'DUAL_EMERGENCY' ? ' primary-station--after-dual' : ''}`}>
+      {selected ? <article className={`primary-station hydrometric-meaning-module${priority.mode === 'DUAL_EMERGENCY' ? ' primary-station--after-dual' : ''}`}>
         <div className="station-identification">
           <div>
             <span>Estación {selected.stationName}</span>
@@ -171,7 +231,7 @@ export function HydrometricMonitoring({
           />
         </div>
 
-        <div className="hydro-reading">
+        <div className="meaning-glance">
           <div className="hydro-level">
             <span>Último nivel disponible</span>
             <strong data-testid="hydro-current-level">
@@ -180,16 +240,30 @@ export function HydrometricMonitoring({
             </strong>
             <time dateTime={selected.observedAt ?? undefined}>{formatLocalDateTime(selected.observedAt)}</time>
           </div>
-          <dl className="hydro-metrics">
-            <div><dt>Movimiento</dt><dd>{trendLabel(selected)}</dd></div>
-            <div><dt>Cambio reciente</dt><dd>{formatDelta(selected.delta24h)}</dd></div>
-          </dl>
+          <div className="meaning-copy">
+            <p className="meaning-copy__primary" data-testid="hydro-meaning">{meaning?.headline}</p>
+            {meaning?.detail && <p className="meaning-copy__caveat">{meaning.detail}</p>}
+            <div className="meaning-copy__movement">
+              <strong>{trendLabel(selected)}</strong>
+              <span>{changeCopy(changeForSystem(selected, 24), 24)}</span>
+              <span>Medición de {formatHumanAge(selected.observedAt, snapshot.generatedAt).replace(/^hace\s+/i, 'hace ')}</span>
+            </div>
+            <button type="button" className="meaning-explain" onClick={(event) => onSources(event.currentTarget)}>Qué significa esta altura</button>
+          </div>
+        </div>
+
+        {selected.available && selected.currentMetres !== null && <ContextualScale system={selected}/>} 
+
+        <div className="meaning-horizons" aria-label="Cambios observados en distintos períodos">
+          <span>{changeCopy(changeForSystem(selected, 72), 72)}</span>
+          <span>{changeCopy(changeForSystem(selected, 168), 168)}</span>
         </div>
 
         <SourceLine buttonRef={sourcesButtonRef} onOpen={onSources}>
           <span><b>Fuente · {selectedSource?.organizationName ?? selected.sourceName}</b></span>
           <span>Medición · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}</span>
           <span>Consulta de la fuente · {formatHumanAge(selected.fetchedAt, snapshot.generatedAt)}</span>
+          {safeThresholds.length > 0 && <span className="source-strip__technical">Referencias de esta estación verificadas</span>}
           {corroboratingTransport && <span className="source-strip__technical">Otra vía del mismo organismo disponible</span>}
           {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
         </SourceLine>
