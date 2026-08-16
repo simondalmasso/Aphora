@@ -1,0 +1,85 @@
+name: order-028-contract-probe
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-contract-probe.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+      - name: Verify official geo contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, re, subprocess, xml.etree.ElementTree as ET
+          from urllib.request import Request, urlopen
+          from urllib.error import HTTPError, URLError
+
+          def get(url, timeout=15):
+              req=Request(url,headers={'User-Agent':'SOS-SF/028 contract probe'})
+              with urlopen(req,timeout=timeout) as r:
+                  return r.status, r.headers, r.read()
+
+          caps='https://aswe.santafe.gov.ar/idesf/wms?service=WMS&version=1.1.1&request=GetCapabilities'
+          status,headers,body=get(caps,20)
+          print('IDESF_CAPABILITIES_HTTP='+str(status))
+          root=ET.fromstring(body)
+          candidates=[]
+          for layer in root.iter():
+              if layer.tag.split('}')[-1] != 'Layer': continue
+              name=title=abstract=None; crs=[]; dims=[]
+              for child in list(layer):
+                  tag=child.tag.split('}')[-1]
+                  text=(child.text or '').strip()
+                  if tag=='Name': name=text
+                  elif tag=='Title': title=text
+                  elif tag=='Abstract': abstract=text
+                  elif tag in ('SRS','CRS') and text: crs.extend(text.split())
+                  elif tag in ('Dimension','Extent') and text: dims.append({'name':child.attrib.get('name'), 'value':text[:500]})
+              blob=' '.join(filter(None,[name,title,abstract])).lower()
+              if any(term in blob for term in ['riesgo hídrico','riesgo hidrico','precipit','isohiet','canales de drenaje','red de canales']):
+                  candidates.append({'name':name,'title':title,'abstract':abstract,'crs':sorted(set(crs)),'dimensions':dims})
+          print('IDESF_MATCHES='+json.dumps(candidates,ensure_ascii=False,separators=(',',':')))
+          risk=[x for x in candidates if 'riesgo h' in ((x.get('title') or '')+' '+(x.get('name') or '')+' '+(x.get('abstract') or '')).lower()]
+          if not risk or not risk[0].get('name'):
+              raise SystemExit('No exact named IDESF hydric risk layer resolved')
+          print('IDESF_RISK_LAYER_NAME='+risk[0]['name'])
+          print('IDESF_RISK_LAYER_TITLE='+(risk[0].get('title') or ''))
+
+          # Confirm a GetMap image around Santa Fe, EPSG:4326, without persisting geodata.
+          from urllib.parse import urlencode
+          q=urlencode({'service':'WMS','version':'1.1.1','request':'GetMap','layers':risk[0]['name'],'styles':'','srs':'EPSG:4326','bbox':'-60.85,-32.15,-60.45,-31.35','width':'512','height':'512','format':'image/png','transparent':'true'})
+          mstatus,mheaders,mbody=get('https://aswe.santafe.gov.ar/idesf/wms?'+q,20)
+          ctype=(mheaders.get('Content-Type') or '').lower()
+          print('IDESF_GETMAP_HTTP='+str(mstatus))
+          print('IDESF_GETMAP_CONTENT_TYPE='+ctype)
+          if mstatus!=200 or not ctype.startswith('image/') or len(mbody)<100:
+              raise SystemExit('IDESF GetMap not safely usable')
+
+          # Official Argenmap TMS sample for Santa Fe. z=10 x=339 y inversion syntax resolved to concrete TMS y.
+          # We only verify the published service; app will lazy-load through a fixed allowlisted template.
+          argen='https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/10/339/616.png'
+          astatus,aheaders,abody=get(argen,20)
+          actype=(aheaders.get('Content-Type') or '').lower()
+          print('ARGENMAP_HTTP='+str(astatus))
+          print('ARGENMAP_CONTENT_TYPE='+actype)
+          if astatus!=200 or not actype.startswith('image/') or len(abody)<100:
+              raise SystemExit('Argenmap published tile service not usable')
+
+          # Primary upstreams remain reachable at contract level; absence of records is not interpreted here.
+          for key,url in {
+              'INA_PARANA':'https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=30&timestart=2026-08-14&timeend=2026-08-17',
+              'INA_SALADO':'https://alerta.ina.gob.ar/a5/getObservaciones?tipo=puntual&series_id=3044&timestart=2026-08-14&timeend=2026-08-17',
+              'SMN_CAP':'https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml'
+          }.items():
+              try:
+                  s,h,b=get(url,20); print(f'{key}_HTTP={s}'); print(f'{key}_BYTES={len(b)}')
+              except Exception as e:
+                  print(f'{key}_PROBE_ERROR={type(e).__name__}')
+          PY
