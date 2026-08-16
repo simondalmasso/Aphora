@@ -1,0 +1,67 @@
+name: order-028-product-repair-r2
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-product-repair-r2.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Rebuild product working tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --save-exact leaflet@1.9.4
+          npm install --save-dev --save-exact @types/leaflet@1.9.20
+          python3 <<'PY'
+          from pathlib import Path
+          s=Path('.github/workflows/order-028-product-apply.yml').read_text()
+          start=s.index('      - name: Apply 028 product foundation'); run=s.index('        run: |\n',start)+len('        run: |\n'); end=s.index('      - name: Validate product tranche',run)
+          lines=[line[10:] if line.startswith('          ') else line for line in s[run:end].splitlines()]
+          Path('/tmp/product.sh').write_text('\n'.join(lines)+'\n')
+          PY
+          bash /tmp/product.sh
+      - name: Repair local Leaflet presentation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('src/client/features/situation/SituationMap.tsx'); s=p.read_text()
+          s=s.replace("import 'leaflet/dist/leaflet.css';\n",'')
+          old="""const STATION_COORDS: Readonly<Record<string, readonly [number, number]>> = Object.freeze({\n  'parana-santa-fe': Object.freeze([-31.6505, -60.7012]),\n  'salado-santo-tome': Object.freeze([-31.6688, -60.7654]),\n});"""
+          new="""const STATION_COORDS: Readonly<Record<string, readonly [number, number]>> = {\n  'parana-santa-fe': [-31.6505, -60.7012],\n  'salado-santo-tome': [-31.6688, -60.7654],\n};"""
+          if old not in s: raise SystemExit('station marker missing')
+          s=s.replace(old,new,1).replace(', keyboard: true }).addTo(map)', ' }).addTo(map)')
+          p.write_text(s)
+          p=Path('src/client/styles/flood-intelligence-028.css'); s=p.read_text()
+          s += """\n/* Minimal local Leaflet layout primitives; no remote stylesheet or font. */\n.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-map-pane svg,.leaflet-map-pane canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}.leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent}.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{user-select:none;-webkit-user-drag:none}.leaflet-tile-container{pointer-events:none}.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-shadow-pane{z-index:500}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}.leaflet-control{position:relative;z-index:800;pointer-events:auto}.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}.leaflet-control{float:left;clear:both}.leaflet-right .leaflet-control{float:right}.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}.leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}.leaflet-control-zoom a{display:block;width:30px;height:30px;line-height:30px;text-align:center;text-decoration:none;background:#fff;color:#1d2b34;border-bottom:1px solid #d7dde0}.leaflet-control-zoom{border-radius:6px;overflow:hidden;box-shadow:0 1px 5px rgb(0 0 0/.25)}.leaflet-control-attribution{padding:2px 5px;background:rgb(255 255 255/.86);color:#42545e}.leaflet-popup{position:absolute;text-align:center;margin-bottom:20px}.leaflet-popup-content-wrapper{background:white;border-radius:12px;box-shadow:0 3px 14px rgb(0 0 0/.22);padding:1px}.leaflet-popup-content{margin:13px 18px;line-height:1.45}.leaflet-tooltip{position:absolute;padding:6px 8px;background:white;border:1px solid #d4dadd;border-radius:7px;white-space:nowrap;box-shadow:0 1px 4px rgb(0 0 0/.16)}.leaflet-interactive{cursor:pointer}.leaflet-fade-anim .leaflet-popup{opacity:0;transition:opacity .2s linear}.leaflet-fade-anim .leaflet-map-pane .leaflet-popup{opacity:1}\n"""
+          p.write_text(s)
+          PY
+      - name: Validate exact product
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+          npm audit --audit-level=high
+          grep -Fq 'SituationMap' dist/.vite/manifest.json
+      - name: Commit exact product
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add package.json package-lock.json src public tests/unit index.html
+          git commit -m 'feat(028): add flood intelligence and lazy official map foundation [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
