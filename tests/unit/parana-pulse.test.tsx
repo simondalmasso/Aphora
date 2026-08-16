@@ -15,11 +15,11 @@ describe('final product 023 hydrometric-first progressive rendering', () => {
       onReport={() => undefined}
     />);
 
-    expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section"/);
+    expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section context-first-hydrometry"/);
     expect(html).toContain('data-testid="hydrometric-situation"');
     expect(html).toContain('Santa Fe · monitoreo hídrico');
     expect(html).toContain('Situación hidrométrica');
-    expect(html).toContain('Niveles, tendencia y vigencia de las últimas mediciones disponibles.');
+    expect(html).toContain('Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.');
     expect(html).toContain('Último nivel disponible');
     expect(html).toContain('Medición · antigüedad no disponible');
     expect(html).toContain('Consulta de la fuente · antigüedad no disponible');

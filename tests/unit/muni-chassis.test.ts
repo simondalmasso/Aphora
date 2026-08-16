@@ -34,7 +34,7 @@ describe('Final Product 023 civic product contract', () => {
   it('keeps hydrometry first on the home surface', async () => {
     const page = await read('src/client/app/DashboardPage.tsx');
     const hydro = page.indexOf('<HydrometricMonitoring');
-    const discovery = page.indexOf('<CivicDiscovery');
+    const discovery = page.indexOf('<ContextDiscovery');
     expect(hydro).toBeGreaterThan(0);
     expect(discovery).toBeGreaterThan(hydro);
     expect(page).not.toContain('SituationSummary');
