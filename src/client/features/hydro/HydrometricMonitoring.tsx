@@ -9,8 +9,9 @@ import {
 } from '../../../domain/hydrometric-context.ts';
 import { deriveHydroPriority, hydroPrioritySignalsForSystem, type HydroPriorityDecision } from '../../../domain/hydro-priority.ts';
 import type { HydrologicalSystem, Snapshot, Source } from '../../../domain/snapshot.ts';
-import { formatHumanAge, formatLocalDateTime } from '../../../domain/public-safety.ts';
+import { formatHumanAge } from '../../../domain/public-safety.ts';
 import { FreshnessBadge, HydrometricChart, HydrometricHero, SourceLine } from '../../components/civic/CivicSystem.tsx';
+import { RainContext } from '../rain/RainContext.tsx';
 
 const EMPTY_SYSTEMS: readonly HydrologicalSystem[] = Object.freeze([]);
 
@@ -29,6 +30,13 @@ function trendLabel(system: HydrologicalSystem): string {
   return 'Sin tendencia suficiente';
 }
 
+function compactMovement(system: HydrologicalSystem): string {
+  if (system.delta24h === null) return '24 h · sin comparación';
+  const centimetres = Math.round(system.delta24h * 100);
+  if (centimetres === 0) return '24 h · sin cambio apreciable';
+  return `${centimetres > 0 ? '↑' : '↓'} ${Math.abs(centimetres)} cm / 24 h`;
+}
+
 function formatLevel(system: HydrologicalSystem): string {
   return system.currentMetres === null ? 'No disponible' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`;
 }
@@ -43,17 +51,30 @@ function sourceError(source: Source | undefined): string | null {
   return source.limitations ?? 'La fuente no está operativa en esta actualización.';
 }
 
-function RiverContextSelector({
-  systems,
-  selectedId,
-  onSelect,
-}: {
+function MiniRiverTrace({ system }: { readonly system: HydrologicalSystem }) {
+  const points = system.points.slice(-30).filter((point) => Number.isFinite(point.metres));
+  if (points.length < 2) return <span className="mini-river-trace mini-river-trace--empty" aria-hidden="true">—</span>;
+  const values = points.map((point) => point.metres);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(.01, max - min);
+  const d = points.map((point, index) => {
+    const x = (index / Math.max(1, points.length - 1)) * 100;
+    const y = 24 - ((point.metres - min) / range) * 20;
+    return `${index ? 'L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+  return <svg className="mini-river-trace" viewBox="0 0 100 28" role="img" aria-label={`Tendencia reciente de ${system.watercourse}, estación ${system.stationName}`}>
+    <path d={d}/><circle cx="100" cy={24 - ((points.at(-1)!.metres - min) / range) * 20} r="2.6"/>
+  </svg>;
+}
+
+function RiverContextSelector({ systems, selectedId, onSelect }: {
   readonly systems: readonly HydrologicalSystem[];
   readonly selectedId?: string;
   readonly onSelect: (id: string) => void;
 }) {
   if (systems.length < 2) return null;
-  return <div className="station-selector station-selector--meaning" role="tablist" aria-label="Elegir río y estación">
+  return <div className="station-selector station-selector--meaning river-switch" role="tablist" aria-label="Elegir río y estación">
     {systems.map((system) => <button
       key={system.id}
       type="button"
@@ -62,8 +83,9 @@ function RiverContextSelector({
       aria-selected={system.id === selectedId}
       onClick={() => onSelect(system.id)}
     >
-      <span>{shortRiverName(system)}</span>
-      <small>Estación {system.stationName}</small>
+      <span className="river-switch__name">{shortRiverName(system)}</span>
+      <span className="river-switch__trace"><MiniRiverTrace system={system}/></span>
+      <small>Est. {system.stationName}</small>
       <em>{semanticMiniSummary(system)}</em>
     </button>)}
   </div>;
@@ -74,7 +96,7 @@ function ContextualScale({ system }: { readonly system: HydrologicalSystem }) {
   const references = referencesForSystem(system).filter((reference) => reference.metres !== null && reference.kind !== 'UNAVAILABLE');
   if (current === null || references.length === 0) {
     return <div className="context-scale context-scale--unavailable" data-testid="hydro-context-scale">
-      <div><strong>Escala contextual de la estación</strong><span>Sin una referencia oficial suficiente para dibujarla.</span></div>
+      <div><strong>Referencia de esta estación</strong><span>Sin referencia oficial suficiente.</span></div>
     </div>;
   }
   const values = [current, ...references.map((reference) => reference.metres!).filter(Number.isFinite)];
@@ -84,8 +106,8 @@ function ContextualScale({ system }: { readonly system: HydrologicalSystem }) {
   const minimum = rawMin - span * .12;
   const maximum = rawMax + span * .12;
   const position = (value: number) => `${Math.max(0, Math.min(100, ((value - minimum) / Math.max(.01, maximum - minimum)) * 100))}%`;
-  return <figure className="context-scale" data-testid="hydro-context-scale" aria-label={`Escala contextual específica de ${system.label}`}>
-    <figcaption><strong>¿Respecto de qué?</strong><span>Escala contextual de esta estación, no profundidad física del río.</span></figcaption>
+  return <figure className="context-scale context-scale--product" data-testid="hydro-context-scale" aria-label={`Escala contextual específica de ${system.label}`}>
+    <figcaption><strong>Referencia de la estación</strong><span>No es profundidad física del río.</span></figcaption>
     <div className="context-scale__track" aria-hidden="true">
       {references.map((reference) => <span
         key={reference.id}
@@ -109,33 +131,20 @@ function OperationalRiverPanel({ system, snapshot, priority }: {
   const source = snapshot.sources.find((item) => item.id === system.sourceId);
   const signals = hydroPrioritySignalsForSystem(priority, system.id);
   const meaning = meaningForSystem(system);
-  return <article className="river-priority__river" data-river-system={system.id}>
+  return <article className="river-priority__river river-priority__river--product" data-river-system={system.id}>
     <header className="river-priority__river-header">
-      <div><span>{system.watercourse}</span><strong>Estación {system.stationName}</strong></div>
-      <FreshnessBadge
-        className={`freshness-badge--${(system.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}
-        label={`${freshnessLabel(system)} · ${formatHumanAge(system.observedAt, snapshot.generatedAt)}`}
-      />
+      <div><span>{system.watercourse}</span><strong>Est. {system.stationName}</strong></div>
+      <FreshnessBadge className={`freshness-badge--${(system.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`} label={freshnessLabel(system)}/>
     </header>
+    <MiniRiverTrace system={system}/>
+    <div className="river-priority__metric-row"><strong>{formatLevel(system)}</strong><span>{compactMovement(system)}</span></div>
     <p className="river-priority__meaning">{meaning.headline}</p>
-    <dl className="river-priority__facts">
-      <div className="river-priority__level"><dt>Nivel</dt><dd>{formatLevel(system)}</dd></div>
-      <div><dt>Movimiento</dt><dd>{trendLabel(system)}</dd></div>
-      <div><dt>Últimas 24 h</dt><dd>{changeCopy(changeForSystem(system, 24), 24)}</dd></div>
-      <div><dt>Vigencia</dt><dd>{freshnessLabel(system)} · hasta {formatLocalDateTime(system.validUntil)}</dd></div>
-      <div className="river-priority__source"><dt>Fuente</dt><dd>{source?.organizationName ?? system.sourceName}</dd></div>
-      <div className="river-priority__status"><dt>Por qué se prioriza</dt><dd>{signals.map((signal) => <span key={`${signal.kind}-${signal.sourceId}-${signal.reason}`}>{signal.reason}</span>)}</dd></div>
-    </dl>
+    <div className="river-priority__source"><span>Fuente · {source?.organizationName ?? system.sourceName}</span><span>Medición · {formatHumanAge(system.observedAt, snapshot.generatedAt)}</span></div>
+    <p className="river-priority__status">{signals.map((signal) => <span key={`${signal.kind}-${signal.sourceId}-${signal.reason}`}>{signal.reason}</span>)}</p>
   </article>;
 }
 
-export function HydrometricMonitoring({
-  snapshot,
-  refreshing,
-  sourcesButtonRef,
-  onRefresh,
-  onSources,
-}: {
+export function HydrometricMonitoring({ snapshot, refreshing, sourcesButtonRef, onRefresh, onSources }: {
   readonly snapshot: Snapshot;
   readonly refreshing: boolean;
   readonly sourcesButtonRef: RefObject<HTMLButtonElement | null>;
@@ -169,30 +178,30 @@ export function HydrometricMonitoring({
   const safeThresholds = selected ? safeStationThresholds(selected) : [];
 
   return <section
-    className="hydrometric-section context-first-hydrometry"
+    className="hydrometric-section context-first-hydrometry smooth-civic-hydrometry"
     id="situacion-hidrica"
     aria-labelledby="hydrometric-title"
     data-testid="hydrometric-situation"
     data-priority-mode={priority.mode}
   >
     <HydrometricHero>
-      <header className="hydrometric-hero__header">
+      <header className="hydrometric-hero__header hydro-product-header">
         <div className="hydrometric-hero__intro">
           <p className="section-kicker">Santa Fe · monitoreo hídrico</p>
           <h1 id="hydrometric-title">Situación hidrométrica</h1>
-          <p className="hydrometric-hero__lede">Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.</p>
+          <p className="hydro-product__strapline">Nivel, tendencia y contexto.</p>
+          <p className="hydrometric-hero__lede sr-only">Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.</p>
         </div>
-        <div className="hydrometric-hero__controls">
-          <RiverContextSelector
-            systems={systems}
-            selectedId={selected?.id}
-            onSelect={(id) => setSelection({ snapshotId: snapshot.id, id })}
-          />
-          <button className="hydro-refresh-button" type="button" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing || undefined} aria-label="Actualizar información">
-            <span aria-hidden="true">{refreshing ? '…' : '↻'}</span>
-          </button>
-        </div>
+        <button className="hydro-refresh-button" type="button" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing || undefined} aria-label="Actualizar información">
+          <span aria-hidden="true">{refreshing ? '…' : '↻'}</span>
+        </button>
       </header>
+
+      <RiverContextSelector
+        systems={systems}
+        selectedId={selected?.id}
+        onSelect={(id) => setSelection({ snapshotId: snapshot.id, id })}
+      />
 
       {priority.mode !== 'NORMAL' && prioritySystems.length > 0 && <aside
         className={`river-priority river-priority--${priority.mode === 'DUAL_EMERGENCY' ? 'dual' : 'single'}`}
@@ -200,78 +209,51 @@ export function HydrometricMonitoring({
         aria-labelledby="river-priority-title"
       >
         <header className="river-priority__masthead">
-          <div>
-            <p>{priority.mode === 'DUAL_EMERGENCY' ? 'Atención compartida' : 'Atención prioritaria'}</p>
-            <h2 id="river-priority-title">{priority.mode === 'DUAL_EMERGENCY'
-              ? 'Paraná y Salado requieren el mismo peso ahora'
-              : `${prioritySystems[0]?.watercourse ?? 'Este sistema'} requiere atención primero`}</h2>
-          </div>
-          <div className="river-priority__explain">
-            <p>{priority.mode === 'DUAL_EMERGENCY'
-              ? 'Hay condiciones verificables relacionadas con ambos sistemas. La vista mantiene prioridad equivalente 50/50.'
-              : 'La jerarquía cambia temporalmente porque hay una condición verificable relacionada con este río. El otro sistema sigue disponible.'}</p>
-            <button type="button" onClick={(event) => onSources(event.currentTarget)}>Ver por qué</button>
-          </div>
+          <div><p>{priority.mode === 'DUAL_EMERGENCY' ? 'Atención compartida' : 'Atención prioritaria'}</p><h2 id="river-priority-title">{priority.mode === 'DUAL_EMERGENCY' ? 'Paraná + Salado' : prioritySystems[0]?.watercourse}</h2></div>
+          <div className="river-priority__explain"><p>{priority.mode === 'DUAL_EMERGENCY' ? 'prioridad equivalente 50/50' : 'Prioridad temporal por condición verificada.'}</p><button type="button" onClick={(event) => onSources(event.currentTarget)}>Ver por qué</button></div>
         </header>
-        <div className="river-priority__grid">
-          {prioritySystems.map((system) => <OperationalRiverPanel key={system.id} system={system} snapshot={snapshot} priority={priority}/>) }
-        </div>
+        <div className="river-priority__grid">{prioritySystems.map((system) => <OperationalRiverPanel key={system.id} system={system} snapshot={snapshot} priority={priority}/>)}</div>
       </aside>}
 
-      {selected ? <article className={`primary-station hydrometric-meaning-module${priority.mode === 'DUAL_EMERGENCY' ? ' primary-station--after-dual' : ''}`}>
-        <div className="station-identification">
-          <div>
-            <span>Estación {selected.stationName}</span>
-            <strong>{selected.watercourse}</strong>
-            <small>Última medición · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}</small>
-          </div>
-          <FreshnessBadge
-            className={`freshness-badge--${(selected.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`}
-            label={freshnessLabel(selected)}
-          />
+      {selected ? <article className={`primary-station hydrometric-meaning-module river-product-card${priority.mode === 'DUAL_EMERGENCY' ? ' primary-station--after-dual' : ''}`}>
+        <div className="station-identification station-identification--product">
+          <div><span>{selected.watercourse}</span><strong>Estación {selected.stationName}</strong><small>Medición · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}</small></div>
+          <FreshnessBadge className={`freshness-badge--${(selected.freshness ?? 'NO_DISPONIBLE').toLowerCase()}`} label={freshnessLabel(selected)}/>
         </div>
 
-        <div className="meaning-glance">
+        <div className="meaning-glance meaning-glance--product">
           <div className="hydro-level">
             <span>Último nivel disponible</span>
-            <strong data-testid="hydro-current-level">
-              {selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}
-              {selected.currentMetres !== null && <small>m</small>}
-            </strong>
-            <time dateTime={selected.observedAt ?? undefined}>{formatLocalDateTime(selected.observedAt)}</time>
+            <strong data-testid="hydro-current-level">{selected.currentMetres === null ? '—' : selected.currentMetres.toFixed(2).replace('.', ',')}{selected.currentMetres !== null && <small>m</small>}</strong>
           </div>
           <div className="meaning-copy">
+            <div className="meaning-copy__movement meaning-copy__movement--product"><strong>{trendLabel(selected)}</strong><span>{compactMovement(selected)}</span></div>
             <p className="meaning-copy__primary" data-testid="hydro-meaning">{meaning?.headline}</p>
-            {meaning?.detail && <p className="meaning-copy__caveat">{meaning.detail}</p>}
-            <div className="meaning-copy__movement">
-              <strong>{trendLabel(selected)}</strong>
-              <span>{changeCopy(changeForSystem(selected, 24), 24)}</span>
-              <span>Medición de {formatHumanAge(selected.observedAt, snapshot.generatedAt).replace(/^hace\s+/i, 'hace ')}</span>
-            </div>
             <button type="button" className="meaning-explain" onClick={(event) => onSources(event.currentTarget)}>Qué significa esta altura</button>
           </div>
         </div>
 
+        {selected.available && selected.currentMetres !== null
+          ? <HydrometricChart system={selected} generatedAt={snapshot.generatedAt}/>
+          : <div className="data-caveat"><strong>No pudimos obtener una medición reciente</strong><p>La estación no entregó una lectura utilizable. La falta de dato no significa una emergencia.</p></div>}
+
         {selected.available && selected.currentMetres !== null && <ContextualScale system={selected}/>} 
 
-        <div className="meaning-horizons" aria-label="Cambios observados en distintos períodos">
-          <span>{changeCopy(changeForSystem(selected, 72), 72)}</span>
-          <span>{changeCopy(changeForSystem(selected, 168), 168)}</span>
+        <div className="meaning-horizons meaning-horizons--secondary" aria-label="Cambios observados en distintos períodos">
+          <span>{changeCopy(changeForSystem(selected, 72), 72)}</span><span>{changeCopy(changeForSystem(selected, 168), 168)}</span>
         </div>
 
         <SourceLine buttonRef={sourcesButtonRef} onOpen={onSources}>
           <span><b>Fuente · {selectedSource?.organizationName ?? selected.sourceName}</b></span>
           <span>Medición · {formatHumanAge(selected.observedAt, snapshot.generatedAt)}</span>
           <span>Consulta de la fuente · {formatHumanAge(selected.fetchedAt, snapshot.generatedAt)}</span>
-          {safeThresholds.length > 0 && <span className="source-strip__technical">Referencias de esta estación verificadas</span>}
+          {safeThresholds.length > 0 && <span className="source-strip__technical">Referencias verificadas de esta estación</span>}
           {corroboratingTransport && <span className="source-strip__technical">Otra vía del mismo organismo disponible</span>}
           {sourceError(selectedSource) && <span className="source-strip__error">{sourceError(selectedSource)}</span>}
         </SourceLine>
-
-        {selected.available && selected.currentMetres !== null
-          ? <HydrometricChart system={selected} generatedAt={snapshot.generatedAt}/>
-          : <div className="data-caveat"><strong>No pudimos obtener una medición reciente</strong><p>La estación no entregó una lectura utilizable. La falta de dato no significa una emergencia.</p></div>}
       </article> : <div className="data-caveat"><strong>No hay mediciones disponibles ahora</strong><p>No se pudo construir la situación hidrométrica. Probá actualizar o consultá las fuentes oficiales.</p></div>}
+
+      <RainContext snapshot={snapshot}/>
     </HydrometricHero>
   </section>;
 }
