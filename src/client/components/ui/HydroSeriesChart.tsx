@@ -1,7 +1,8 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { changeForSystem, safeStationThresholds } from '../../../domain/hydrometric-context.ts';
 import type { HydrologicalSystem, RiverPoint } from '../../../domain/snapshot.ts';
-import { formatHumanAge, formatLocalDateTime, isPublicTimestamp, LOCAL_TIME_ZONE } from '../../../domain/public-safety.ts';
+import { formatHumanAge, formatLocalDateTime, LOCAL_TIME_ZONE } from '../../../domain/public-safety.ts';
+import { hasTemporalCoverage, strictTimeWindow, sanitizeMeasuredRiverPoints } from '../../../domain/temporal-series.ts';
 
 const WIDTH = 760;
 const HEIGHT = 300;
@@ -27,8 +28,11 @@ function qualityLabel(point: RiverPoint): string {
   return 'Calidad no informada';
 }
 
-function shortDate(value: string): string {
-  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: 'short', timeZone: LOCAL_TIME_ZONE }).format(new Date(value));
+function axisLabel(value: string, hours: WindowHours): string {
+  const date = new Date(value);
+  if (hours === 24) return new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: LOCAL_TIME_ZONE }).format(date);
+  if (hours === 72) return new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: '2-digit', hour: '2-digit', hour12: false, timeZone: LOCAL_TIME_ZONE }).format(date);
+  return new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: LOCAL_TIME_ZONE }).format(date);
 }
 
 function median(values: readonly number[]): number {
@@ -59,17 +63,10 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
   const svgRef = useRef<SVGSVGElement>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [windowHours, setWindowHours] = useState<WindowHours>(24);
-  const allPoints = useMemo(() => system.points
-    .filter((point) => Number.isFinite(point.metres) && isPublicTimestamp(point.at)), [system.points]);
+  const allPoints = useMemo(() => [...sanitizeMeasuredRiverPoints(system.points, generatedAt)], [system.points, generatedAt]);
   const safeThresholds = useMemo(() => safeStationThresholds(system), [system]);
-  const latestTime = allPoints.length ? Date.parse(allPoints.at(-1)!.at) : 0;
-  const availableSpanHours = allPoints.length > 1 ? (latestTime - Date.parse(allPoints[0]!.at)) / 3_600_000 : 0;
-  const points = useMemo(() => {
-    if (!allPoints.length) return [];
-    const start = latestTime - windowHours * 3_600_000;
-    const selected = allPoints.filter((point) => Date.parse(point.at) >= start);
-    return selected.length >= 2 ? selected : allPoints.slice(-Math.min(48, allPoints.length));
-  }, [allPoints, latestTime, windowHours]);
+  const windowResult = useMemo(() => strictTimeWindow(allPoints, windowHours, generatedAt), [allPoints, windowHours, generatedAt]);
+  const points = useMemo(() => windowResult.sufficient ? [...windowResult.points] : [], [windowResult]);
 
   const geometry = useMemo(() => {
     if (!points.length) return null;
@@ -116,11 +113,12 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
   }, [points, safeThresholds]);
 
   if (!geometry || points.length < 2) {
-    return <div className="hydro-chart hydro-chart--unavailable hydro-chart--product" data-testid="main-hydro-chart">
+    return <div className="hydro-chart hydro-chart--unavailable hydro-chart--product" data-testid="main-hydro-chart" data-window-hours={windowHours} data-window-sufficient="false">
+      <div className="hydro-chart__windows" aria-label="Período del gráfico">{WINDOWS.map((hours) => <button key={hours} type="button" aria-pressed={windowHours === hours} disabled={!hasTemporalCoverage(allPoints, hours, generatedAt)} onClick={() => setWindowHours(hours)}>{labelForWindow(hours)}</button>)}</div>
       <div className="hydro-chart__empty-icon" aria-hidden="true">∿</div>
-      <strong>Serie reciente no disponible</strong>
-      <span>Última observación · {formatLocalDateTime(system.observedAt)}</span>
-      <span>{freshnessLabel(system)}</span>
+      <strong>No hay cobertura suficiente en {labelForWindow(windowHours)}</strong>
+      <span>No se completan huecos con observaciones más antiguas.</span>
+      <span>Última medición · {formatLocalDateTime(system.observedAt)} · {freshnessLabel(system)}</span>
     </div>;
   }
 
@@ -160,6 +158,7 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
     data-plot-max={geometry.maximum.toFixed(2)}
     data-window-hours={windowHours}
     data-interactive="true"
+    data-window-sufficient="true"
   >
     <header className="hydro-chart__context-head hydro-chart__product-head">
       <div className="hydro-chart__trend-summary">
@@ -171,7 +170,7 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
           key={hours}
           type="button"
           aria-pressed={windowHours === hours}
-          disabled={availableSpanHours < Math.min(hours * .75, hours - 1)}
+          disabled={!hasTemporalCoverage(allPoints, hours, generatedAt)}
           onClick={() => { setWindowHours(hours); setActiveIndex(null); }}
         >{labelForWindow(hours)}</button>)}
       </div>
@@ -201,7 +200,7 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
         </defs>
         <rect className="hydro-chart__plot" x={LEFT} y={TOP} width={PLOT_WIDTH} height={PLOT_HEIGHT} rx="18"/>
         {geometry.yTicks.map((tick) => <g key={tick}><line className="hydro-chart__grid" x1={LEFT} x2={WIDTH - RIGHT} y1={y(tick)} y2={y(tick)}/><text className="hydro-chart__axis-label" x={LEFT - 8} y={y(tick) + 4} textAnchor="end">{tick.toFixed(2).replace('.', ',')}</text></g>)}
-        {geometry.xTicks.map((tick) => <g key={tick.at}><text className="hydro-chart__axis-label" x={tick.x} y={HEIGHT - 15} textAnchor={tick.x === LEFT ? 'start' : tick.x === WIDTH - RIGHT ? 'end' : 'middle'}>{shortDate(tick.at)}</text></g>)}
+        {geometry.xTicks.map((tick) => <g key={tick.at}><text className="hydro-chart__axis-label" x={tick.x} y={HEIGHT - 15} textAnchor={tick.x === LEFT ? 'start' : tick.x === WIDTH - RIGHT ? 'end' : 'middle'}>{axisLabel(tick.at, windowHours)}</text></g>)}
         <text className="hydro-chart__unit" x="14" y={TOP + PLOT_HEIGHT / 2} transform={`rotate(-90 14 ${TOP + PLOT_HEIGHT / 2})`} textAnchor="middle">Altura de escala (m)</text>
         {geometry.visibleThresholds.map((threshold) => <g key={threshold.id}><line x1={LEFT} x2={WIDTH - RIGHT} y1={y(threshold.metres)} y2={y(threshold.metres)} className={`hydro-chart__threshold hydro-chart__threshold--${threshold.id.toLowerCase()}`}/><text x={WIDTH - RIGHT - 8} y={y(threshold.metres) - 6} textAnchor="end" className="hydro-chart__threshold-label">{threshold.label} · {threshold.metres.toFixed(2).replace('.', ',')} m</text></g>)}
         {geometry.gaps.map((gap) => <g className="hydro-chart__gap" key={`${gap.fromAt}-${gap.toAt}`}><rect x={gap.fromX} y={TOP} width={Math.max(3, gap.toX - gap.fromX)} height={PLOT_HEIGHT} fill={`url(#${patternId})`}/>{gap.toX - gap.fromX > 58 && <text x={(gap.fromX + gap.toX) / 2} y={TOP + PLOT_HEIGHT / 2} textAnchor="middle">Sin datos</text>}</g>)}
@@ -215,7 +214,7 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
         </g>
         {active && <g className="hydro-chart__tooltip" aria-hidden="true"><line x1={active.x} x2={active.x} y1={TOP} y2={HEIGHT - BOTTOM}/><circle cx={active.x} cy={active.y} r="6"/><rect x={tooltipX} y={tooltipY} width="194" height="58" rx="12"/><text x={tooltipX + 12} y={tooltipY + 22}>{formatLocalDateTime(active.point.at)}</text><text x={tooltipX + 12} y={tooltipY + 44}>{active.point.metres.toFixed(2).replace('.', ',')} m</text></g>}
       </svg>
-      <div className="hydro-chart__now-chip" aria-hidden="true"><span>Ahora</span><strong>{latest.point.metres.toFixed(2).replace('.', ',')} m</strong></div>
+      <div className="hydro-chart__now-chip" aria-hidden="true"><span>Última medición</span><strong>{latest.point.metres.toFixed(2).replace('.', ',')} m</strong></div>
     </div>
     {geometry.externalThresholds.length > 0 && <div className="hydro-chart__external-reference" aria-label="Referencias fuera de la escala reciente">
       {geometry.externalThresholds.map((threshold) => <span key={threshold.id}><b>{threshold.label} </b>{threshold.metres.toFixed(2).replace('.', ',')} m · fuera de escala</span>)}

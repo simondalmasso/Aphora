@@ -3,7 +3,7 @@ import { CIVIC_PRIMARY_NAV, CIVIC_SECONDARY_NAV, SOSBrand } from './CivicSystem.
 
 function isActive(currentPath: string, href: string): boolean {
   if (href === '/') return currentPath === '/';
-  if (href.startsWith('/#')) return currentPath === '/';
+  if (href.startsWith('/#')) return false;
   return currentPath === href || currentPath.startsWith(`${href}/`);
 }
 
@@ -70,7 +70,7 @@ export function MuniCivicHeader({ currentPath, actions, communications }: {
 
     <nav className="mobile-dock" aria-label="Navegación rápida">
       <a href="/" aria-current={currentPath === '/' ? 'page' : undefined}><DockIcon name="home"/><span>Inicio</span></a>
-      <a href="/#situacion-hidrica" aria-current={currentPath === '/' ? 'page' : undefined}><DockIcon name="river"/><span>Ríos</span></a>
+      <a href="/#situacion-hidrica"><DockIcon name="river"/><span>Ríos</span></a>
       <a href="/gestion-de-riesgo" aria-current={currentPath.startsWith('/gestion-de-riesgo') ? 'page' : undefined}><DockIcon name="risk"/><span>Riesgo</span></a>
       <button type="button" aria-expanded={menuOpen} aria-controls="civic-mobile-menu" onClick={() => setMenuOpen((value) => !value)}><DockIcon name="more"/><span>Más</span>{communications.unread > 0 && <i aria-hidden="true">{Math.min(communications.unread, 9)}</i>}</button>
     </nav>

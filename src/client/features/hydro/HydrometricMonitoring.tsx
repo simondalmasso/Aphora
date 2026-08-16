@@ -117,7 +117,7 @@ function ContextualScale({ system }: { readonly system: HydrologicalSystem }) {
       <span className="context-scale__current" style={{ left: position(current) }}><i/></span>
     </div>
     <div className="context-scale__legend">
-      <span className="context-scale__legend-current"><i/>Ahora · {formatLevel(system)}</span>
+      <span className="context-scale__legend-current"><i/>Última medición · {formatLevel(system)}</span>
       {references.map((reference) => <span key={reference.id}><i className={reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' ? 'statistical' : 'protection'}/>{reference.label} · {reference.metres!.toFixed(2).replace('.', ',')} m</span>)}
     </div>
   </figure>;
@@ -157,9 +157,8 @@ export function HydrometricMonitoring({ snapshot, refreshing, sourcesButtonRef, 
   const operationalDefaultId = priority.mode === 'SINGLE_RIVER_PRIORITY'
     ? priority.affectedSystemIds[0]
     : snapshot.river.systemId ?? systems[0]?.id;
-  const [selection, setSelection] = useState(() => ({ snapshotId: snapshot.id, id: operationalDefaultId ?? '' }));
-  const requestedId = selection.snapshotId === snapshot.id ? selection.id : operationalDefaultId ?? '';
-  const validSelectedId = systems.some((system) => system.id === requestedId) ? requestedId : operationalDefaultId ?? systems[0]?.id ?? '';
+  const [selectedId, setSelectedId] = useState(() => operationalDefaultId ?? '');
+  const validSelectedId = systems.some((system) => system.id === selectedId) ? selectedId : operationalDefaultId ?? systems[0]?.id ?? '';
   const selected = systems.find((system) => system.id === validSelectedId) ?? systems[0];
   const prioritySystems = priority.affectedSystemIds
     .map((id) => systems.find((system) => system.id === id))
@@ -201,7 +200,7 @@ export function HydrometricMonitoring({ snapshot, refreshing, sourcesButtonRef, 
       <RiverContextSelector
         systems={systems}
         selectedId={selected?.id}
-        onSelect={(id) => setSelection({ snapshotId: snapshot.id, id })}
+        onSelect={setSelectedId}
       />
 
       {priority.mode !== 'NORMAL' && prioritySystems.length > 0 && <aside

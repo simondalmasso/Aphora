@@ -17,10 +17,10 @@ function activeWeatherAlert(snapshot: Snapshot) {
 export function RainContext({ snapshot }: { readonly snapshot: Snapshot }) {
   const source = nasaRainSource(snapshot);
   const rate = source?.instantRateMmPerHour;
-  const usableRate = source?.connected === true && typeof rate === 'number' && Number.isFinite(rate) && rate >= 0;
+  const usableRate = source?.connected === true && source.freshness === 'ACTUALIZADO' && typeof rate === 'number' && Number.isFinite(rate) && rate >= 0 && Boolean(source.validUntil) && Date.parse(source.validUntil!) >= Date.parse(snapshot.generatedAt);
   const alert = activeWeatherAlert(snapshot);
-  const observedAge = source?.connected ? formatHumanAge(source.observedAt, snapshot.generatedAt) : null;
-  const fetchedAge = source?.connected ? formatHumanAge(source.fetchedAt, snapshot.generatedAt) : null;
+  const observedAge = usableRate ? formatHumanAge(source.observedAt, snapshot.generatedAt) : null;
+  const fetchedAge = usableRate ? formatHumanAge(source.fetchedAt, snapshot.generatedAt) : null;
 
   return <section className="rain-context" data-testid="rain-context" aria-labelledby="rain-context-title">
     <div className="rain-context__icon" aria-hidden="true">
@@ -29,7 +29,7 @@ export function RainContext({ snapshot }: { readonly snapshot: Snapshot }) {
     <div className="rain-context__main">
       <span id="rain-context-title">Lluvia en contexto</span>
       <strong>{usableRate ? formatRate(rate) : 'Sin estimación reciente'}</strong>
-      <small>{usableRate ? 'Estimación satelital instantánea · NASA IMERG Early' : 'NASA IMERG · sin muestra local utilizable'}</small>
+      <small>{usableRate ? 'Estimación satelital reciente · NASA IMERG Early' : 'NASA IMERG · sin muestra local utilizable'}</small>
     </div>
     <div className="rain-context__meta">
       {observedAge && <span>Observación · {observedAge}</span>}

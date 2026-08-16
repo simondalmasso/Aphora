@@ -13,6 +13,7 @@ import './styles/app.css';
 import './styles/final-product-023.css';
 import './styles/final-product-023-terminal.css';
 import './styles/smooth-civic-027.css';
+import './styles/flood-intelligence-028.css';
 
 function canonicalPath(): string {
   const path = window.location.pathname.replace(/\/+$/, '');

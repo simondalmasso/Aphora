@@ -1,5 +1,6 @@
 import { useState, type ReactNode, type RefObject } from 'react';
 import type { HydrologicalSystem, Snapshot } from '../../../domain/snapshot.ts';
+import { ESSENTIAL_CONTACTS } from '../../../domain/essential-contacts.ts';
 import { HydroSeriesChart } from '../ui/HydroSeriesChart.tsx';
 
 export const CIVIC_PRIMARY_NAV = Object.freeze([
@@ -11,7 +12,6 @@ export const CIVIC_PRIMARY_NAV = Object.freeze([
 
 export const CIVIC_SECONDARY_NAV = Object.freeze([
   { label: 'Alertas y ayuda', href: '/#alertas' },
-  { label: 'Comunicaciones', href: '/#alertas' },
   { label: 'Acerca de SOS-SF', href: '/#acerca' },
 ]);
 
@@ -65,7 +65,7 @@ export function CivicHeader({ currentPath, actions }: { readonly currentPath: st
     <div className="civic-header__main header-inner">
       <SOSBrand/>
       <CivicNav currentPath={currentPath}/>
-      <div className="civic-header__actions header-actions">{actions}</div>
+      <div className="civic-header__actions header-actions" aria-label="Comunicaciones y acciones">{actions}</div>
       <button type="button" className="civic-menu-toggle" aria-expanded={menuOpen} aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'} onClick={() => setMenuOpen((value) => !value)}><span/><span/><span/></button>
     </div>
     <CivicMobileMenu open={menuOpen} currentPath={currentPath} onClose={() => setMenuOpen(false)}/>
@@ -128,7 +128,7 @@ export function CivicNewsGrid() {
 }
 
 export function EmergencyStrip() {
-  return <aside className="emergency-strip" aria-label="Canales de emergencia"><div><strong>Si hay peligro inmediato</strong><span>Usá los canales oficiales. SOS-SF no reemplaza una emergencia.</span></div><a href="tel:911">911</a><a href="tel:103">COBEM 103</a><a href="tel:107">107</a></aside>;
+  return <aside className="emergency-strip" aria-label="Canales de emergencia"><div><strong>Si hay peligro inmediato</strong><span>Usá los canales oficiales. SOS-SF no reemplaza una emergencia.</span></div>{ESSENTIAL_CONTACTS.map((contact) => <a key={contact.id} href={contact.href}>{contact.label === 'Emergencias' ? contact.number : `${contact.label} ${contact.number}`}</a>)}</aside>;
 }
 
 export function CivicFooter({ disclaimer }: { readonly disclaimer: string }) {

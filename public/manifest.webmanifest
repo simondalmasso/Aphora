@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "SOS Santa Fe — Información pública para emergencias",
+  "name": "SOS Santa Fe — Ríos e inteligencia de inundaciones",
   "short_name": "SOS Santa Fe",
-  "description": "Alertas oficiales, situación territorial, mediciones hidrométricas, contactos y preparación para Santa Fe.",
+  "description": "Niveles del Paraná y Salado, alertas oficiales, lluvia contextual y riesgo territorial para Santa Fe.",
   "lang": "es-AR",
   "start_url": "/",
   "scope": "/",
@@ -12,8 +12,7 @@
   "theme_color": "#f4f6f8",
   "categories": [
     "utilities",
-    "weather",
-    "government"
+    "weather"
   ],
   "icons": [
     {

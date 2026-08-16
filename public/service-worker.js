@@ -1,8 +1,6 @@
-const CACHE_VERSION = 'sos-sf-public-safety-020-20260806a';
+const CACHE_VERSION = 'sos-sf-flood-intelligence-028-20260816a';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const PUBLIC_DATA_CACHE = `${CACHE_VERSION}-public-data`;
 const SHELL = ['/', '/lite', '/offline.html', '/manifest.webmanifest', '/icons/icon.svg', '/lite.css', '/essential-contacts.json', '/offline-guidance.json'];
-const PUBLIC_API_ALLOWLIST = new Set(['/api/snapshot', '/api/sources', '/api/messages', '/api/essential-contacts']);
 
 function mayStore(response) {
   if (!response.ok) return false;
@@ -27,7 +25,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((key) => key !== STATIC_CACHE && key !== PUBLIC_DATA_CACHE).map((key) => caches.delete(key))))
+    .then((keys) => Promise.all(keys.filter((key) => key !== STATIC_CACHE).map((key) => caches.delete(key))))
     .then(() => self.clients.claim()));
 });
 
@@ -36,19 +34,6 @@ function offlineJson(message) {
     status: 503,
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store' },
   });
-}
-
-async function publicApiNetworkFirst(request) {
-  const cache = await caches.open(PUBLIC_DATA_CACHE);
-  try {
-    const response = await fetch(request);
-    if (mayStore(response)) await cache.put(request, response.clone());
-    else await cache.delete(request);
-    return response;
-  } catch {
-    const cached = await cache.match(request, { ignoreVary: false });
-    return cached || offlineJson('Sin conexión y sin una lectura pública previa guardada.');
-  }
 }
 
 async function privateApiNetworkOnly(request) {
@@ -80,7 +65,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(PUBLIC_API_ALLOWLIST.has(url.pathname) ? publicApiNetworkFirst(request) : privateApiNetworkOnly(request));
+    event.respondWith(privateApiNetworkOnly(request));
     return;
   }
   if (request.mode === 'navigate') {

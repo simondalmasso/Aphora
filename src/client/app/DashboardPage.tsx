@@ -4,6 +4,7 @@ import { SafetyActions } from '../features/actions/SafetyActions.tsx';
 import { VerifiedAlertBanner } from '../features/alerts/OfficialAlertPanel.tsx';
 import { ContextDiscovery } from '../features/discovery/ContextDiscovery.tsx';
 import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';
+import { FloodSituationPanel } from '../features/situation/FloodSituationPanel.tsx';
 import { SourceTransparency } from '../features/sources/SourceTransparency.tsx';
 
 interface Props {
@@ -27,6 +28,7 @@ export function DashboardPage(props: Props) {
       onRefresh={props.onRefresh ?? (() => undefined)}
       onSources={props.onSources}
     />
+    <FloodSituationPanel snapshot={props.snapshot}/>
     <ContextDiscovery/>
     <SafetyActions
       snapshot={props.snapshot}
