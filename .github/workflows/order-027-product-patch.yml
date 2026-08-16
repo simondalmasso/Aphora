@@ -1,0 +1,68 @@
+name: order-027-product-patch
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: [.github/workflows/order-027-product-patch.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Apply exact source patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('src/domain/snapshot.ts')
+          s = p.read_text()
+          old = "  readonly uncertainty?: string;\n  readonly qualityNote?: string;"
+          new = "  readonly uncertainty?: string;\n  readonly instantRateMmPerHour?: number;\n  readonly qualityNote?: string;"
+          if old not in s: raise SystemExit('snapshot Source insertion marker missing')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('src/domain/validation.ts')
+          s = p.read_text()
+          old = "  if (row.fetchedAt !== undefined) iso(row.fetchedAt, `snapshot.sources[${index}].fetchedAt`);\n  if (row.lastCheckedAt !== undefined) iso(row.lastCheckedAt, `snapshot.sources[${index}].lastCheckedAt`);"
+          new = "  if (row.fetchedAt !== undefined) iso(row.fetchedAt, `snapshot.sources[${index}].fetchedAt`);\n  if (row.lastCheckedAt !== undefined) iso(row.lastCheckedAt, `snapshot.sources[${index}].lastCheckedAt`);\n  if (row.instantRateMmPerHour !== undefined && finite(row.instantRateMmPerHour, `snapshot.sources[${index}].instantRateMmPerHour`) < 0) throw new TypeError(`snapshot.sources[${index}].instantRateMmPerHour inválido`);"
+          if old not in s: raise SystemExit('validation source marker missing')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('src/worker/live-data.ts')
+          s = p.read_text()
+          old = "  uncertainty?: string;\n  official?: boolean;"
+          new = "  uncertainty?: string;\n  instantRateMmPerHour?: number;\n  official?: boolean;"
+          if old not in s: raise SystemExit('sourceBase input marker missing')
+          s = s.replace(old, new, 1)
+          old = "    uncertainty: input.uncertainty,\n  };"
+          new = "    uncertainty: input.uncertainty,\n    instantRateMmPerHour: input.instantRateMmPerHour,\n  };"
+          if old not in s: raise SystemExit('sourceBase preliminary marker missing')
+          s = s.replace(old, new, 1)
+          old = "  const connected = result.value !== null && Number.isFinite(result.value.value) && Number.isFinite(Date.parse(result.value.observedAt));"
+          new = "  const connected = result.value !== null && Number.isFinite(result.value.value) && result.value.value >= 0 && Number.isFinite(Date.parse(result.value.observedAt));"
+          if old not in s: raise SystemExit('NASA connected marker missing')
+          s = s.replace(old, new, 1)
+          old = "    uncertainty: connected ? result.value!.uncertainty : 'Sin muestra válida; no aporta un dato local.',\n    official: false,"
+          new = "    uncertainty: connected ? result.value!.uncertainty : 'Sin muestra válida; no aporta un dato local.',\n    instantRateMmPerHour: connected ? result.value!.value : undefined,\n    official: false,"
+          if old not in s: raise SystemExit('NASA source structured value marker missing')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('src/client/App.tsx')
+          s = p.read_text()
+          old = "import './styles/owner-seriousness-024.css';\nimport './styles/context-first-026.css';"
+          new = "import './styles/smooth-civic-027.css';"
+          if old not in s: raise SystemExit('App style import marker missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git config user.name 'sos-sf-arq'
+          git config user.email 'actions@users.noreply.github.com'
+          git add src/domain/snapshot.ts src/domain/validation.ts src/worker/live-data.ts src/client/App.tsx
+          git commit -m 'feat(027): structure rain rate and consolidate active product styling [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
