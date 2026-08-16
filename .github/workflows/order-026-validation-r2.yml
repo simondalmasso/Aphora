@@ -1,0 +1,76 @@
+name: order-026-context-first-validation-r2
+
+on:
+  push:
+    branches: [arq/visual-dashboard-v3]
+    paths: ['.github/workflows/order-026-validation-r2.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      BRANCH: arq/visual-dashboard-v3
+      EXPECTED_MAIN: 45047d1c1e16941ea37967d67307d0ab17e85fad
+      EVIDENCE_DIR: artifacts/order-026
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Reconcile superseded 023 unit contracts
+        id: fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('tests/unit/muni-chassis.test.ts')
+          s = p.read_text()
+          old = "const discovery = page.indexOf('<CivicDiscovery');"
+          new = "const discovery = page.indexOf('<ContextDiscovery');"
+          if old not in s: raise SystemExit('CivicDiscovery unit marker missing')
+          p.write_text(s.replace(old, new, 1))
+
+          p = Path('tests/unit/parana-pulse.test.tsx')
+          s = p.read_text()
+          old = r'''expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section"/);'''
+          new = r'''expect(html).toMatch(/^<main id="main" class="dashboard" data-snapshot-id="unavailable-public-safety-snapshot"><section class="hydrometric-section context-first-hydrometry"/);'''
+          if old not in s: raise SystemExit('hydrometric section unit marker missing')
+          s = s.replace(old, new, 1)
+          old_lede = "expect(html).toContain('Niveles, tendencia y vigencia de las últimas mediciones disponibles.');"
+          new_lede = "expect(html).toContain('Qué marca cada estación, cómo viene cambiando y contra qué referencia puede leerse.');"
+          if old_lede not in s: raise SystemExit('old lede marker missing')
+          p.write_text(s.replace(old_lede, new_lede, 1))
+          PY
+          git config user.name 'sos-sf-arq'
+          git config user.email 'actions@users.noreply.github.com'
+          git add tests/unit/muni-chassis.test.ts tests/unit/parana-pulse.test.tsx
+          git commit -m 'test(026): reconcile superseded hydrometric product contracts [skip ci]'
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "product_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - name: Static runtime and data gates
+        run: |
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+      - run: npx playwright install --with-deps chromium
+      - name: Full E2E
+        run: |
+          npx playwright test
+          npx playwright test tests/e2e/context-first-026.spec.ts tests/e2e/owner-seriousness-024.spec.ts tests/e2e/dual-river-priority.spec.ts --project=desktop
+      - name: Evidence
+        run: |
+          echo 'ORDER_026_PREDEPLOY_VALIDATION_R2=PASS'
+          echo 'PRODUCT_COMMIT=${{ steps.fix.outputs.product_commit }}'
+          echo 'DEPLOY_COUNT=0'
