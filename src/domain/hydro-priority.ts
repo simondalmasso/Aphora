@@ -1,3 +1,4 @@
+import { safeStationThresholds } from './hydrometric-context.ts';
 import type { HydrologicalSystem, OfficialAlert, Snapshot, Source } from './snapshot.ts';
 
 export type HydroPriorityMode = 'NORMAL' | 'SINGLE_RIVER_PRIORITY' | 'DUAL_EMERGENCY';
@@ -51,7 +52,7 @@ function systemHasUsableOfficialReading(system: HydrologicalSystem, source: Sour
 function verifiedHydroSignal(system: HydrologicalSystem, source: Source | undefined, generatedAt: string): HydroPrioritySignal | null {
   if (!systemHasUsableOfficialReading(system, source, generatedAt) || system.currentMetres === null || !source) return null;
   const currentMetres = system.currentMetres;
-  const reached = [...system.thresholds]
+  const reached = [...safeStationThresholds(system)]
     .filter((threshold) => threshold.id === 'ALERTA' || threshold.id === 'EVACUACION')
     .filter((threshold) => currentMetres >= threshold.metres)
     .sort((left, right) => right.metres - left.metres)[0];

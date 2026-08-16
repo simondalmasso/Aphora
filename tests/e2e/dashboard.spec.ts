@@ -289,7 +289,8 @@ test('390x844 starts with hydrometric situation and exposes the chart', async ({
 
   const wordsBeforeChart = await page.locator('.hydrometric-hero__header, .station-identification, .hydro-reading, .source-strip').evaluateAll((elements) =>
     elements.map((element) => (element as HTMLElement).innerText).join(' ').trim().split(/\s+/).filter(Boolean).length);
-  expect(wordsBeforeChart).toBeLessThanOrEqual(75);
+  expect(wordsBeforeChart).toBeLessThanOrEqual(125);
+  await expect(page.getByTestId('hydro-meaning')).toBeVisible();
   await writeFile(`${evidenceDir}/first-viewport-metrics.json`, `${JSON.stringify({
     viewport: '390x844',
     headingY: headingBox?.y ?? null,

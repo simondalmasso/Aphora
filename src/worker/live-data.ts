@@ -65,7 +65,7 @@ const STATIONS = Object.freeze([
     stationSubtitle: 'Estación hidrométrica Santo Tomé',
     stationCode: '1679',
     seriesId: '3044',
-    low: 0,
+    low: null,
     alert: 4.7,
     evacuation: null,
   }),
@@ -152,11 +152,11 @@ function trend(points: readonly RiverPoint[]): HydrologicalSystem['trend'] {
 }
 
 function thresholds(station: typeof STATIONS[number]): readonly RiverThreshold[] {
-  return Object.freeze([
-    Object.freeze({ id: 'NORMAL' as const, label: 'Referencia inferior', metres: station.low }),
-    Object.freeze({ id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: station.alert }),
-    ...(station.evacuation === null ? [] : [Object.freeze({ id: 'EVACUACION' as const, label: 'Nivel de evacuación de referencia', metres: station.evacuation })]),
-  ]);
+  const items: RiverThreshold[] = [];
+  if (station.low !== null) items.push(Object.freeze({ id: 'NORMAL' as const, label: 'Referencia inferior', metres: station.low }));
+  items.push(Object.freeze({ id: 'ALERTA' as const, label: 'Nivel de alerta de referencia', metres: station.alert }));
+  if (station.evacuation !== null) items.push(Object.freeze({ id: 'EVACUACION' as const, label: 'Nivel de evacuación de referencia', metres: station.evacuation }));
+  return Object.freeze(items.sort((left, right) => left.metres - right.metres));
 }
 
 function systemState(system: HydrologicalSystem): PublicState {
