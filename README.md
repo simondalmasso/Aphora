@@ -46,3 +46,18 @@ Las alertas oficiales se normalizan conceptualmente según CAP 1.2. La ausencia 
 Google Identity Services directo y sesión propia firmada habilitan mensajería y reportes. Los reportes ciudadanos nunca cambian automáticamente el estado público. Máximo dos fotos privadas, sanitización, TTL, acceso corto de un solo uso, moderación, idempotencia y límites de tasa.
 
 Reportar una situación no inicia un despacho de emergencia. Ante peligro inmediato se debe llamar al servicio correspondiente.
+
+
+## Flood intelligence foundation (028)
+
+La rama canónica incorpora una capa de **inteligencia de inundaciones** sin convertir SOS-SF en una app meteorológica genérica. La lectura diaria sigue empezando por Paraná y Salado; sobre esa base se separan observaciones oficiales, referencias de protección, alertas oficiales, lluvia satelital suplementaria y contexto territorial estático.
+
+Principios operativos:
+
+- los huecos temporales producen `null`/`UNKNOWN`, nunca cambios inventados en cero;
+- timestamps significativamente futuros se rechazan o degradan;
+- una referencia de alerta alcanzada no equivale a una emergencia declarada;
+- lluvia, modelos y reportes comunitarios no crean por sí solos un estado oficial;
+- el mapa es secundario y lazy: Argenmap como base y `Áreas de Riesgo Hídrico` de IDESF como contexto territorial estático, nunca como mapa de inundación en tiempo real;
+- sin conexión, la PWA conserva únicamente el último snapshot público validado en almacenamiento local y deja explícito que la verificación de alertas no es actual;
+- Cloudflare Workers continúa siendo la infraestructura canónica y no se introducen servicios pagos.

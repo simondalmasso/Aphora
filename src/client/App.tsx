@@ -21,7 +21,7 @@ function canonicalPath(): string {
 }
 
 export default function App() {
-  const { snapshot, online, refresh, refreshing } = useSnapshot();
+  const { snapshot, online, savedAt, refresh, refreshing } = useSnapshot();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
@@ -82,6 +82,7 @@ export default function App() {
     refreshing={refreshing}
     unread={unread}
     alertStatus={snapshot.alertStatus}
+    savedAt={savedAt}
     messagesButtonRef={messagesButtonRef}
     alertsButtonRef={alertsOpenerRef}
     onRefresh={() => void refresh()}

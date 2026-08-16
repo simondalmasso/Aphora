@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import type { AlertVerificationState } from '../../domain/snapshot.ts';
+import { formatLocalDateTime } from '../../domain/public-safety.ts';
 import { CivicFooter } from '../components/civic/CivicSystem.tsx';
 import { MuniCivicHeader } from '../components/civic/MuniShell.tsx';
 import { IconButton } from '../components/ui/IconButton.tsx';
@@ -10,6 +11,7 @@ interface AppShellProps {
   readonly refreshing: boolean;
   readonly unread: number;
   readonly alertStatus?: AlertVerificationState;
+  readonly savedAt?: string | null;
   readonly messagesButtonRef: RefObject<HTMLButtonElement | null>;
   readonly alertsButtonRef: RefObject<HTMLButtonElement | null>;
   readonly onRefresh: () => void;
@@ -31,6 +33,7 @@ export function AppShell({
   refreshing,
   unread,
   alertStatus,
+  savedAt,
   messagesButtonRef,
   alertsButtonRef,
   onRefresh,
@@ -44,6 +47,7 @@ export function AppShell({
     <span className={online ? 'connection-chip' : 'connection-chip connection-chip--offline'}>
       <i aria-hidden="true"/>{online ? 'Datos conectados' : 'Sin conexión'}
     </span>
+    {!online && savedAt && <span className="offline-saved-chip" data-testid="offline-saved-at">Copia guardada · {formatLocalDateTime(savedAt)}</span>}
     <button
       ref={alertsButtonRef}
       type="button"

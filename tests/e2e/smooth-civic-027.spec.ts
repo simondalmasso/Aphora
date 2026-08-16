@@ -196,7 +196,7 @@ test('027 mobile first viewport is a visual river product with interactive chart
   const rain = page.getByTestId('rain-context');
   await expect(rain).toBeVisible();
   await expect(rain).toContainText('0,42 mm/h');
-  await expect(rain).toContainText('Estimación satelital instantánea · NASA IMERG Early');
+  await expect(rain).toContainText('Estimación satelital reciente · NASA IMERG Early');
   await expect(rain).toContainText('Observación ·');
   await expect(rain).toContainText('Consulta ·');
 
