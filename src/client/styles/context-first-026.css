@@ -1,0 +1,805 @@
+/* SOS-SF-026 — Context-first hydrometry.
+   Meaning before metric, station-specific references, calm civic hierarchy. */
+
+.final-product-023 .context-first-hydrometry .muni-hydrometric-hero {
+  padding-top: 16px;
+}
+
+.final-product-023 .context-first-hydrometry .hydrometric-hero__header {
+  display: grid;
+  grid-template-columns: minmax(0, .72fr) minmax(320px, 1.28fr);
+  align-items: start;
+  gap: 22px;
+  margin-bottom: 18px;
+}
+
+.final-product-023 .context-first-hydrometry .hydrometric-hero__intro {
+  max-width: 460px;
+}
+
+.final-product-023 .context-first-hydrometry .hydrometric-hero__header h1 {
+  max-width: 440px;
+  font-size: clamp(1.7rem, 2.8vw, 2.35rem);
+  line-height: 1.04;
+  letter-spacing: -.04em;
+  font-weight: 710;
+}
+
+.final-product-023 .context-first-hydrometry .hydrometric-hero__lede {
+  max-width: 470px;
+  margin-top: 8px;
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.final-product-023 .context-first-hydrometry .hydrometric-hero__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.final-product-023 .station-selector--meaning {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(35, 61, 68, .14);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.final-product-023 .station-selector--meaning button {
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px 12px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #52636b;
+  text-align: left;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.final-product-023 .station-selector--meaning button + button {
+  border-left: 1px solid rgba(35, 61, 68, .10);
+}
+
+.final-product-023 .station-selector--meaning button[aria-selected="true"] {
+  border-bottom-color: #2e6c72;
+  background: rgba(46, 108, 114, .035);
+  color: #183d42;
+}
+
+.final-product-023 .station-selector--meaning button > span,
+.final-product-023 .station-selector--meaning button > small,
+.final-product-023 .station-selector--meaning button > em {
+  display: block;
+  min-width: 0;
+}
+
+.final-product-023 .station-selector--meaning button > span {
+  font-size: .94rem;
+  font-weight: 760;
+  letter-spacing: -.015em;
+}
+
+.final-product-023 .station-selector--meaning button > small {
+  margin-top: 2px;
+  color: #718087;
+  font-size: .69rem;
+  line-height: 1.25;
+}
+
+.final-product-023 .station-selector--meaning button > em {
+  margin-top: 4px;
+  color: #3b555b;
+  font-size: .72rem;
+  font-style: normal;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+
+.final-product-023 .context-first-hydrometry .hydro-refresh-button {
+  align-self: stretch;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.final-product-023 .hydrometric-meaning-module {
+  margin-top: 0;
+  padding-top: 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.final-product-023 .hydrometric-meaning-module .station-identification {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(35, 61, 68, .10);
+}
+
+.final-product-023 .meaning-glance {
+  display: grid;
+  grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr);
+  gap: 26px;
+  align-items: end;
+  padding: 6px 0 12px;
+}
+
+.final-product-023 .meaning-glance .hydro-level {
+  min-width: 0;
+}
+
+.final-product-023 .meaning-glance .hydro-level > span {
+  color: #65757d;
+  font-size: .72rem;
+  font-weight: 720;
+  letter-spacing: .025em;
+}
+
+.final-product-023 .meaning-glance .hydro-level > strong {
+  display: block;
+  margin-top: 1px;
+  font-size: clamp(3.5rem, 8vw, 6.4rem);
+  line-height: .91;
+  letter-spacing: -.075em;
+  font-variant-numeric: tabular-nums;
+  color: #163b40;
+}
+
+.final-product-023 .meaning-glance .hydro-level > strong small {
+  margin-left: .12em;
+  font-size: .25em;
+  letter-spacing: -.02em;
+  color: #536a70;
+}
+
+.final-product-023 .meaning-glance .hydro-level time {
+  display: block;
+  margin-top: 8px;
+  color: #687980;
+  font-size: .76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.final-product-023 .meaning-copy {
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.final-product-023 .meaning-copy__primary {
+  max-width: 690px;
+  margin: 0;
+  color: #172f35;
+  font-size: clamp(1.05rem, 2vw, 1.42rem);
+  font-weight: 690;
+  line-height: 1.26;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+
+.final-product-023 .meaning-copy__caveat {
+  max-width: 620px;
+  margin: 6px 0 0;
+  color: #6a6760;
+  font-size: .78rem;
+  line-height: 1.42;
+}
+
+.final-product-023 .meaning-copy__movement {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 10px;
+  color: #55686f;
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.final-product-023 .meaning-copy__movement strong {
+  color: #24545a;
+  font-weight: 760;
+}
+
+.final-product-023 .meaning-explain {
+  min-height: 44px;
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #245f66;
+  font-size: .77rem;
+  font-weight: 740;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.final-product-023 .context-scale {
+  margin: 2px 0 8px;
+  padding: 13px 0 11px;
+  border-top: 1px solid rgba(35, 61, 68, .10);
+  border-bottom: 1px solid rgba(35, 61, 68, .10);
+}
+
+.final-product-023 .context-scale figcaption,
+.final-product-023 .context-scale--unavailable > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.final-product-023 .context-scale figcaption strong,
+.final-product-023 .context-scale--unavailable strong {
+  color: #27464d;
+  font-size: .77rem;
+  font-weight: 780;
+}
+
+.final-product-023 .context-scale figcaption span,
+.final-product-023 .context-scale--unavailable span {
+  color: #718087;
+  font-size: .7rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.final-product-023 .context-scale__track {
+  position: relative;
+  height: 22px;
+  margin: 0 5px;
+}
+
+.final-product-023 .context-scale__track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(74, 110, 114, .18), rgba(74, 110, 114, .38));
+}
+
+.final-product-023 .context-scale__reference,
+.final-product-023 .context-scale__current {
+  position: absolute;
+  top: 3px;
+  width: 2px;
+  height: 16px;
+  transform: translateX(-1px);
+}
+
+.final-product-023 .context-scale__reference--statistical {
+  background: #83989a;
+}
+
+.final-product-023 .context-scale__reference--protection {
+  background: #b77d42;
+}
+
+.final-product-023 .context-scale__current {
+  top: 0;
+  width: 3px;
+  height: 22px;
+  background: #1e626a;
+}
+
+.final-product-023 .context-scale__current i {
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #f7f4ec;
+  border-radius: 50%;
+  background: #1e626a;
+  transform: translate(-50%, -50%);
+}
+
+.final-product-023 .context-scale__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  margin-top: 6px;
+  color: #64757c;
+  font-size: .69rem;
+  line-height: 1.35;
+}
+
+.final-product-023 .context-scale__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.final-product-023 .context-scale__legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1e626a;
+}
+
+.final-product-023 .context-scale__legend i.statistical {
+  background: #83989a;
+}
+
+.final-product-023 .context-scale__legend i.protection {
+  background: #b77d42;
+  border-radius: 1px;
+}
+
+.final-product-023 .meaning-horizons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 7px 0 9px;
+  color: #66777d;
+  font-size: .72rem;
+}
+
+.final-product-023 .context-first-hydrometry .source-strip {
+  margin-top: 5px;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid rgba(35, 61, 68, .09);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.final-product-023 .context-first-hydrometry .source-strip__copy {
+  gap: 2px 10px;
+  color: #65767c;
+  font-size: .69rem;
+}
+
+.final-product-023 .context-first-hydrometry .source-strip__copy b {
+  color: #355960;
+  font-weight: 740;
+}
+
+.final-product-023 .context-first-hydrometry .source-strip button {
+  background: transparent;
+  border-color: rgba(37, 91, 97, .20);
+  color: #285e65;
+}
+
+.final-product-023 .hydro-chart--contextual {
+  margin-top: 7px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(35, 61, 68, .10);
+  background: transparent;
+}
+
+.final-product-023 .hydro-chart__context-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.final-product-023 .hydro-chart__context-head > div:first-child span,
+.final-product-023 .hydro-chart__context-head > div:first-child strong {
+  display: block;
+}
+
+.final-product-023 .hydro-chart__context-head > div:first-child span {
+  color: #748187;
+  font-size: .68rem;
+  font-weight: 720;
+  text-transform: uppercase;
+  letter-spacing: .075em;
+}
+
+.final-product-023 .hydro-chart__context-head > div:first-child strong {
+  margin-top: 2px;
+  color: #24494f;
+  font-size: .94rem;
+  line-height: 1.3;
+}
+
+.final-product-023 .hydro-chart__windows {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(41, 82, 88, .055);
+}
+
+.final-product-023 .hydro-chart__windows button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5c6e74;
+  font-size: .72rem;
+  font-weight: 720;
+}
+
+.final-product-023 .hydro-chart__windows button[aria-pressed="true"] {
+  background: #fffdf8;
+  color: #234f55;
+  box-shadow: 0 1px 5px rgba(27, 54, 59, .08);
+}
+
+.final-product-023 .hydro-chart__windows button:disabled {
+  opacity: .34;
+}
+
+.final-product-023 .hydro-chart__meta {
+  margin-bottom: 7px;
+  color: #758187;
+  font-size: .66rem;
+}
+
+.final-product-023 .hydro-chart svg {
+  width: 100%;
+  height: auto;
+}
+
+.final-product-023 .hydro-chart__plot {
+  fill: rgba(247, 245, 239, .68);
+  stroke: rgba(37, 71, 77, .07);
+}
+
+.final-product-023 .hydro-chart__grid {
+  stroke: rgba(48, 77, 82, .09);
+  stroke-width: 1;
+}
+
+.final-product-023 .hydro-chart__line {
+  fill: none;
+  stroke: #2c6970;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.final-product-023 .hydro-chart__point {
+  fill: #2c6970;
+  stroke: #fbf8f1;
+  stroke-width: 2;
+}
+
+.final-product-023 .hydro-chart__threshold {
+  stroke: #b77d42;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+.final-product-023 .hydro-chart__threshold--normal {
+  stroke: #829799;
+}
+
+.final-product-023 .hydro-chart__threshold-label {
+  fill: #715d49;
+  font-size: 11px;
+  font-weight: 690;
+}
+
+.final-product-023 .hydro-chart__external-reference {
+  margin: 3px 0 0;
+  color: #6b6b65;
+  font-size: .7rem;
+  line-height: 1.4;
+}
+
+.final-product-023 .hydro-chart__external-reference strong {
+  color: #4d5d61;
+}
+
+.final-product-023 .hydro-chart__readout {
+  margin-top: 4px;
+  color: #66777d;
+  font-size: .72rem;
+}
+
+.final-product-023 .river-priority__meaning {
+  margin: 8px 0 4px;
+  color: #294b51;
+  font-size: .82rem;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.final-product-023 .context-discovery__principles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 18px;
+  border-top: 1px solid rgba(35, 61, 68, .10);
+  border-bottom: 1px solid rgba(35, 61, 68, .10);
+}
+
+.final-product-023 .context-discovery__principles article {
+  padding: 15px 18px 14px 0;
+}
+
+.final-product-023 .context-discovery__principles article + article {
+  padding-left: 18px;
+  border-left: 1px solid rgba(35, 61, 68, .09);
+}
+
+.final-product-023 .context-discovery__principles strong {
+  display: block;
+  color: #284b51;
+  font-size: .86rem;
+  line-height: 1.3;
+}
+
+.final-product-023 .context-discovery__principles p {
+  margin: 5px 0 0;
+  color: #6a787e;
+  font-size: .75rem;
+  line-height: 1.45;
+}
+
+.final-product-023 .detail-list--hydrometric article {
+  align-content: start;
+}
+
+.final-product-023 .detail-list__datum {
+  margin: 7px 0 10px;
+  color: #5f7077;
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
+.final-product-023 .station-reference-detail {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(35, 61, 68, .10);
+}
+
+.final-product-023 .station-reference-detail h4 {
+  margin: 0 0 7px;
+  color: #39575d;
+  font-size: .75rem;
+}
+
+.final-product-023 .station-reference-detail ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.final-product-023 .station-reference-detail li {
+  display: grid;
+  gap: 2px;
+  color: #55686e;
+  font-size: .76rem;
+}
+
+.final-product-023 .station-reference-detail li small {
+  color: #78858a;
+  font-size: .68rem;
+  line-height: 1.35;
+}
+
+.final-product-023 .station-reference-detail a {
+  width: fit-content;
+  color: #29656c;
+  font-size: .69rem;
+}
+
+@media (max-width: 900px) {
+  .final-product-023 .context-first-hydrometry .hydrometric-hero__header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .final-product-023 .meaning-glance {
+    grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr);
+    gap: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .final-product-023 .context-first-hydrometry .muni-hydrometric-hero {
+    padding-top: 13px;
+  }
+
+  .final-product-023 .context-first-hydrometry .hydrometric-hero__header {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .final-product-023 .context-first-hydrometry .hydrometric-hero__header h1 {
+    font-size: 1.72rem;
+  }
+
+  .final-product-023 .context-first-hydrometry .hydrometric-hero__lede {
+    max-width: 34rem;
+    margin-top: 5px;
+    font-size: .8rem;
+    line-height: 1.36;
+  }
+
+  .final-product-023 .context-first-hydrometry .hydrometric-hero__controls {
+    grid-template-columns: minmax(0, 1fr) 46px;
+  }
+
+  .final-product-023 .station-selector--meaning button {
+    min-height: 58px;
+    padding: 7px 9px 9px;
+  }
+
+  .final-product-023 .station-selector--meaning button > em {
+    font-size: .66rem;
+    line-height: 1.25;
+  }
+
+  .final-product-023 .hydrometric-meaning-module .station-identification {
+    margin-bottom: 7px;
+    padding-bottom: 7px;
+  }
+
+  .final-product-023 .meaning-glance {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 2px 0 8px;
+  }
+
+  .final-product-023 .meaning-glance .hydro-level > strong {
+    font-size: clamp(3.4rem, 18vw, 4.8rem);
+  }
+
+  .final-product-023 .meaning-glance .hydro-level time {
+    margin-top: 4px;
+    font-size: .7rem;
+  }
+
+  .final-product-023 .meaning-copy__primary {
+    max-width: 32rem;
+    font-size: 1rem;
+    line-height: 1.22;
+  }
+
+  .final-product-023 .meaning-copy__caveat {
+    margin-top: 4px;
+    font-size: .7rem;
+  }
+
+  .final-product-023 .meaning-copy__movement {
+    margin-top: 6px;
+    gap: 2px 9px;
+    font-size: .72rem;
+  }
+
+  .final-product-023 .meaning-explain {
+    margin-top: 2px;
+    font-size: .71rem;
+  }
+
+  .final-product-023 .context-scale {
+    margin-top: 0;
+    padding: 9px 0 8px;
+  }
+
+  .final-product-023 .context-scale figcaption {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 7px;
+  }
+
+  .final-product-023 .context-scale figcaption span {
+    text-align: left;
+    font-size: .64rem;
+  }
+
+  .final-product-023 .context-scale__legend {
+    gap: 3px 10px;
+    font-size: .62rem;
+  }
+
+  .final-product-023 .meaning-horizons {
+    margin: 5px 0 7px;
+    gap: 2px 8px;
+    font-size: .65rem;
+  }
+
+  .final-product-023 .context-first-hydrometry .source-strip {
+    padding: 6px 0;
+  }
+
+  .final-product-023 .hydro-chart--contextual {
+    margin-top: 4px;
+    padding-top: 10px;
+  }
+
+  .final-product-023 .hydro-chart__context-head {
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .final-product-023 .hydro-chart__context-head > div:first-child strong {
+    font-size: .8rem;
+  }
+
+  .final-product-023 .hydro-chart__windows button {
+    min-height: 34px;
+    padding-inline: 8px;
+    font-size: .66rem;
+  }
+
+  .final-product-023 .context-discovery__principles {
+    grid-template-columns: 1fr;
+  }
+
+  .final-product-023 .context-discovery__principles article,
+  .final-product-023 .context-discovery__principles article + article {
+    padding: 11px 0;
+    border-left: 0;
+  }
+
+  .final-product-023 .context-discovery__principles article + article {
+    border-top: 1px solid rgba(35, 61, 68, .08);
+  }
+}
+
+@media (max-width: 390px) {
+  .final-product-023 .context-first-hydrometry .hydrometric-hero__header h1 {
+    font-size: 1.63rem;
+  }
+
+  .final-product-023 .station-selector--meaning button > small {
+    font-size: .62rem;
+  }
+
+  .final-product-023 .station-selector--meaning button > em {
+    font-size: .61rem;
+  }
+
+  .final-product-023 .meaning-glance .hydro-level > strong {
+    font-size: 3.65rem;
+  }
+
+  .final-product-023 .hydro-chart__meta {
+    font-size: .6rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .final-product-023 .station-selector--meaning {
+    grid-template-columns: 1fr;
+  }
+
+  .final-product-023 .station-selector--meaning button + button {
+    border-left: 0;
+    border-top: 1px solid rgba(35, 61, 68, .08);
+  }
+
+  .final-product-023 .meaning-glance .hydro-level > strong {
+    font-size: 3.25rem;
+  }
+
+  .final-product-023 .hydro-chart__context-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .final-product-023 .station-selector--meaning button,
+  .final-product-023 .context-scale__current,
+  .final-product-023 .hydro-chart__line,
+  .final-product-023 .hydro-chart__point {
+    transition: none !important;
+    animation: none !important;
+  }
+}
