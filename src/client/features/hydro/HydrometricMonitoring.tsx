@@ -157,7 +157,7 @@ export function HydrometricMonitoring({ snapshot, refreshing, sourcesButtonRef, 
   const operationalDefaultId = priority.mode === 'SINGLE_RIVER_PRIORITY'
     ? priority.affectedSystemIds[0]
     : snapshot.river.systemId ?? systems[0]?.id;
-  const [selectedId, setSelectedId] = useState(() => operationalDefaultId ?? '');
+  const [selectedId, setSelectedId] = useState('');
   const validSelectedId = systems.some((system) => system.id === selectedId) ? selectedId : operationalDefaultId ?? systems[0]?.id ?? '';
   const selected = systems.find((system) => system.id === validSelectedId) ?? systems[0];
   const prioritySystems = priority.affectedSystemIds

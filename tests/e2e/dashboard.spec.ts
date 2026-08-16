@@ -319,7 +319,7 @@ test('stays within section, scroll and horizontal-overflow budgets', async ({ pa
       sections: document.querySelectorAll('main > section').length,
     }));
     results.push({ ...item, ...metrics });
-    expect(metrics.sections).toBe(4);
+    expect(metrics.sections).toBe(5);
     expect(metrics.overflow).toBeLessThanOrEqual(1);
   }
   await writeFile(`${evidenceDir}/density-metrics.json`, `${JSON.stringify(results, null, 2)}\n`);

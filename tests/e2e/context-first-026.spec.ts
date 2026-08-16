@@ -171,7 +171,7 @@ test('three-second Paraná read shows level, station reference, trend, age and s
   await open(page, normal);
   await expect(page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' })).toBeVisible();
   await expect(page.getByTestId('hydro-current-level')).toContainText('3,20');
-  await expect(page.getByTestId('hydro-meaning')).toContainText('por debajo del nivel de alerta de referencia');
+  await expect(page.getByTestId('hydro-meaning')).toContainText('por encima de la referencia de aguas bajas');
   await expect(page.getByText('Sube lentamente', { exact: true })).toBeVisible();
   await expect(page.locator('.station-identification')).toContainText(/Medición · hace/);
   await expect(page.getByTestId('hydro-source-strip')).toContainText('Instituto Nacional del Agua');
