@@ -92,7 +92,6 @@ function salado(metres = 3.42, count = 190): HydrologicalSystem {
     thresholds: [
       { id: 'NORMAL', label: 'Referencia inferior', metres: 0 },
       { id: 'ALERTA', label: 'Nivel de alerta de referencia', metres: 4.7 },
-      { id: 'EVACUACION', label: 'Nivel de evacuación de referencia', metres: 0 },
     ],
     trend: 'RISING_SLOWLY',
     delta1h: .001,
