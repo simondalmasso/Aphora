@@ -1,0 +1,51 @@
+{
+  "result": "PASS",
+  "officialEmergencyFalsePositives": 0,
+  "fixtures": [
+    {
+      "scenario": "routine_fresh",
+      "expected": "ROUTINE",
+      "pass": true
+    },
+    {
+      "scenario": "single_parana_reference",
+      "expected": "FLOOD_SITUATION_SINGLE",
+      "pass": true
+    },
+    {
+      "scenario": "single_salado_reference",
+      "expected": "FLOOD_SITUATION_SINGLE",
+      "pass": true
+    },
+    {
+      "scenario": "dual_material_relevance",
+      "expected": "FLOOD_SITUATION_DUAL_50_50",
+      "pass": true
+    },
+    {
+      "scenario": "official_weather_warning",
+      "expected": "OFFICIAL_WARNING_ACTIVE_WITHOUT_RIVER_EMERGENCY",
+      "pass": true
+    },
+    {
+      "scenario": "model_only",
+      "expected": "NO_OFFICIAL_STATE_ESCALATION",
+      "pass": true
+    },
+    {
+      "scenario": "stale_hydrometry",
+      "expected": "VERIFICATION_DEGRADED",
+      "pass": true
+    },
+    {
+      "scenario": "alert_feed_unavailable",
+      "expected": "VERIFICATION_DEGRADED",
+      "pass": true
+    },
+    {
+      "scenario": "community_only",
+      "expected": "NO_OFFICIAL_STATE_ESCALATION",
+      "pass": true
+    }
+  ]
+}

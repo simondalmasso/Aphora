@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-16T07:44:28.257Z",
+  "budgets": {
+    "initialJsGzipBytes": 97280,
+    "initialCssGzipBytes": 30720,
+    "lazyVisualJsGzipBytes": 174080
+  },
+  "actual": {
+    "jsGzipBytes": 96693,
+    "initialJsGzipBytes": 96693,
+    "lazyVisualJsGzipBytes": 45988,
+    "totalJsGzipBytes": 142681,
+    "cssGzipBytes": 17741,
+    "totalDistBytes": 2406856
+  },
+  "loading": {
+    "threeJs": "REMOVED",
+    "lazyJsGzipBytes": 45988,
+    "initialFiles": [
+      "assets/index-Bp7LO_z4.js"
+    ]
+  },
+  "files": [
+    {
+      "path": ".vite/manifest.json",
+      "bytes": 536,
+      "gzipBytes": 240
+    },
+    {
+      "path": "assets/SituationMap-B-2PNAzT.js",
+      "bytes": 152687,
+      "gzipBytes": 44702
+    },
+    {
+      "path": "assets/SituationMap-B-2PNAzT.js.map",
+      "bytes": 664283,
+      "gzipBytes": 156449
+    },
+    {
+      "path": "assets/index-Bp7LO_z4.js",
+      "bytes": 324389,
+      "gzipBytes": 96693
+    },
+    {
+      "path": "assets/index-Bp7LO_z4.js.map",
+      "bytes": 1161763,
+      "gzipBytes": 243709
+    },
+    {
+      "path": "assets/index-CxYLbUnR.css",
+      "bytes": 93956,
+      "gzipBytes": 17344
+    },
+    {
+      "path": "essential-contacts.json",
+      "bytes": 541,
+      "gzipBytes": 288
+    },
+    {
+      "path": "icons/icon.svg",
+      "bytes": 492,
+      "gzipBytes": 358
+    },
+    {
+      "path": "index.html",
+      "bytes": 997,
+      "gzipBytes": 558
+    },
+    {
+      "path": "lite.css",
+      "bytes": 665,
+      "gzipBytes": 397
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 716,
+      "gzipBytes": 395
+    },
+    {
+      "path": "offline-guidance.json",
+      "bytes": 445,
+      "gzipBytes": 305
+    },
+    {
+      "path": "offline.html",
+      "bytes": 1717,
+      "gzipBytes": 873
+    },
+    {
+      "path": "service-worker.js",
+      "bytes": 3238,
+      "gzipBytes": 1286
+    },
+    {
+      "path": "source-provenance.json",
+      "bytes": 431,
+      "gzipBytes": 335
+    }
+  ],
+  "externalFonts": false,
+  "thirdPartyTrackers": [],
+  "pass": true
+}

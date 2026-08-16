@@ -1,0 +1,26 @@
+[
+  {
+    "width": 390,
+    "height": 844,
+    "maxRatio": 2.4,
+    "ratio": 5.488151658767772,
+    "overflow": 0,
+    "sections": 5
+  },
+  {
+    "width": 768,
+    "height": 1024,
+    "maxRatio": 1.9,
+    "ratio": 3.400390625,
+    "overflow": 0,
+    "sections": 5
+  },
+  {
+    "width": 1440,
+    "height": 900,
+    "maxRatio": 1.35,
+    "ratio": 3.5211111111111113,
+    "overflow": 0,
+    "sections": 5
+  }
+]

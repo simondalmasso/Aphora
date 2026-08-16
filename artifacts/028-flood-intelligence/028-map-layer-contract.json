@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "load_policy": "EXPLICIT_LAZY_OPEN",
+  "initial_external_map_requests_expected": 0,
+  "base": {
+    "template": "https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{y}.png",
+    "result": "PASS",
+    "http": 200,
+    "content_type": "image/png"
+  },
+  "idesf": {
+    "result": "PASS",
+    "endpoint": "https://aswe.santafe.gov.ar/idesf/wms",
+    "layer": "areas_de_riesgo_hidrico"
+  },
+  "station_markers": [
+    "parana-santa-fe",
+    "salado-santo-tome"
+  ],
+  "risk_semantics": "STATIC_OFFICIAL_RISK_CONTEXT_NOT_CURRENT_FLOOD_EXTENT",
+  "bulk_downloads": 0,
+  "failure_policy": "REMOVE_FAILED_WMS_OVERLAY_KEEP_HYDROMETRY_AND_TEXT_EQUIVALENT"
+}

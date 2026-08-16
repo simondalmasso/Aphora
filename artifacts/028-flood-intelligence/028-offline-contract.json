@@ -1,0 +1,9 @@
+{
+  "result": "PASS",
+  "liveData": "NETWORK_FIRST_NO_STORE",
+  "offlineData": "VALIDATED_LAST_PUBLIC_SNAPSHOT_LOCAL_STORAGE",
+  "serviceWorkerApiCache": false,
+  "mapTileCache": false,
+  "savedAtVisibleOffline": true,
+  "alertVerificationOffline": "FUENTES_DE_ALERTAS_NO_DISPONIBLES"
+}

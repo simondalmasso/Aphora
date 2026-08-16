@@ -1,0 +1,118 @@
+{
+  "result": "PASS",
+  "productionUrl": "https://sos-sf.simondalmasso44.workers.dev/",
+  "firebaseAlias": "https://sos-sf.web.app",
+  "productCommit": "ac1c01fa7d7ffed8de8de83ec14ce2106bdea8f9",
+  "cloudflareVersion": "a7f5fa09-ad5e-4a4b-a676-9b75aeb73c80",
+  "deployCount": 1,
+  "httpEndpoints": "PASS",
+  "browser": {
+    "result": "PASS",
+    "viewports": [
+      {
+        "width": 390,
+        "height": 844,
+        "overflow": 0,
+        "hydrometryVisible": true,
+        "floodSituationVisible": true,
+        "mapOpened": true,
+        "mapTextEquivalent": true
+      },
+      {
+        "width": 1440,
+        "height": 900,
+        "overflow": 0,
+        "hydrometryVisible": true,
+        "floodSituationVisible": true,
+        "mapOpened": true,
+        "mapTextEquivalent": true
+      }
+    ],
+    "lazyMap": {
+      "initialExternalRequests": 0,
+      "afterOpenExternalRequests": 12,
+      "result": "PASS"
+    },
+    "errors": []
+  },
+  "sourceTruth": {
+    "result": "PASS",
+    "generatedAt": "2026-08-16T07:46:25.196Z",
+    "mode": "LIVE",
+    "alertStatus": "FUENTES_DE_ALERTAS_NO_DISPONIBLES",
+    "systems": {
+      "parana": {
+        "available": true,
+        "freshness": "DESACTUALIZADO",
+        "sourceId": "ina-rest-30"
+      },
+      "salado": {
+        "available": true,
+        "freshness": "DESACTUALIZADO",
+        "sourceId": "ina-rest-3044"
+      }
+    },
+    "saladoUnsafeZeroReferences": 0,
+    "smnCap": {
+      "contract": "PASS",
+      "liveAvailability": "FAIL_CLOSED",
+      "sourceStatus": "UNAVAILABLE",
+      "freshness": "NO_DISPONIBLE",
+      "alertStatus": "FUENTES_DE_ALERTAS_NO_DISPONIBLES",
+      "absenceClaimSafe": true
+    },
+    "nasaRain": {
+      "connected": false,
+      "freshness": "NO_DISPONIBLE",
+      "structuredRate": null
+    }
+  },
+  "upstreams": {
+    "argenmap": {
+      "template": "https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{y}.png",
+      "result": "PASS",
+      "http": 200,
+      "content_type": "image/png"
+    },
+    "idesf": {
+      "endpoint": "https://aswe.santafe.gov.ar/idesf/wms",
+      "layer": "areas_de_riesgo_hidrico",
+      "result": "PASS",
+      "restricted_downloads": 0,
+      "capabilities_http": 200,
+      "resolved_layer": {
+        "name": "areas_de_riesgo_hidrico",
+        "title": "Áreas de Riesgo Hídrico",
+        "crs": [
+          "EPSG:4326",
+          "EPSG:5347"
+        ]
+      },
+      "getmap_http": 200,
+      "getmap_content_type": "image/png"
+    },
+    "smn": {
+      "contract": "PASS",
+      "url": "https://ssl.smn.gob.ar/feeds/CAP/rss_alertaCAP_nuevo_2026.xml",
+      "live_probe": "FAIL_CLOSED",
+      "failure_class": "HTTPError",
+      "fail_closed_required": true
+    },
+    "ina": {
+      "parana": {
+        "http": 200,
+        "bytes": 266,
+        "reachable": true
+      },
+      "salado": {
+        "http": 200,
+        "bytes": 2,
+        "reachable": true
+      }
+    }
+  },
+  "mainUnchanged": true,
+  "functionalRegressions": 0,
+  "genericWeatherApp": false,
+  "multiHazardReady": true
+}

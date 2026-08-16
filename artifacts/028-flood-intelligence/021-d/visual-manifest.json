@@ -1,0 +1,17 @@
+{
+  "dual-desktop": {
+    "sha256": "488fa322261e16d5048a75bc7b63d79782d4e93734dbb25ed2cd0345539c36ed",
+    "semantic": "DUAL_EMERGENCY_50_50",
+    "snapshotId": "021d-dual"
+  },
+  "dual-mobile-390": {
+    "sha256": "4a57991d6519a5df674c178096ad59655c80510c269ec9d11fc363627e423d7a",
+    "semantic": "DUAL_EMERGENCY_BOTH_VISIBLE_MOBILE",
+    "snapshotId": "021d-dual-mobile-evidence"
+  },
+  "single-salado-mobile-360": {
+    "sha256": "001d53503eeae0245a80e4286ab2bc4d8ba2d2adbd64eea43ae404902e54036e",
+    "semantic": "SINGLE_RIVER_PRIORITY_SALADO",
+    "snapshotId": "021d-single-mobile-evidence"
+  }
+}

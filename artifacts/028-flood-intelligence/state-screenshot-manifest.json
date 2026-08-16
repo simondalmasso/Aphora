@@ -1,0 +1,42 @@
+{
+  "after-390x844": {
+    "sha256": "7f90d4fc76dc0e14f2dc4b9b62a21a532e66bd0167f5ab32f014d5e5cd7626c4",
+    "snapshotId": "order-020-live",
+    "semantic": "LIVE_HYDROMETRIC_FIRST"
+  },
+  "after-768x1024": {
+    "sha256": "6d277186b3cf143bb0476ba24258cf44a1e41035e3891dfba7cc370c1c0534a1",
+    "snapshotId": "order-020-live",
+    "semantic": "LIVE_HYDROMETRIC_FIRST"
+  },
+  "after-1440x900": {
+    "sha256": "df9847c87256af5a1d3ce87e5274bd0d9f1b60d434682e90f66a8108d0a07045",
+    "snapshotId": "order-020-live",
+    "semantic": "LIVE_HYDROMETRIC_FIRST"
+  },
+  "state-live": {
+    "sha256": "7f90d4fc76dc0e14f2dc4b9b62a21a532e66bd0167f5ab32f014d5e5cd7626c4",
+    "snapshotId": "order-020-live",
+    "semantic": "LIVE_VALUE_AND_CHART"
+  },
+  "state-stale": {
+    "sha256": "608d894704bd3cd0270a512152652560e9d3f138583edf4a575157bec685ecf7",
+    "snapshotId": "order-020-stale",
+    "semantic": "STALE_VALUE_AND_CHART_PRESERVED"
+  },
+  "state-active-alert": {
+    "sha256": "f13113b0d0748249de71b2b90ecd8e0d84cea3072bd6651bca35f9b3dfe2598f",
+    "snapshotId": "order-020-active-alert",
+    "semantic": "VERIFIED_ACTIVE_ALERT_BAND"
+  },
+  "state-alerts-unverified": {
+    "sha256": "7ecf95a80323cedd9e7907998dacaac2c15eb0dd61515d99b0a922d40f3d5aed",
+    "snapshotId": "order-020-live",
+    "semantic": "HEADER_BADGE_ONLY"
+  },
+  "state-offline": {
+    "sha256": "ed2112a782ad83ec5e5a846f3773ee914fd558ef82ddbf192c3614ef532cd620",
+    "snapshotId": "order-020-live",
+    "semantic": "OFFLINE_CACHED_HYDROMETRY"
+  }
+}

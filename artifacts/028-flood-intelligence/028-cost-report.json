@@ -1,0 +1,10 @@
+{
+  "result": "PASS",
+  "usdCost": 0,
+  "paidServicesAdded": [],
+  "backendMigration": false,
+  "d1DestructiveMigration": false,
+  "kvMove": false,
+  "authMove": false,
+  "canonicalInfra": "Cloudflare Workers"
+}

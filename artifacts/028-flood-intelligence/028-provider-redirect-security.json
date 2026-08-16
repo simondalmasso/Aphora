@@ -1,0 +1,13 @@
+{
+  "result": "PASS",
+  "redirectMode": "manual",
+  "redirectLimit": 1,
+  "allowlistRevalidatedAfterRedirect": true,
+  "redirectChainsRejected": true,
+  "futureTimestampRejectedOrDegraded": true,
+  "secretsPersisted": false,
+  "cspMapHosts": [
+    "https://wms.ign.gob.ar",
+    "https://aswe.santafe.gov.ar"
+  ]
+}

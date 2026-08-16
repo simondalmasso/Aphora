@@ -1,0 +1,43 @@
+{
+  "result": "PASS",
+  "roles": [
+    {
+      "source": "INA",
+      "role": "OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION",
+      "canDetermineOfficialEmergency": false,
+      "primaryFor": "hydrometry"
+    },
+    {
+      "source": "SMN CAP",
+      "role": "OFFICIAL_WARNING",
+      "canDetermineOfficialWarning": true,
+      "canAloneProveRiverFlood": false
+    },
+    {
+      "source": "IDESF",
+      "role": "OFFICIAL_STATIC_RISK_CONTEXT",
+      "canDetermineLiveFloodExtent": false
+    },
+    {
+      "source": "NASA IMERG Early",
+      "role": "SUPPLEMENTARY_SATELLITE_ESTIMATE",
+      "canDeterminePublicState": false
+    },
+    {
+      "source": "forecast model",
+      "role": "SUPPLEMENTARY_MODEL_FORECAST",
+      "canDetermineOfficialState": false,
+      "028": "DEFERRED"
+    },
+    {
+      "source": "community report",
+      "role": "COMMUNITY_REPORT",
+      "canDeterminePublicState": false
+    },
+    {
+      "source": "SOS-SF derivation",
+      "role": "INTERNAL_DERIVATION",
+      "canInventRiskCategory": false
+    }
+  ]
+}

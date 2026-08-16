@@ -1,0 +1,17 @@
+{
+  "endpoint": "https://aswe.santafe.gov.ar/idesf/wms",
+  "layer": "areas_de_riesgo_hidrico",
+  "result": "PASS",
+  "restricted_downloads": 0,
+  "capabilities_http": 200,
+  "resolved_layer": {
+    "name": "areas_de_riesgo_hidrico",
+    "title": "Áreas de Riesgo Hídrico",
+    "crs": [
+      "EPSG:4326",
+      "EPSG:5347"
+    ]
+  },
+  "getmap_http": 200,
+  "getmap_content_type": "image/png"
+}

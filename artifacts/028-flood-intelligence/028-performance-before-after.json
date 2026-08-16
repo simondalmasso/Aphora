@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "before027": {
+    "initialJsGzipBytes": 92154,
+    "lazyVisualJsGzipBytes": 1458,
+    "totalJsGzipBytes": 93612,
+    "cssGzipBytes": 16576
+  },
+  "after028": {
+    "initialJsGzipBytes": 96696,
+    "lazyVisualJsGzipBytes": 45989,
+    "totalJsGzipBytes": 142685,
+    "cssGzipBytes": 17741
+  },
+  "initialJsDeltaBytes": 4542,
+  "initialJsDeltaPercent": 4.93,
+  "mapChunkLazyOnly": true,
+  "mapLazyGzipBytes": 45989
+}

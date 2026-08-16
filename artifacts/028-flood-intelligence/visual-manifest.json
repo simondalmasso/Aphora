@@ -1,0 +1,26 @@
+{
+  "normal-390": {
+    "sha256": "481e2c36879f3f03f0980e81ae6951c0994875f58173e93647c52289fe579719",
+    "snapshotId": "023-normal",
+    "semantic": "NORMAL_WARM_MOBILE",
+    "overflow": 0
+  },
+  "normal-1440": {
+    "sha256": "cabb1234b44042628ddebce36b8824b36c455f2a863a29bd0e39d2e6da285027",
+    "snapshotId": "023-normal-desktop",
+    "semantic": "NORMAL_WARM_DESKTOP",
+    "overflow": 0
+  },
+  "single-390": {
+    "sha256": "47ae57342759bdd89bbdb8ffc91a01b66f02f472307763fd2c664b1fb3a6731a",
+    "snapshotId": "023-single-salado",
+    "semantic": "SINGLE_SALADO_PRIORITY",
+    "overflow": 0
+  },
+  "dual-1440": {
+    "sha256": "a32f2a62e8a38c896226c51fbb8dd2e6f5859a6059705d67078f893deea9c8fb",
+    "snapshotId": "023-dual",
+    "semantic": "DUAL_50_50",
+    "overflow": 0
+  }
+}
