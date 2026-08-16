@@ -24,7 +24,8 @@ describe('final product 023 hydrometric-first progressive rendering', () => {
     expect(html).toContain('Medición · antigüedad no disponible');
     expect(html).toContain('Consulta de la fuente · antigüedad no disponible');
     expect(html).toContain('Río Paraná');
-    expect(html).toContain('Río Salado');
+    expect(html).toContain('aria-label="Salado"');
+    expect(html).toContain('Estación Santo Tomé');
     expect(html).toContain('No pudimos obtener una medición reciente');
     expect(html).toContain('La falta de dato no significa una emergencia.');
     expect(html).toContain('Alertas, ayuda y reportes');
