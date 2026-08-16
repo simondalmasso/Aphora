@@ -178,7 +178,7 @@ test('three-second Paraná read shows level, station reference, trend, age and s
   await expect(page.getByTestId('hydro-source-strip')).toContainText('Instituto Nacional del Agua');
   await expect(page.getByTestId('hydro-context-scale')).toBeVisible();
   const saladoTab = page.getByRole('tab', { name: 'Salado' });
-  await expect(saladoTab).not.toContainText(/\d[,\.]\d+\s*m/);
+  await expect(saladoTab).not.toContainText(/\d[,.]\d+\s*m/);
   const [h1Size, levelSize] = await Promise.all([
     page.getByRole('heading', { level: 1, name: 'Situación hidrométrica' }).evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
     page.getByTestId('hydro-current-level').evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize)),
