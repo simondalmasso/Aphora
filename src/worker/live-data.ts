@@ -15,13 +15,13 @@ import type {
   HydrologicalSystem,
   OfficialAlert,
   PublicState,
-  RiverPoint,
   RiverThreshold,
   Snapshot,
   Source,
   SourceOrganization,
 } from '../domain/snapshot.ts';
 import { providerHealth, publishProviderBlock, restoreProviderHealth, type ProviderHealth, type ProviderResult } from './providers/core.ts';
+import { deriveHydrometricTrend, sanitizeMeasuredRiverPoints, temporalDelta } from '../domain/temporal-series.ts';
 import { fetchInaSeries, fetchInaWaterMl } from './providers/ina.ts';
 import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa.ts';
 import { fetchPortsHydrometers, type PortsHydrometerReading } from './providers/ports.ts';
@@ -134,23 +134,6 @@ async function writeSnapshotCache(key: string, snapshot: Snapshot): Promise<void
   );
 }
 
-function deltaAt(points: readonly RiverPoint[], hours: number): number | null {
-  const latest = points.at(-1);
-  if (!latest) return null;
-  const target = Date.parse(latest.at) - hours * 3_600_000;
-  const previous = [...points].reverse().find((point) => Date.parse(point.at) <= target);
-  return previous ? latest.metres - previous.metres : null;
-}
-
-function trend(points: readonly RiverPoint[]): HydrologicalSystem['trend'] {
-  const delta = deltaAt(points, 6);
-  if (delta === null) return 'UNKNOWN';
-  if (delta >= 0.12) return 'RISING';
-  if (delta >= 0.02) return 'RISING_SLOWLY';
-  if (delta <= -0.02) return 'FALLING';
-  return 'STABLE';
-}
-
 function thresholds(station: typeof STATIONS[number]): readonly RiverThreshold[] {
   const items: RiverThreshold[] = [];
   if (station.low !== null) items.push(Object.freeze({ id: 'NORMAL' as const, label: 'Referencia inferior', metres: station.low }));
@@ -248,7 +231,7 @@ async function stationSystem(station: typeof STATIONS[number], now: Date): Promi
   endpoint.searchParams.set('timeend', end);
   const sourceUrl = endpoint.toString();
   const result = await fetchInaSeries(sourceUrl, `ina-rest-${station.seriesId}`, station.seriesId);
-  const points = result.value ?? Object.freeze([]);
+  const points = sanitizeMeasuredRiverPoints(result.value ?? Object.freeze([]), now);
   const latest = points.at(-1);
   const freshness = freshnessFor(latest?.at, now, FRESH_MEASUREMENT_MS, DELAYED_MEASUREMENT_MS);
   const status = dataStatusForFreshness(freshness);
@@ -270,10 +253,12 @@ async function stationSystem(station: typeof STATIONS[number], now: Date): Promi
     sourceName: 'Instituto Nacional del Agua · INA REST',
     points,
     thresholds: thresholds(station),
-    trend: trend(points),
-    delta1h: deltaAt(points, 1),
-    delta6h: deltaAt(points, 6),
-    delta24h: deltaAt(points, 24),
+    trend: deriveHydrometricTrend(points, now),
+    delta1h: temporalDelta(points, 1, now).value,
+    delta6h: temporalDelta(points, 6, now).value,
+    delta24h: temporalDelta(points, 24, now).value,
+    delta72h: temporalDelta(points, 72, now).value,
+    delta7d: temporalDelta(points, 168, now).value,
   });
   const validated = latest?.quality === 'PROVIDER_VALIDATED';
   const source = sourceBase({
@@ -603,8 +588,8 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
   const freshness = highestFreshness(systems);
   const status: DataStatus = dataStatusForFreshness(freshness);
   const state = highestState(systems);
-  const delta24h = primary.delta24h ?? 0;
-  const direction: ChangeItem['direction'] = primary.delta24h === null ? 'UNKNOWN' : delta24h > 0.01 ? 'UP' : delta24h < -0.01 ? 'DOWN' : 'SAME';
+  const delta24h = primary.delta24h;
+  const direction: ChangeItem['direction'] = delta24h === null ? 'UNKNOWN' : delta24h > 0.01 ? 'UP' : delta24h < -0.01 ? 'DOWN' : 'SAME';
   const action = alertAction(alertStatus, alerts);
   const nasa = sources.find((source) => source.id === 'nasa-gpm-imerg-early');
   const contradictions = Object.freeze(systems
@@ -637,16 +622,16 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
     timeline: timelineFor(systems, alerts, sources, now),
     sourceOrganizations: ORGANIZATIONS,
     serviceStatus: Object.freeze({ worker: 'OPERATIONAL', api: 'OPERATIONAL', checkedAt: now.toISOString(), note: 'La API está operativa; este estado técnico no garantiza vigencia, cobertura ni ausencia de alertas.' }),
-    changes: Object.freeze([{ id: 'primary-24h', label: primary.label, direction, detail: primary.delta24h === null ? 'Sin comparación de 24 horas' : `${delta24h >= 0 ? '+' : ''}${delta24h.toFixed(2)} m en 24 horas` }]),
+    changes: Object.freeze([{ id: 'primary-24h', label: primary.label, direction, detail: delta24h === null ? 'Sin comparación de 24 horas' : `${delta24h >= 0 ? '+' : ''}${delta24h.toFixed(2)} m en 24 horas` }]),
     systems,
     river: Object.freeze({
       systemId: primary.id,
       available: true,
       dataStatus: primary.dataStatus,
       stationName: primary.stationName,
-      currentMetres: primary.currentMetres ?? 0,
-      delta1h: primary.delta1h ?? 0,
-      delta6h: primary.delta6h ?? 0,
+      currentMetres: primary.currentMetres,
+      delta1h: primary.delta1h,
+      delta6h: primary.delta6h,
       delta24h,
       trend: primary.trend,
       observedAt: primary.observedAt ?? now.toISOString(),

@@ -116,6 +116,8 @@ export interface HydrologicalSystem {
   readonly delta1h: number | null;
   readonly delta6h: number | null;
   readonly delta24h: number | null;
+  readonly delta72h?: number | null;
+  readonly delta7d?: number | null;
 }
 
 export interface RainPoint { readonly at: string; readonly millimetres: number }
@@ -150,10 +152,10 @@ export interface Snapshot {
     readonly available?: boolean;
     readonly dataStatus?: DataStatus;
     readonly stationName: string;
-    readonly currentMetres: number;
-    readonly delta1h: number;
-    readonly delta6h: number;
-    readonly delta24h: number;
+    readonly currentMetres: number | null;
+    readonly delta1h: number | null;
+    readonly delta6h: number | null;
+    readonly delta24h: number | null;
     readonly trend: 'RISING_SLOWLY' | 'RISING' | 'STABLE' | 'FALLING' | 'UNKNOWN';
     readonly observedAt: string;
     readonly fetchedAt: string;

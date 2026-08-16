@@ -1,5 +1,6 @@
 import type { HydrologicalSystem, OfficialAlert, RiverForecastPoint, RiverPoint, RiverThreshold, Snapshot, Source, SourceOrganization, TimelineEvent } from './snapshot.ts';
 import { validateCriticalMessage } from './zungun-compat/validation.ts';
+import { CLOCK_SKEW_TOLERANCE_MS } from './temporal-series.ts';
 
 function plain(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError(`${label} debe ser un objeto`);
@@ -31,13 +32,14 @@ function httpsUrl(value: unknown, label: string): string {
   if (parsed.protocol !== 'https:') throw new TypeError(`${label} debe usar HTTPS`);
   return result;
 }
-function points(value: unknown, label: string): readonly RiverPoint[] {
+function points(value: unknown, label: string, maximumAt?: string): readonly RiverPoint[] {
   if (!Array.isArray(value)) throw new TypeError(`${label} debe ser un arreglo`);
   let previous = -Infinity;
   return value.map((item, index) => {
     const row = plain(item, `${label}[${index}]`);
     const at = iso(row.at, `${label}[${index}].at`);
     const time = Date.parse(at);
+    if (maximumAt && time > Date.parse(maximumAt) + CLOCK_SKEW_TOLERANCE_MS) throw new TypeError(`${label}[${index}].at está significativamente en el futuro`);
     if (time <= previous) throw new TypeError(`${label} debe estar ordenado sin duplicados`);
     previous = time;
     if (Math.abs(finite(row.metres, `${label}[${index}].metres`)) > 100) throw new TypeError(`${label}[${index}].metres fuera de rango`);
@@ -77,12 +79,13 @@ function thresholds(value: unknown, label: string): readonly RiverThreshold[] {
     previous = metres; return item as RiverThreshold;
   });
 }
-function source(value: unknown, index: number): Source {
+function source(value: unknown, index: number, generatedAt?: string): Source {
   const row = plain(value, `snapshot.sources[${index}]`);
   text(row.id, `snapshot.sources[${index}].id`, 160); text(row.name, `snapshot.sources[${index}].name`, 200);
   if (!['OFFICIAL_OBSERVATION', 'OFFICIAL_ALERT', 'FORECAST_MODEL', 'SATELLITE_OBSERVATION', 'COMMUNITY_REPORT', 'INTERNAL_DERIVATION', 'DEMO_FIXTURE'].includes(String(row.kind))) throw new TypeError(`snapshot.sources[${index}].kind inválido`);
   if (!['FRESH', 'STALE', 'UNAVAILABLE', 'UNKNOWN'].includes(String(row.status))) throw new TypeError(`snapshot.sources[${index}].status inválido`);
-  iso(row.observedAt, `snapshot.sources[${index}].observedAt`); iso(row.validUntil, `snapshot.sources[${index}].validUntil`); text(row.contribution, `snapshot.sources[${index}].contribution`, 1000);
+  const sourceObservedAt = iso(row.observedAt, `snapshot.sources[${index}].observedAt`); iso(row.validUntil, `snapshot.sources[${index}].validUntil`);
+  if (generatedAt && Date.parse(sourceObservedAt) > Date.parse(generatedAt) + CLOCK_SKEW_TOLERANCE_MS) throw new TypeError(`snapshot.sources[${index}].observedAt está significativamente en el futuro`); text(row.contribution, `snapshot.sources[${index}].contribution`, 1000);
   if (row.url !== undefined) httpsUrl(row.url, `snapshot.sources[${index}].url`);
   if (typeof row.official !== 'boolean') throw new TypeError(`snapshot.sources[${index}].official inválido`);
   if (row.connected !== undefined && typeof row.connected !== 'boolean') throw new TypeError(`snapshot.sources[${index}].connected inválido`);
@@ -133,7 +136,7 @@ function timelineEvent(value: unknown, index: number): TimelineEvent {
   return value as TimelineEvent;
 }
 
-function system(value: unknown, index: number, sourceIds: ReadonlySet<string>): HydrologicalSystem {
+function system(value: unknown, index: number, sourceIds: ReadonlySet<string>, generatedAt?: string): HydrologicalSystem {
   const row = plain(value, `snapshot.systems[${index}]`);
   text(row.id, `snapshot.systems[${index}].id`, 160); text(row.label, `snapshot.systems[${index}].label`, 160); text(row.watercourse, `snapshot.systems[${index}].watercourse`, 160); text(row.stationName, `snapshot.systems[${index}].stationName`, 160); text(row.stationCode, `snapshot.systems[${index}].stationCode`, 80);
   if (typeof row.available !== 'boolean') throw new TypeError(`snapshot.systems[${index}].available inválido`);
@@ -144,9 +147,9 @@ function system(value: unknown, index: number, sourceIds: ReadonlySet<string>): 
   if (row.currentMetres !== null) finite(row.currentMetres, `snapshot.systems[${index}].currentMetres`);
   if (row.observedAt !== null) iso(row.observedAt, `snapshot.systems[${index}].observedAt`);
   const sourceId = text(row.sourceId, `snapshot.systems[${index}].sourceId`, 160); text(row.sourceName, `snapshot.systems[${index}].sourceName`, 200);
-  const observations = points(row.points, `snapshot.systems[${index}].points`); thresholds(row.thresholds, `snapshot.systems[${index}].thresholds`);
+  const observations = points(row.points, `snapshot.systems[${index}].points`, generatedAt); thresholds(row.thresholds, `snapshot.systems[${index}].thresholds`);
   if (!['RISING_SLOWLY', 'RISING', 'STABLE', 'FALLING', 'UNKNOWN'].includes(String(row.trend))) throw new TypeError(`snapshot.systems[${index}].trend inválido`);
-  for (const field of ['delta1h', 'delta6h', 'delta24h'] as const) if (row[field] !== null) finite(row[field], `snapshot.systems[${index}].${field}`);
+  for (const field of ['delta1h', 'delta6h', 'delta24h', 'delta72h', 'delta7d'] as const) if (row[field] !== undefined && row[field] !== null) finite(row[field], `snapshot.systems[${index}].${field}`);
   if (row.available) {
     if (row.currentMetres === null || row.observedAt === null || observations.length === 0) throw new TypeError(`snapshot.systems[${index}] disponible sin lectura completa`);
     if (!sourceIds.has(sourceId)) throw new TypeError(`snapshot.systems[${index}] referencia una fuente inexistente`);
@@ -189,21 +192,21 @@ export function validateSnapshot(value: unknown): Snapshot {
   }
 
   if (!Array.isArray(record.sources)) throw new TypeError('snapshot.sources debe ser un arreglo');
-  const sources = record.sources.map(source); const sourceIds = new Set(sources.map((item) => item.id));
+  const sources = record.sources.map((item, index) => source(item, index, generatedAt)); const sourceIds = new Set(sources.map((item) => item.id));
   if (sourceIds.size !== sources.length) throw new TypeError('snapshot.sources contiene IDs duplicados');
   if ((record.mode === 'DEMO') !== sources.some((item) => item.kind === 'DEMO_FIXTURE')) throw new TypeError('snapshot usa un modo incompatible con sus fuentes demo');
 
   const rawSystems = record.systems ?? [];
   if (!Array.isArray(rawSystems)) throw new TypeError('snapshot.systems debe ser un arreglo');
-  const systems = rawSystems.map((item, index) => system(item, index, sourceIds)); const systemIds = new Set(systems.map((item) => item.id));
+  const systems = rawSystems.map((item, index) => system(item, index, sourceIds, generatedAt)); const systemIds = new Set(systems.map((item) => item.id));
   if (systemIds.size !== systems.length) throw new TypeError('snapshot.systems contiene IDs duplicados');
 
   const river = plain(record.river, 'snapshot.river');
   if (typeof river.available !== 'boolean' && river.available !== undefined) throw new TypeError('snapshot.river.available inválido');
-  text(river.stationName, 'snapshot.river.stationName', 160); finite(river.currentMetres, 'snapshot.river.currentMetres');
-  for (const field of ['delta1h', 'delta6h', 'delta24h'] as const) finite(river[field], `snapshot.river.${field}`);
+  text(river.stationName, 'snapshot.river.stationName', 160); finiteOrNull(river.currentMetres, 'snapshot.river.currentMetres');
+  for (const field of ['delta1h', 'delta6h', 'delta24h'] as const) finiteOrNull(river[field], `snapshot.river.${field}`);
   if (!['RISING_SLOWLY', 'RISING', 'STABLE', 'FALLING', 'UNKNOWN'].includes(String(river.trend))) throw new TypeError('snapshot.river.trend inválido');
-  iso(river.observedAt, 'snapshot.river.observedAt'); iso(river.fetchedAt, 'snapshot.river.fetchedAt'); iso(river.validUntil, 'snapshot.river.validUntil'); text(river.sourceId, 'snapshot.river.sourceId', 160); points(river.points, 'snapshot.river.points'); thresholds(river.thresholds, 'snapshot.river.thresholds'); forecasts(river.forecastPoints, 'snapshot.river.forecastPoints');
+  iso(river.observedAt, 'snapshot.river.observedAt'); iso(river.fetchedAt, 'snapshot.river.fetchedAt'); iso(river.validUntil, 'snapshot.river.validUntil'); text(river.sourceId, 'snapshot.river.sourceId', 160); points(river.points, 'snapshot.river.points', generatedAt); thresholds(river.thresholds, 'snapshot.river.thresholds'); forecasts(river.forecastPoints, 'snapshot.river.forecastPoints');
   if (river.systemId !== undefined && systems.length && !systemIds.has(String(river.systemId))) throw new TypeError('snapshot.river.systemId no corresponde a un sistema');
   if (river.available === true && !sourceIds.has(String(river.sourceId))) throw new TypeError('snapshot.river.sourceId no corresponde a una fuente');
 

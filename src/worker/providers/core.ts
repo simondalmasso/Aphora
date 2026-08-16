@@ -1,5 +1,5 @@
 export type ProviderStatus = 'FRESH' | 'STALE' | 'UNAVAILABLE';
-export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'CIRCUIT_OPEN' | 'NETWORK' | 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE' | 'CREDENTIAL_REQUIRED' | null;
+export type ProviderErrorClass = 'TIMEOUT' | 'HTTP' | 'CONTENT_TYPE' | 'BODY_TOO_LARGE' | 'PARSE' | 'ALLOWLIST' | 'REDIRECT' | 'FUTURE_TIMESTAMP' | 'CIRCUIT_OPEN' | 'NETWORK' | 'OFFICIAL_MACHINE_ENDPOINT_NOT_AVAILABLE' | 'CREDENTIAL_REQUIRED' | null;
 
 export interface ParsedProvider<T> { readonly value: T; readonly observedAt: string }
 export interface ProviderPolicy {
@@ -41,6 +41,7 @@ const DEFAULT_FRESH_MS = 15 * 60_000;
 const DEFAULT_STALE_MS = 48 * 60 * 60_000;
 const CIRCUIT_FAILURES = 3;
 const CIRCUIT_OPEN_MS = 5 * 60_000;
+const FUTURE_TOLERANCE_MS = 5 * 60_000;
 const health = new Map<string, ProviderHealth>();
 
 function defaultCircuit(): CircuitState { return { failures: 0, lastSuccessAt: null, lastObservedAt: null, errorClass: null, openUntil: null }; }
@@ -51,6 +52,8 @@ function cacheApi(): Cache | null {
 function classify(error: unknown): ProviderErrorClass {
   const message = error instanceof Error ? error.message : '';
   if (message.includes('ALLOWLIST')) return 'ALLOWLIST';
+  if (message.includes('REDIRECT')) return 'REDIRECT';
+  if (message.includes('FUTURE_TIMESTAMP')) return 'FUTURE_TIMESTAMP';
   if (message.includes('TIMEOUT') || message.includes('AbortError')) return 'TIMEOUT';
   if (message.includes('HTTP_')) return 'HTTP';
   if (message.includes('CONTENT_TYPE')) return 'CONTENT_TYPE';
@@ -133,7 +136,9 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
   const freshMs = policy.freshMs ?? DEFAULT_FRESH_MS;
   const refreshMs = policy.refreshMs ?? freshMs;
   const staleMs = policy.staleMs ?? DEFAULT_STALE_MS;
-  if (cached && cachedAge <= refreshMs) {
+  if (cached && Date.parse(cached.observedAt) > now.getTime() + FUTURE_TOLERANCE_MS) {
+    await cacheWrite(payloadKey, { value: cached.value, fetchedAt: cached.fetchedAt, observedAt: new Date(0).toISOString() }, 1);
+  } else if (cached && cachedAge <= refreshMs) {
     const observationStatus: ProviderStatus = now.getTime() - Date.parse(cached.observedAt) <= freshMs ? 'FRESH' : 'STALE';
     const result: ProviderResult<T> = { value: cached.value, status: observationStatus, fetchedAt: cached.fetchedAt, observedAt: cached.observedAt, errorClass: null, fromCache: true };
     publishHealth(policy, result, circuit);
@@ -149,7 +154,15 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error('PROVIDER_TIMEOUT')), policy.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { signal: controller.signal, headers: { Accept: policy.contentTypes.join(', ') } });
+    const requestInit: RequestInit = { signal: controller.signal, redirect: 'manual', headers: { Accept: policy.contentTypes.join(', ') } };
+    let response = await fetch(url, requestInit);
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get('Location');
+      if (!location) throw new Error('PROVIDER_REDIRECT_MISSING_LOCATION');
+      const redirected = allowedUrl(new URL(location, url).toString(), policy);
+      response = await fetch(redirected, requestInit);
+      if ([301, 302, 303, 307, 308].includes(response.status)) throw new Error('PROVIDER_REDIRECT_CHAIN_REJECTED');
+    }
     if (!response.ok) throw new Error(`PROVIDER_HTTP_${response.status}`);
     const contentType = (response.headers.get('Content-Type') ?? '').toLowerCase();
     if (!policy.contentTypes.some((item) => contentType.includes(item.toLowerCase().split(';')[0]!))) throw new Error('PROVIDER_CONTENT_TYPE_REJECTED');
@@ -157,6 +170,7 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
     let parsed: ParsedProvider<T>;
     try { parsed = parse(body, contentType); } catch { throw new Error('PROVIDER_PARSE_FAILED'); }
     if (!Number.isFinite(Date.parse(parsed.observedAt))) throw new Error('PROVIDER_PARSE_FAILED');
+    if (Date.parse(parsed.observedAt) > now.getTime() + FUTURE_TOLERANCE_MS) throw new Error('PROVIDER_FUTURE_TIMESTAMP');
     const fetchedAt = new Date().toISOString();
     const stored: CachedProvider<T> = { value: parsed.value, fetchedAt, observedAt: new Date(parsed.observedAt).toISOString() };
     await cacheWrite(payloadKey, stored, Math.ceil(staleMs / 1000));

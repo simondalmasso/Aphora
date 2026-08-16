@@ -1,4 +1,5 @@
-import type { HydrologicalSystem, RiverPoint, RiverThreshold } from './snapshot.ts';
+import type { HydrologicalSystem, RiverThreshold } from './snapshot.ts';
+import { temporalDelta } from './temporal-series.ts';
 
 export type HydrometricReferenceKind =
   | 'OFFICIAL_HYDROLOGIC_CONDITION'
@@ -167,6 +168,16 @@ export function meaningForSystem(system: HydrologicalSystem): HydrometricMeaning
   }
   const references = referencesForSystem(system);
   const alert = references.find((reference) => reference.kind === 'OFFICIAL_PROTECTION_THRESHOLD' && reference.label.includes('alerta') && reference.metres !== null);
+  const statistical = references.find((reference) => reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' && reference.metres !== null);
+  const alertReached = alert?.metres !== null && alert?.metres !== undefined && system.currentMetres >= alert.metres;
+  if (statistical?.metres !== null && statistical?.metres !== undefined && !alertReached) {
+    const difference = system.currentMetres - statistical.metres;
+    return Object.freeze({
+      headline: `${formatMetres(Math.abs(difference))} ${difference >= 0 ? 'por encima' : 'por debajo'} de la ${statistical.label.toLowerCase()} · ${formatMetres(statistical.metres)}`,
+      detail: statistical.period ? `Referencia estadística oficial · período ${statistical.period}.` : 'Referencia estadística oficial de esta estación.',
+      reference: statistical,
+    });
+  }
   if (alert?.metres !== null && alert?.metres !== undefined) {
     const difference = system.currentMetres - alert.metres;
     const amount = formatMetres(Math.abs(difference));
@@ -181,15 +192,6 @@ export function meaningForSystem(system: HydrologicalSystem): HydrometricMeaning
       headline: `${amount} ${difference < 0 ? 'por debajo' : 'por encima'} del nivel de alerta de referencia · ${formatMetres(alert.metres)}`,
       detail: difference > 0 ? 'Superar el umbral no equivale por sí solo a una orden oficial.' : null,
       reference: alert,
-    });
-  }
-  const statistical = references.find((reference) => reference.kind === 'OFFICIAL_STATISTICAL_REFERENCE' && reference.metres !== null);
-  if (statistical?.metres !== null && statistical?.metres !== undefined) {
-    const difference = system.currentMetres - statistical.metres;
-    return Object.freeze({
-      headline: `${formatMetres(Math.abs(difference))} ${difference >= 0 ? 'por encima' : 'por debajo'} de la ${statistical.label.toLowerCase()} · ${formatMetres(statistical.metres)}`,
-      detail: statistical.period ? `Referencia estadística oficial · período ${statistical.period}.` : 'Referencia estadística oficial de esta estación.',
-      reference: statistical,
     });
   }
   return Object.freeze({
@@ -215,25 +217,9 @@ export function stationDatumExplanation(system: HydrologicalSystem): string {
     ?? 'La altura se interpreta en la escala de su propia estación. SOS-SF no asume que sea profundidad total del río ni que comparta cero con otras estaciones.';
 }
 
-function median(values: readonly number[]): number {
-  if (!values.length) return 60 * 60_000;
-  const ordered = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(ordered.length / 2);
-  return ordered.length % 2 === 1 ? ordered[middle]! : (ordered[middle - 1]! + ordered[middle]!) / 2;
-}
-
-export function deltaAtHours(points: readonly RiverPoint[], hours: number): number | null {
-  const usable = points.filter((point) => point.measured && Number.isFinite(point.metres) && Number.isFinite(Date.parse(point.at)));
-  const latest = usable.at(-1);
-  if (!latest || hours <= 0) return null;
-  const target = Date.parse(latest.at) - hours * 3_600_000;
-  const previous = [...usable].reverse().find((point) => Date.parse(point.at) <= target);
-  if (!previous) return null;
-  const intervals = usable.slice(1).map((point, index) => Date.parse(point.at) - Date.parse(usable[index]!.at)).filter((value) => value > 0);
-  const typicalInterval = median(intervals);
-  const tolerance = Math.max(6 * 3_600_000, typicalInterval * 3, hours >= 168 ? 24 * 3_600_000 : hours >= 72 ? 12 * 3_600_000 : 6 * 3_600_000);
-  if (target - Date.parse(previous.at) > tolerance) return null;
-  return latest.metres - previous.metres;
+export function deltaAtHours(points: HydrologicalSystem['points'], hours: number, now?: Date | string): number | null {
+  const anchor = now ?? points.at(-1)?.at ?? new Date().toISOString();
+  return temporalDelta(points, hours, anchor).value;
 }
 
 export function changeCopy(value: number | null, hours: 24 | 72 | 168): string {
@@ -245,6 +231,8 @@ export function changeCopy(value: number | null, hours: 24 | 72 | 168): string {
 }
 
 export function changeForSystem(system: HydrologicalSystem, hours: 24 | 72 | 168): number | null {
-  if (hours === 24 && system.delta24h !== null) return system.delta24h;
-  return deltaAtHours(system.points, hours);
+  if (hours === 24) return system.delta24h;
+  if (hours === 72 && system.delta72h !== undefined) return system.delta72h;
+  if (hours === 168 && system.delta7d !== undefined) return system.delta7d;
+  return deltaAtHours(system.points, hours, system.observedAt ?? undefined);
 }

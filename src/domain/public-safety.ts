@@ -1,4 +1,5 @@
 import type { AlertVerificationState, DataStatus, FeedClassification, FreshnessState, HydrologicalSystem, OfficialAlert, Source, TimelineEvent } from './snapshot.ts';
+import { CLOCK_SKEW_TOLERANCE_MS, isObservationTimestampUsable } from './temporal-series.ts';
 
 export const LOCAL_TIME_ZONE = 'America/Argentina/Cordoba';
 const EARLIEST_PUBLIC_TIMESTAMP = Date.UTC(2000, 0, 1);
@@ -10,7 +11,7 @@ export function isPublicTimestamp(value: string | null | undefined): value is st
 }
 
 export function freshnessFor(observedAt: string | null | undefined, now: Date, delayedMs: number, staleMs: number): FreshnessState {
-  if (!observedAt || !Number.isFinite(Date.parse(observedAt))) return 'NO_DISPONIBLE';
+  if (!observedAt || !Number.isFinite(Date.parse(observedAt)) || !isObservationTimestampUsable(observedAt, now)) return 'NO_DISPONIBLE';
   const age = Math.max(0, now.getTime() - Date.parse(observedAt));
   if (age <= delayedMs) return 'ACTUALIZADO';
   if (age <= staleMs) return 'ACTUALIZACION_DEMORADA';
@@ -89,7 +90,10 @@ export function formatLocalDateTime(value: string | null | undefined): string {
 
 export function ageMinutes(value: string | null | undefined, now: string): number | null {
   if (!isPublicTimestamp(value) || !isPublicTimestamp(now)) return null;
-  return Math.max(0, Math.floor((Date.parse(now) - Date.parse(value)) / 60_000));
+  const valueTime = Date.parse(value);
+  const nowTime = Date.parse(now);
+  if (valueTime > nowTime + CLOCK_SKEW_TOLERANCE_MS) return null;
+  return Math.max(0, Math.floor((nowTime - valueTime) / 60_000));
 }
 
 export function formatHumanAge(value: string | null | undefined, now: string): string {

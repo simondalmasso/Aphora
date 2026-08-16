@@ -24,6 +24,8 @@ function unavailableSystem(id: string, label: string, watercourse: string, stati
     delta1h: null,
     delta6h: null,
     delta24h: null,
+    delta72h: null,
+    delta7d: null,
   });
 }
 
@@ -57,10 +59,10 @@ export const unavailableSnapshot: Snapshot = Object.freeze({
     available: false,
     dataStatus: 'UNAVAILABLE',
     stationName: 'Santa Fe',
-    currentMetres: 0,
-    delta1h: 0,
-    delta6h: 0,
-    delta24h: 0,
+    currentMetres: null,
+    delta1h: null,
+    delta6h: null,
+    delta24h: null,
     trend: 'UNKNOWN',
     observedAt: REFERENCE_AT,
     fetchedAt: REFERENCE_AT,
