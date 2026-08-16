@@ -1,0 +1,398 @@
+name: order-028-product-apply
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-product-apply.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+          fetch-depth: 0
+      - name: Guard 028 authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main arq/visual-dashboard-v3 --quiet
+          test "$(git rev-parse origin/main)" = "45047d1c1e16941ea37967d67307d0ab17e85fad"
+          git merge-base --is-ancestor 1d2126616bf7cf8580ab53a26557f41a5914bd18 HEAD
+          test -f src/domain/flood-situation.ts
+          test -f src/domain/temporal-series.ts
+      - name: Add local map dependency
+        run: |
+          set -euo pipefail
+          npm install --save-exact leaflet@1.9.4
+          npm install --save-dev --save-exact @types/leaflet@1.9.20
+      - name: Apply 028 product foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p src/client/features/situation
+          cat > src/domain/essential-contacts.ts <<'EOF'
+          export interface EssentialContact {
+            readonly id: string;
+            readonly label: string;
+            readonly number: string;
+            readonly href: string;
+            readonly purpose: string;
+          }
+
+          export const ESSENTIAL_CONTACTS: readonly EssentialContact[] = Object.freeze([
+            Object.freeze({ id: 'emergency-911', label: 'Emergencias', number: '911', href: 'tel:911', purpose: 'Peligro inmediato' }),
+            Object.freeze({ id: 'civil-protection-103', label: 'COBEM / Protección Civil', number: '103', href: 'tel:103', purpose: 'Asistencia y coordinación local' }),
+            Object.freeze({ id: 'medical-107', label: 'Emergencias médicas', number: '107', href: 'tel:107', purpose: 'Urgencia médica' }),
+          ]);
+          EOF
+
+          cat > src/client/features/situation/SituationMapGate.tsx <<'EOF'
+          import { lazy, Suspense, useState } from 'react';
+          import type { Snapshot } from '../../../domain/snapshot.ts';
+
+          const SituationMap = lazy(() => import('./SituationMap.tsx'));
+
+          export function SituationMapGate({ snapshot }: { readonly snapshot: Snapshot }) {
+            const [open, setOpen] = useState(false);
+            return <section className="situation-map-gate" aria-labelledby="situation-map-title" data-testid="situation-map-gate">
+              <div className="situation-map-gate__copy">
+                <span>Contexto territorial</span>
+                <h3 id="situation-map-title">Mapa oficial, cuando lo necesitás</h3>
+                <p>Estaciones y áreas oficiales de riesgo hídrico. El mapa no representa zonas inundadas en tiempo real.</p>
+              </div>
+              {!open && <button type="button" onClick={() => setOpen(true)} data-testid="open-situation-map">Abrir mapa</button>}
+              {open && <Suspense fallback={<div className="situation-map-loading" role="status">Cargando mapa oficial…</div>}><SituationMap snapshot={snapshot}/></Suspense>}
+            </section>;
+          }
+          EOF
+
+          cat > src/client/features/situation/SituationMap.tsx <<'EOF'
+          import { useEffect, useMemo, useRef, useState } from 'react';
+          import L from 'leaflet';
+          import 'leaflet/dist/leaflet.css';
+          import type { HydrologicalSystem, Snapshot } from '../../../domain/snapshot.ts';
+          import { formatHumanAge } from '../../../domain/public-safety.ts';
+
+          const ARGENMAP_TMS = 'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{y}.png';
+          const IDESF_WMS = 'https://aswe.santafe.gov.ar/idesf/wms';
+          const IDESF_RISK_LAYER = 'areas_de_riesgo_hidrico';
+          const STATION_COORDS: Readonly<Record<string, readonly [number, number]>> = Object.freeze({
+            'parana-santa-fe': Object.freeze([-31.6505, -60.7012]),
+            'salado-santo-tome': Object.freeze([-31.6688, -60.7654]),
+          });
+
+          function level(system: HydrologicalSystem): string {
+            return system.currentMetres === null ? 'Sin lectura utilizable' : `${system.currentMetres.toFixed(2).replace('.', ',')} m`;
+          }
+          function trend(system: HydrologicalSystem): string {
+            if (system.trend === 'RISING') return 'subiendo';
+            if (system.trend === 'RISING_SLOWLY') return 'subiendo lentamente';
+            if (system.trend === 'FALLING') return 'bajando';
+            if (system.trend === 'STABLE') return 'estable';
+            return 'sin tendencia suficiente';
+          }
+          function freshness(system: HydrologicalSystem): string {
+            if (system.freshness === 'ACTUALIZADO') return 'al día';
+            if (system.freshness === 'ACTUALIZACION_DEMORADA') return 'con demora';
+            if (system.freshness === 'DESACTUALIZADO') return 'desactualizada';
+            return 'sin vigencia confirmada';
+          }
+          function escapeHtml(value: string): string {
+            return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[character]!);
+          }
+
+          export default function SituationMap({ snapshot }: { readonly snapshot: Snapshot }) {
+            const mapNode = useRef<HTMLDivElement>(null);
+            const [riskLayerState, setRiskLayerState] = useState<'LOADING' | 'READY' | 'UNAVAILABLE'>('LOADING');
+            const systems = useMemo(() => (snapshot.systems ?? []).filter((system) => STATION_COORDS[system.id]), [snapshot.systems]);
+
+            useEffect(() => {
+              if (!mapNode.current) return;
+              const map = L.map(mapNode.current, { center: [-31.66, -60.735], zoom: 11, keyboard: true, zoomControl: true, attributionControl: true });
+              L.tileLayer(ARGENMAP_TMS, {
+                tms: true,
+                maxZoom: 18,
+                minZoom: 5,
+                attribution: 'Instituto Geográfico Nacional + OpenStreetMap',
+                crossOrigin: true,
+              }).addTo(map);
+
+              systems.forEach((system) => {
+                const [lat, lng] = STATION_COORDS[system.id]!;
+                const source = snapshot.sources.find((item) => item.id === system.sourceId);
+                const marker = L.circleMarker([lat, lng], { radius: 8, weight: 3, fillOpacity: .86, keyboard: true }).addTo(map);
+                marker.bindTooltip(`${system.watercourse} · ${system.stationName}`, { direction: 'top' });
+                marker.bindPopup(`<strong>${escapeHtml(system.watercourse)} · Estación ${escapeHtml(system.stationName)}</strong><br>${escapeHtml(level(system))} · ${escapeHtml(trend(system))}<br>Vigencia: ${escapeHtml(freshness(system))}<br>Fuente: ${escapeHtml(source?.organizationName ?? system.sourceName)}<br><small>Referencia cartográfica aproximada; la medición se identifica por estación/serie, no por esta coordenada.</small>`);
+              });
+
+              const risk = L.tileLayer.wms(IDESF_WMS, {
+                layers: IDESF_RISK_LAYER,
+                format: 'image/png',
+                transparent: true,
+                version: '1.1.1',
+                attribution: 'IDESF · Gobierno de Santa Fe',
+                opacity: .42,
+              });
+              let settled = false;
+              const ready = () => { settled = true; setRiskLayerState('READY'); };
+              const unavailable = () => {
+                if (settled) return;
+                settled = true;
+                setRiskLayerState('UNAVAILABLE');
+                if (map.hasLayer(risk)) map.removeLayer(risk);
+              };
+              risk.once('load', ready);
+              risk.on('tileerror', unavailable);
+              risk.addTo(map);
+              const timer = window.setTimeout(unavailable, 8_000);
+              requestAnimationFrame(() => map.invalidateSize());
+              return () => { window.clearTimeout(timer); risk.off(); map.remove(); };
+            }, [snapshot.sources, systems]);
+
+            return <div className="situation-map-shell" data-testid="situation-map">
+              <div ref={mapNode} className="situation-map-canvas" role="region" aria-label="Mapa de contexto hídrico de Santa Fe" tabIndex={0}/>
+              <div className="situation-map-status" aria-live="polite">
+                {riskLayerState === 'LOADING' && <span>Verificando capa de riesgo hídrico IDESF…</span>}
+                {riskLayerState === 'READY' && <span>Capa IDESF activa · contexto territorial oficial estático.</span>}
+                {riskLayerState === 'UNAVAILABLE' && <span>La capa IDESF no respondió a tiempo. La hidrometría sigue disponible sin inferir riesgo territorial.</span>}
+              </div>
+              <div className="situation-map-list" aria-label="Equivalente textual del mapa">
+                <h4>Lo que muestra el mapa</h4>
+                <p><strong>Área oficial de riesgo hídrico · IDESF.</strong> Contexto territorial estático. No representa una zona inundada ahora.</p>
+                {systems.map((system) => <article key={system.id}>
+                  <strong>{system.watercourse} · Estación {system.stationName}</strong>
+                  <span>{level(system)} · {trend(system)} · {freshness(system)}</span>
+                  <small>Medición · {formatHumanAge(system.observedAt, snapshot.generatedAt)} · Fuente {snapshot.sources.find((item) => item.id === system.sourceId)?.organizationName ?? system.sourceName}</small>
+                </article>)}
+                <small>Base: Argenmap · Instituto Geográfico Nacional + OpenStreetMap. Riesgo hídrico: IDESF · Gobierno de Santa Fe.</small>
+              </div>
+            </div>;
+          }
+          EOF
+
+          cat > src/client/features/situation/FloodSituationPanel.tsx <<'EOF'
+          import { deriveFloodSituation } from '../../../domain/flood-situation.ts';
+          import { ESSENTIAL_CONTACTS } from '../../../domain/essential-contacts.ts';
+          import type { Snapshot } from '../../../domain/snapshot.ts';
+          import { formatHumanAge } from '../../../domain/public-safety.ts';
+          import { SituationMapGate } from './SituationMapGate.tsx';
+
+          const SIGNAL_LABELS = Object.freeze({
+            OFFICIAL_HYDROMETRIC_OBSERVATION: 'Hidrometría oficial',
+            OFFICIAL_PROTECTION_REFERENCE_REACHED: 'Referencia de protección alcanzada',
+            RAPID_CHANGE_OBSERVED: 'Cambio observado',
+            OFFICIAL_WEATHER_ALERT: 'Alerta meteorológica oficial',
+            OFFICIAL_FLOOD_OR_CIVIL_PROTECTION_ALERT: 'Alerta hídrica oficial',
+            MODEL_FLOOD_SIGNAL: 'Modelo suplementario',
+            HEAVY_RAIN_CONTEXT: 'Lluvia en contexto',
+            OFFICIAL_RISK_AREA_CONTEXT: 'Riesgo territorial oficial',
+            SOURCE_DEGRADED: 'Verificación limitada',
+            COMMUNITY_REPORT_CONTEXT: 'Reporte comunitario',
+          });
+
+          export function FloodSituationPanel({ snapshot }: { readonly snapshot: Snapshot }) {
+            const decision = deriveFloodSituation(snapshot);
+            const relevant = decision.state !== 'ROUTINE';
+            const activeSignals = decision.signals.filter((signal) => signal.active && signal.kind !== 'OFFICIAL_HYDROMETRIC_OBSERVATION');
+            return <section className={`flood-situation flood-situation--${decision.state.toLowerCase()}`} data-testid="flood-situation" data-flood-state={decision.state} aria-labelledby="flood-situation-title">
+              <header className="flood-situation__header">
+                <div><span className="section-kicker">Situación de inundación</span><h2 id="flood-situation-title">{decision.displayLabel}</h2><p>{decision.explanation}</p></div>
+                <span className="flood-situation__truth">Sin inferir emergencia</span>
+              </header>
+              {activeSignals.length > 0 && <details className="flood-situation__signals">
+                <summary>Por qué se muestra así</summary>
+                <div>{activeSignals.map((signal) => <article key={signal.id} data-signal-kind={signal.kind}>
+                  <strong>{SIGNAL_LABELS[signal.kind]}</strong>
+                  <p>{signal.explanation}</p>
+                  <small>{signal.organization} · {signal.observedAt ? `observado ${formatHumanAge(signal.observedAt, snapshot.generatedAt)}` : 'sin hora de observación'} · {signal.sourceRole.replaceAll('_', ' ').toLowerCase()}</small>
+                </article>)}</div>
+              </details>}
+              {relevant && <details className="flood-situation__guidance">
+                <summary>Qué conviene hacer con esta información</summary>
+                <ol>
+                  <li>Revisá la medición y su vigencia antes de comparar valores.</li>
+                  <li>Si hay una alerta oficial, seguí sus indicaciones y área de aplicación.</li>
+                  <li>El mapa de riesgo territorial es contexto estático: no confirma una calle inundada ahora.</li>
+                </ol>
+                <div className="flood-situation__contacts">{ESSENTIAL_CONTACTS.slice(0, 2).map((contact) => <a key={contact.id} href={contact.href}><span>{contact.label}</span><strong>{contact.number}</strong></a>)}</div>
+              </details>}
+              <SituationMapGate snapshot={snapshot}/>
+            </section>;
+          }
+          EOF
+
+          cat > src/client/styles/flood-intelligence-028.css <<'EOF'
+          .flood-situation{margin:clamp(14px,3vw,28px) auto 0;max-width:1180px;padding:0 clamp(14px,3vw,28px);color:var(--ink,#10232f)}
+          .flood-situation__header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px 0 14px;border-top:1px solid color-mix(in srgb,currentColor 12%,transparent)}
+          .flood-situation__header h2{margin:.2rem 0 .35rem;font-size:clamp(1.28rem,3vw,1.7rem);letter-spacing:-.025em}.flood-situation__header p{margin:0;max-width:66ch;color:var(--muted,#5f6f78);line-height:1.5}
+          .flood-situation__truth{flex:0 0 auto;font-size:.78rem;font-weight:750;padding:7px 10px;border-radius:999px;background:color-mix(in srgb,currentColor 6%,transparent)}
+          .flood-situation__signals,.flood-situation__guidance{border-top:1px solid color-mix(in srgb,currentColor 10%,transparent);padding:10px 0}.flood-situation summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:760}
+          .flood-situation__signals>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px;padding:4px 0 10px}.flood-situation__signals article{padding:13px;border-radius:14px;background:color-mix(in srgb,currentColor 4%,transparent)}.flood-situation__signals p{margin:.35rem 0;font-size:.92rem;line-height:1.45}.flood-situation__signals small{color:var(--muted,#66757c)}
+          .flood-situation__guidance ol{padding-left:1.25rem;line-height:1.55}.flood-situation__contacts{display:flex;flex-wrap:wrap;gap:10px}.flood-situation__contacts a{min-height:44px;display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:12px;text-decoration:none;color:inherit}.flood-situation__contacts strong{font-size:1.1rem}
+          .situation-map-gate{margin:8px 0 18px;padding:16px;border-radius:18px;background:color-mix(in srgb,currentColor 3.5%,transparent);border:1px solid color-mix(in srgb,currentColor 9%,transparent)}.situation-map-gate__copy h3{margin:.2rem 0 .35rem;font-size:1.05rem}.situation-map-gate__copy p{margin:0;color:var(--muted,#66757c);line-height:1.45}.situation-map-gate__copy>span{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.situation-map-gate>button{margin-top:12px;min-height:44px;padding:0 16px;border-radius:12px;border:0;font-weight:800;cursor:pointer}.situation-map-loading{padding:18px 0}
+          .situation-map-shell{margin-top:14px}.situation-map-canvas{height:min(56vh,460px);min-height:300px;border-radius:14px;overflow:hidden;background:#e9eef0;outline-offset:3px}.situation-map-status{min-height:32px;padding:8px 2px;font-size:.8rem;color:var(--muted,#66757c)}.situation-map-list{display:grid;gap:8px;padding-top:8px}.situation-map-list h4,.situation-map-list p{margin:0}.situation-map-list article{display:grid;gap:2px;padding:10px 0;border-top:1px solid color-mix(in srgb,currentColor 8%,transparent)}.situation-map-list small{color:var(--muted,#66757c)}
+          .leaflet-container{font-family:inherit}.leaflet-control-attribution{font-size:10px!important}
+          @media(max-width:560px){.flood-situation__header{display:grid}.flood-situation__truth{justify-self:start}.situation-map-canvas{min-height:280px}.flood-situation{padding:0 14px}.situation-map-gate{border-radius:15px}}
+          @media(prefers-reduced-motion:reduce){.situation-map-gate *,.flood-situation *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+          EOF
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          p=Path('src/client/app/DashboardPage.tsx'); s=p.read_text()
+          s=s.replace("import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';", "import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';\nimport { FloodSituationPanel } from '../features/situation/FloodSituationPanel.tsx';")
+          s=s.replace("    />\n    <ContextDiscovery/>", "    />\n    <FloodSituationPanel snapshot={props.snapshot}/>\n    <ContextDiscovery/>",1)
+          p.write_text(s)
+
+          p=Path('src/client/App.tsx'); s=p.read_text()
+          s=s.replace("import './styles/smooth-civic-027.css';", "import './styles/smooth-civic-027.css';\nimport './styles/flood-intelligence-028.css';")
+          p.write_text(s)
+
+          p=Path('src/client/features/hydro/HydrometricMonitoring.tsx'); s=p.read_text()
+          s=s.replace("<span className=\"context-scale__legend-current\"><i/>Ahora · {formatLevel(system)}</span>", "<span className=\"context-scale__legend-current\"><i/>Última medición · {formatLevel(system)}</span>")
+          old="""  const [selection, setSelection] = useState(() => ({ snapshotId: snapshot.id, id: operationalDefaultId ?? '' }));\n  const requestedId = selection.snapshotId === snapshot.id ? selection.id : operationalDefaultId ?? '';\n  const validSelectedId = systems.some((system) => system.id === requestedId) ? requestedId : operationalDefaultId ?? systems[0]?.id ?? '';"""
+          new="""  const [selectedId, setSelectedId] = useState(() => operationalDefaultId ?? '');\n  const validSelectedId = systems.some((system) => system.id === selectedId) ? selectedId : operationalDefaultId ?? systems[0]?.id ?? '';"""
+          if old not in s: raise SystemExit('selection contract marker missing')
+          s=s.replace(old,new,1)
+          s=s.replace("onSelect={(id) => setSelection({ snapshotId: snapshot.id, id })}", "onSelect={setSelectedId}")
+          p.write_text(s)
+
+          p=Path('src/client/features/rain/RainContext.tsx'); s=p.read_text()
+          s=s.replace("  const usableRate = source?.connected === true && typeof rate === 'number' && Number.isFinite(rate) && rate >= 0;", "  const usableRate = source?.connected === true && source.freshness === 'ACTUALIZADO' && typeof rate === 'number' && Number.isFinite(rate) && rate >= 0 && Boolean(source.validUntil) && Date.parse(source.validUntil!) >= Date.parse(snapshot.generatedAt);")
+          s=s.replace("'Estimación satelital instantánea · NASA IMERG Early'", "'Estimación satelital reciente · NASA IMERG Early'")
+          s=s.replace("const observedAge = source?.connected ?", "const observedAge = usableRate ?")
+          s=s.replace("const fetchedAge = source?.connected ?", "const fetchedAge = usableRate ?")
+          p.write_text(s)
+
+          p=Path('src/client/components/ui/HydroSeriesChart.tsx'); s=p.read_text()
+          s=s.replace("import { formatHumanAge, formatLocalDateTime, isPublicTimestamp, LOCAL_TIME_ZONE } from '../../../domain/public-safety.ts';", "import { formatHumanAge, formatLocalDateTime, LOCAL_TIME_ZONE } from '../../../domain/public-safety.ts';\nimport { hasTemporalCoverage, strictTimeWindow, sanitizeMeasuredRiverPoints } from '../../../domain/temporal-series.ts';")
+          start=s.index('function shortDate(value: string): string {')
+          end=s.index('\nfunction median(',start)
+          s=s[:start]+"""function axisLabel(value: string, hours: WindowHours): string {\n  const date = new Date(value);\n  if (hours === 24) return new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: LOCAL_TIME_ZONE }).format(date);\n  if (hours === 72) return new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: '2-digit', hour: '2-digit', hour12: false, timeZone: LOCAL_TIME_ZONE }).format(date);\n  return new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: LOCAL_TIME_ZONE }).format(date);\n}\n"""+s[end:]
+          old="""  const allPoints = useMemo(() => system.points\n    .filter((point) => Number.isFinite(point.metres) && isPublicTimestamp(point.at)), [system.points]);\n  const safeThresholds = useMemo(() => safeStationThresholds(system), [system]);\n  const latestTime = allPoints.length ? Date.parse(allPoints.at(-1)!.at) : 0;\n  const availableSpanHours = allPoints.length > 1 ? (latestTime - Date.parse(allPoints[0]!.at)) / 3_600_000 : 0;\n  const points = useMemo(() => {\n    if (!allPoints.length) return [];\n    const start = latestTime - windowHours * 3_600_000;\n    const selected = allPoints.filter((point) => Date.parse(point.at) >= start);\n    return selected.length >= 2 ? selected : allPoints.slice(-Math.min(48, allPoints.length));\n  }, [allPoints, latestTime, windowHours]);"""
+          new="""  const allPoints = useMemo(() => [...sanitizeMeasuredRiverPoints(system.points, generatedAt)], [system.points, generatedAt]);\n  const safeThresholds = useMemo(() => safeStationThresholds(system), [system]);\n  const windowResult = useMemo(() => strictTimeWindow(allPoints, windowHours, generatedAt), [allPoints, windowHours, generatedAt]);\n  const points = useMemo(() => windowResult.sufficient ? [...windowResult.points] : [], [windowResult]);"""
+          if old not in s: raise SystemExit('chart window marker missing')
+          s=s.replace(old,new,1)
+          # Replace early unavailable block with one that preserves period controls and tells truth.
+          old2="""  if (!geometry || points.length < 2) {\n    return <div className=\"hydro-chart hydro-chart--unavailable hydro-chart--product\" data-testid=\"main-hydro-chart\">\n      <div className=\"hydro-chart__empty-icon\" aria-hidden=\"true\">∿</div>\n      <strong>Serie reciente no disponible</strong>\n      <span>Última observación · {formatLocalDateTime(system.observedAt)}</span>\n      <span>{freshnessLabel(system)}</span>\n    </div>;\n  }"""
+          new2="""  if (!geometry || points.length < 2) {\n    return <div className=\"hydro-chart hydro-chart--unavailable hydro-chart--product\" data-testid=\"main-hydro-chart\" data-window-hours={windowHours} data-window-sufficient=\"false\">\n      <div className=\"hydro-chart__windows\" aria-label=\"Período del gráfico\">{WINDOWS.map((hours) => <button key={hours} type=\"button\" aria-pressed={windowHours === hours} disabled={!hasTemporalCoverage(allPoints, hours, generatedAt)} onClick={() => setWindowHours(hours)}>{labelForWindow(hours)}</button>)}</div>\n      <div className=\"hydro-chart__empty-icon\" aria-hidden=\"true\">∿</div>\n      <strong>No hay cobertura suficiente en {labelForWindow(windowHours)}</strong>\n      <span>No se completan huecos con observaciones más antiguas.</span>\n      <span>Última medición · {formatLocalDateTime(system.observedAt)} · {freshnessLabel(system)}</span>\n    </div>;\n  }"""
+          if old2 not in s: raise SystemExit('chart unavailable marker missing')
+          s=s.replace(old2,new2,1)
+          s=s.replace("disabled={availableSpanHours < Math.min(hours * .75, hours - 1)}", "disabled={!hasTemporalCoverage(allPoints, hours, generatedAt)}")
+          s=s.replace("{shortDate(tick.at)}", "{axisLabel(tick.at, windowHours)}")
+          s=s.replace("<span>Ahora</span><strong>{latest.point.metres.toFixed(2).replace('.', ',')} m</strong>", "<span>Última medición</span><strong>{latest.point.metres.toFixed(2).replace('.', ',')} m</strong>")
+          s=s.replace('data-interactive="true"', 'data-interactive="true"\n    data-window-sufficient="true"')
+          p.write_text(s)
+
+          p=Path('src/client/components/civic/MuniShell.tsx'); s=p.read_text()
+          s=s.replace("  if (href.startsWith('/#')) return currentPath === '/';", "  if (href.startsWith('/#')) return false;")
+          s=s.replace("<a href=\"/#situacion-hidrica\" aria-current={currentPath === '/' ? 'page' : undefined}", "<a href=\"/#situacion-hidrica\"")
+          p.write_text(s)
+
+          p=Path('src/client/components/civic/CivicSystem.tsx'); s=p.read_text()
+          s=s.replace("import type { HydrologicalSystem, Snapshot } from '../../../domain/snapshot.ts';", "import type { HydrologicalSystem, Snapshot } from '../../../domain/snapshot.ts';\nimport { ESSENTIAL_CONTACTS } from '../../../domain/essential-contacts.ts';")
+          s=s.replace("  { label: 'Comunicaciones', href: '/#alertas' },\n", '')
+          old="""export function EmergencyStrip() {\n  return <aside className=\"emergency-strip\" aria-label=\"Canales de emergencia\"><div><strong>Si hay peligro inmediato</strong><span>Usá los canales oficiales. SOS-SF no reemplaza una emergencia.</span></div><a href=\"tel:911\">911</a><a href=\"tel:103\">COBEM 103</a><a href=\"tel:107\">107</a></aside>;\n}"""
+          new="""export function EmergencyStrip() {\n  return <aside className=\"emergency-strip\" aria-label=\"Canales de emergencia\"><div><strong>Si hay peligro inmediato</strong><span>Usá los canales oficiales. SOS-SF no reemplaza una emergencia.</span></div>{ESSENTIAL_CONTACTS.map((contact) => <a key={contact.id} href={contact.href}>{contact.label === 'Emergencias' ? contact.number : `${contact.label} ${contact.number}`}</a>)}</aside>;\n}"""
+          if old not in s: raise SystemExit('emergency strip marker missing')
+          p.write_text(s.replace(old,new,1))
+
+          p=Path('src/worker/security.ts'); s=p.read_text()
+          s=s.replace("img-src 'self' data: blob: https://lh3.googleusercontent.com;", "img-src 'self' data: blob: https://lh3.googleusercontent.com https://wms.ign.gob.ar https://aswe.santafe.gov.ar;")
+          p.write_text(s)
+
+          p=Path('public/service-worker.js'); s=p.read_text()
+          s=s.replace("const CACHE_VERSION = 'sos-sf-public-safety-020-20260806a';", "const CACHE_VERSION = 'sos-sf-flood-intelligence-028-20260816a';")
+          s=s.replace("const PUBLIC_DATA_CACHE = `${CACHE_VERSION}-public-data`;\n", '')
+          s=s.replace("const PUBLIC_API_ALLOWLIST = new Set(['/api/snapshot', '/api/sources', '/api/messages', '/api/essential-contacts']);\n", '')
+          s=s.replace(".then((keys) => Promise.all(keys.filter((key) => key !== STATIC_CACHE && key !== PUBLIC_DATA_CACHE).map((key) => caches.delete(key))))", ".then((keys) => Promise.all(keys.filter((key) => key !== STATIC_CACHE).map((key) => caches.delete(key))))")
+          start=s.index('async function publicApiNetworkFirst(request) {')
+          end=s.index('async function privateApiNetworkOnly(request) {',start)
+          s=s[:start]+s[end:]
+          s=s.replace("event.respondWith(PUBLIC_API_ALLOWLIST.has(url.pathname) ? publicApiNetworkFirst(request) : privateApiNetworkOnly(request));", "event.respondWith(privateApiNetworkOnly(request));")
+          p.write_text(s)
+
+          p=Path('tests/unit/service-worker-policy.test.ts'); p.write_text("""import { readFile } from 'node:fs/promises';\nimport { describe, expect, it } from 'vitest';\n\ndescribe('service worker 028 offline truth policy', () => {\n  it('keeps every API request network-only and delegates last public snapshot to validated local storage', async () => {\n    const source = await readFile('public/service-worker.js', 'utf8');\n    expect(source).toContain(\"if (url.pathname.startsWith('/api/'))\");\n    expect(source).toContain('event.respondWith(privateApiNetworkOnly(request));');\n    expect(source).not.toContain('PUBLIC_DATA_CACHE');\n    expect(source).not.toContain('publicApiNetworkFirst');\n  });\n  it('never caches no-store responses or cross-origin map tiles', async () => {\n    const source = await readFile('public/service-worker.js', 'utf8');\n    expect(source).toContain(\"directive.includes('no-store')\");\n    expect(source).toContain('if (url.origin !== self.location.origin) return;');\n    expect(source).toContain(\"'Cache-Control': 'private, no-store'\");\n  });\n});\n""")
+
+          p=Path('public/manifest.webmanifest'); s=p.read_text(); s=s.replace(', "government"','').replace('"government", ',''); p.write_text(s)
+
+          p=Path('index.html'); s=p.read_text()
+          import re
+          s=re.sub(r'<title>.*?</title>', '<title>SOS SF — Ríos e inteligencia de inundaciones</title>', s)
+          s=re.sub(r'<meta name="description" content="[^"]*"', '<meta name="description" content="Información hídrica independiente para Santa Fe: Paraná y Salado, tendencias, alertas oficiales, lluvia contextual y riesgo territorial."', s)
+          p.write_text(s)
+          PY
+
+          cat > tests/unit/map-contract-028.test.ts <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          import { describe, expect, it } from 'vitest';
+          describe('028 official map contract', () => {
+            it('pins exact official endpoints and fail-closed territorial semantics', async () => {
+              const source=await readFile('src/client/features/situation/SituationMap.tsx','utf8');
+              expect(source).toContain('wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap');
+              expect(source).toContain("const IDESF_WMS = 'https://aswe.santafe.gov.ar/idesf/wms'");
+              expect(source).toContain("const IDESF_RISK_LAYER = 'areas_de_riesgo_hidrico'");
+              expect(source).toContain('No representa una zona inundada ahora');
+              expect(source).toContain("setRiskLayerState('UNAVAILABLE')");
+            });
+            it('keeps map code behind an explicit lazy gate', async () => {
+              const gate=await readFile('src/client/features/situation/SituationMapGate.tsx','utf8');
+              expect(gate).toContain("lazy(() => import('./SituationMap.tsx'))");
+              expect(gate).toContain('open && <Suspense');
+            });
+          });
+          EOF
+
+          cat > tests/unit/rain-freshness-028.test.ts <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          import { describe, expect, it } from 'vitest';
+          describe('028 rain truth UI contract',()=>{
+            it('requires connected, current source and validUntil before showing a numeric rate',async()=>{
+              const source=await readFile('src/client/features/rain/RainContext.tsx','utf8');
+              expect(source).toContain("source.freshness === 'ACTUALIZADO'");
+              expect(source).toContain("Date.parse(source.validUntil!) >= Date.parse(snapshot.generatedAt)");
+              expect(source).toContain('Sin estimación reciente');
+              expect(source).not.toContain('Estimación satelital instantánea');
+            });
+          });
+          EOF
+
+          cat > tests/unit/ui-cleanup-028.test.ts <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          import { describe, expect, it } from 'vitest';
+          describe('028 civic cleanup',()=>{
+            it('does not mark Inicio and Ríos as the same current page and removes the stale communications hash link',async()=>{
+              const shell=await readFile('src/client/components/civic/MuniShell.tsx','utf8');
+              const civic=await readFile('src/client/components/civic/CivicSystem.tsx','utf8');
+              expect(shell).toContain("if (href.startsWith('/#')) return false");
+              expect(shell).not.toContain("href=\"/#situacion-hidrica\" aria-current");
+              expect(civic).not.toContain("{ label: 'Comunicaciones', href: '/#alertas' }");
+            });
+            it('removes government manifest classification',async()=>{
+              const manifest=await readFile('public/manifest.webmanifest','utf8'); expect(manifest).not.toContain('government');
+            });
+          });
+          EOF
+      - name: Validate product tranche
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck
+          npm run lint -- --max-warnings=0
+          npm run test:unit
+          npm run test:contract
+          npm run build
+          npm run test:worker
+          npm audit --audit-level=high
+          grep -Fq 'SituationMap-' dist/.vite/manifest.json
+      - name: Commit product tranche
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name sos-sf-arq
+          git config user.email actions@users.noreply.github.com
+          git add package.json package-lock.json src public tests/unit index.html
+          git commit -m 'feat(028): add flood intelligence and lazy official map foundation [skip ci]'
+          git push origin HEAD:refs/heads/arq/visual-dashboard-v3
