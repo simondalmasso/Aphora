@@ -1,0 +1,17 @@
+name: order-028-browser-fastfail
+on:
+  push:
+    paths:
+      - '.github/workflows/order-028-browser-fastfail.yml'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arq/visual-dashboard-v3
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --max-failures=1 --workers=1
