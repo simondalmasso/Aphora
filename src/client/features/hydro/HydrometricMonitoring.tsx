@@ -209,7 +209,7 @@ export function HydrometricMonitoring({ snapshot, refreshing, sourcesButtonRef, 
         aria-labelledby="river-priority-title"
       >
         <header className="river-priority__masthead">
-          <div><p>{priority.mode === 'DUAL_EMERGENCY' ? 'Atención compartida' : 'Atención prioritaria'}</p><h2 id="river-priority-title">{priority.mode === 'DUAL_EMERGENCY' ? 'Paraná + Salado' : prioritySystems[0]?.watercourse}</h2></div>
+          <div><p>{priority.mode === 'DUAL_EMERGENCY' ? 'Atención compartida' : 'Atención prioritaria'}</p><h2 id="river-priority-title">{priority.mode === 'DUAL_EMERGENCY' ? 'Paraná y Salado requieren el mismo peso ahora' : `${prioritySystems[0]?.watercourse} requiere atención primero`}</h2></div>
           <div className="river-priority__explain"><p>{priority.mode === 'DUAL_EMERGENCY' ? 'prioridad equivalente 50/50' : 'Prioridad temporal por condición verificada.'}</p><button type="button" onClick={(event) => onSources(event.currentTarget)}>Ver por qué</button></div>
         </header>
         <div className="river-priority__grid">{prioritySystems.map((system) => <OperationalRiverPanel key={system.id} system={system} snapshot={snapshot} priority={priority}/>)}</div>

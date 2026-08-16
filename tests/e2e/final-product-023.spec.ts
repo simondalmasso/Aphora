@@ -137,7 +137,7 @@ test('mobile first viewport answers river, level, movement, recency, source and 
   await expect(page.getByRole('tab', { name: /Salado/ })).toBeVisible();
   await expect(page.getByTestId('hydro-current-level')).toContainText('3,20');
   await expect(page.getByText('Sube lentamente')).toBeVisible();
-  await expect(page.getByText(/Última medición/)).toBeVisible();
+  await expect(page.locator('.station-identification')).toContainText(/Medición ·/);
   await expect(page.getByTestId('hydro-source-strip')).toContainText('Instituto Nacional del Agua');
   await expect(page.getByRole('button', { name: 'Sin alertas oficiales', exact: true })).toBeVisible();
   await expect(page.getByTestId('main-hydro-chart')).toBeVisible();

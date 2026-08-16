@@ -173,7 +173,7 @@ test('three-second Paraná read shows level, station reference, trend, age and s
   await expect(page.getByTestId('hydro-current-level')).toContainText('3,20');
   await expect(page.getByTestId('hydro-meaning')).toContainText('por debajo del nivel de alerta de referencia');
   await expect(page.getByText('Sube lentamente', { exact: true })).toBeVisible();
-  await expect(page.getByText(/Medición de hace/)).toBeVisible();
+  await expect(page.locator('.station-identification')).toContainText(/Medición · hace/);
   await expect(page.getByTestId('hydro-source-strip')).toContainText('Instituto Nacional del Agua');
   await expect(page.getByTestId('hydro-context-scale')).toBeVisible();
   const saladoTab = page.getByRole('tab', { name: 'Salado' });

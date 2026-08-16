@@ -178,7 +178,6 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
     </header>
     <div className="hydro-chart__meta hydro-chart__meta--quiet">
       <span>Medición · {formatHumanAge(system.observedAt, generatedAt)}</span>
-      <span>{freshnessLabel(system)}</span>
     </div>
     <div className="hydro-chart__canvas-wrap">
       <svg
@@ -219,7 +218,7 @@ export function HydroSeriesChart({ system, generatedAt }: { readonly system: Hyd
       <div className="hydro-chart__now-chip" aria-hidden="true"><span>Ahora</span><strong>{latest.point.metres.toFixed(2).replace('.', ',')} m</strong></div>
     </div>
     {geometry.externalThresholds.length > 0 && <div className="hydro-chart__external-reference" aria-label="Referencias fuera de la escala reciente">
-      {geometry.externalThresholds.map((threshold) => <span key={threshold.id}><b>{threshold.label}</b>{threshold.metres.toFixed(2).replace('.', ',')} m · fuera de escala</span>)}
+      {geometry.externalThresholds.map((threshold) => <span key={threshold.id}><b>{threshold.label} </b>{threshold.metres.toFixed(2).replace('.', ',')} m · fuera de escala</span>)}
     </div>}
     <p className="hydro-chart__readout" aria-live="polite">{active ? `${formatLocalDateTime(active.point.at)}: ${active.point.metres.toFixed(2).replace('.', ',')} metros. ${qualityLabel(active.point)}.` : 'Tocá el gráfico o usá las flechas para explorar cada medición.'}</p>
     <details className="data-table-disclosure"><summary>Ver mediciones</summary><div className="table-scroll"><table><caption>Mediciones de {system.label} · {labelForWindow(windowHours)}</caption><thead><tr><th>Fecha y hora</th><th>Altura de escala</th><th>Calidad</th></tr></thead><tbody>{points.map((point) => <tr key={point.at}><td>{formatLocalDateTime(point.at)}</td><td>{point.metres.toFixed(2).replace('.', ',')} m</td><td>{qualityLabel(point)}</td></tr>)}</tbody></table></div></details>

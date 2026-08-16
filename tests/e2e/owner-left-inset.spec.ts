@@ -11,7 +11,7 @@ const selectors = [
   ['river-name', '.station-identification > div > strong'],
   ['level-label', '.hydro-level > span'],
   ['level-value', '[data-testid="hydro-current-level"]'],
-  ['observation-time', '.hydro-level time'],
+  ['observation-time', '.station-identification > div > small'],
   ['source-line', '[data-testid="hydro-source-strip"] .source-strip__copy > span:first-child'],
   ['chart', '[data-testid="main-hydro-chart"]'],
 ] as const;
