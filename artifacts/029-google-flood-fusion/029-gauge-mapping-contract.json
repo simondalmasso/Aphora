@@ -1,0 +1,13 @@
+{
+  "liveMappingStatus": "BLOCKED_EXTERNAL_CREDENTIAL",
+  "fabricatedGaugeMappings": 0,
+  "associationInputs": [
+    "WGS84 gauge coordinates",
+    "local cartographic station anchor",
+    "river/site/source metadata",
+    "distance"
+  ],
+  "rawMetreSubtractionWithoutDatumProof": false,
+  "qualityVerifiedFalse": "LOWER_CONFIDENCE",
+  "hasModelFalse": "NO_MODEL_NOT_NO_RISK"
+}

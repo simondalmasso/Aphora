@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-17T02:29:10.933Z",
+  "build": "PASS",
+  "fileCount": 17,
+  "totalDistBytes": 2414786,
+  "initialJsGzipBytes": 97090,
+  "lazyVisualJsGzipBytes": 46657,
+  "cssGzipBytes": 17940,
+  "performanceBudgets": "PASS"
+}

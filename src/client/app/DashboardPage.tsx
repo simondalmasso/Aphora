@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { lazy, Suspense, type RefObject } from 'react';
 import type { Snapshot } from '../../domain/snapshot.ts';
 import { SafetyActions } from '../features/actions/SafetyActions.tsx';
 import { VerifiedAlertBanner } from '../features/alerts/OfficialAlertPanel.tsx';
@@ -6,6 +6,8 @@ import { ContextDiscovery } from '../features/discovery/ContextDiscovery.tsx';
 import { HydrometricMonitoring } from '../features/hydro/HydrometricMonitoring.tsx';
 import { FloodSituationPanel } from '../features/situation/FloodSituationPanel.tsx';
 import { SourceTransparency } from '../features/sources/SourceTransparency.tsx';
+
+const GoogleFloodFusionPanel = lazy(() => import('../features/situation/GoogleFloodFusionPanel.tsx').then((module) => ({ default: module.GoogleFloodFusionPanel })));
 
 interface Props {
   readonly snapshot: Snapshot;
@@ -29,6 +31,7 @@ export function DashboardPage(props: Props) {
       onSources={props.onSources}
     />
     <FloodSituationPanel snapshot={props.snapshot}/>
+    <Suspense fallback={null}><GoogleFloodFusionPanel snapshot={props.snapshot}/></Suspense>
     <ContextDiscovery/>
     <SafetyActions
       snapshot={props.snapshot}

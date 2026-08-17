@@ -1,0 +1,12 @@
+{
+  "clientGoogleApiRequestsAllowed": false,
+  "userControlledUpstreamUrl": false,
+  "secretInUrl": false,
+  "secretInArtifacts": false,
+  "boundedArea": true,
+  "boundedBatch": true,
+  "boundedBody": true,
+  "circuitBreaker": true,
+  "paidServices": false,
+  "billingEnable": false
+}

@@ -1,4 +1,5 @@
 import type { CriticalMessage } from './zungun-compat/types.ts';
+import type { GoogleFloodFusion } from './google-flood.ts';
 
 export type PublicState = 'NORMAL' | 'VIGILANCIA' | 'ALERTA' | 'UMBRAL_EVACUACION_ALCANZADO' | 'EVACUACION_OFICIAL' | 'UNKNOWN';
 export type DataStatus = 'LIVE' | 'STALE' | 'UNAVAILABLE' | 'OFFLINE';
@@ -179,6 +180,7 @@ export interface Snapshot {
     readonly points: readonly RainPoint[];
   };
   readonly sources: readonly Source[];
+  readonly googleFlood?: GoogleFloodFusion;
   readonly contradictions: readonly Contradiction[];
   readonly shelters: readonly Shelter[];
   readonly actions: readonly string[];
@@ -207,6 +209,7 @@ export function compactSnapshot(snapshot: Snapshot) {
     systems: snapshot.systems,
     river: snapshot.river,
     rain: snapshot.rain,
+    googleFlood: snapshot.googleFlood,
     contradictions: snapshot.contradictions,
     shelters: snapshot.shelters,
     actions: snapshot.actions,

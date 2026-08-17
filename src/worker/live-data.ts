@@ -26,6 +26,7 @@ import { fetchInaSeries, fetchInaWaterMl } from './providers/ina.ts';
 import { fetchNasaGpm, type NasaGpmReading } from './providers/nasa.ts';
 import { fetchPortsHydrometers, type PortsHydrometerReading } from './providers/ports.ts';
 import { fetchSmnAlerts, fetchSmnObservations, type SmnAlertSummary, type SmnObservationSummary } from './providers/smn.ts';
+import { buildGoogleFloodFusion } from './google-flood-fusion.ts';
 
 export interface LiveDataEnv {
   readonly INA_WATERML_PARANA_URL?: string;
@@ -33,6 +34,7 @@ export interface LiveDataEnv {
   readonly PORTS_HYDROMETER_JSON_URL?: string;
   readonly SMN_OBSERVATIONS_JSON_URL?: string;
   readonly SMN_ALERTS_JSON_URL?: string;
+  readonly GOOGLE_FLOOD_API_KEY?: string;
 }
 
 const INA_BASE = 'https://alerta.ina.gob.ar/a5/getObservaciones';
@@ -106,6 +108,7 @@ async function configKey(env: LiveDataEnv): Promise<string> {
     ports: optionalHttpsConfigUrl(env.PORTS_HYDROMETER_JSON_URL, 'PORTS_HYDROMETER_JSON_URL') ?? null,
     smnObservations: optionalHttpsConfigUrl(env.SMN_OBSERVATIONS_JSON_URL, 'SMN_OBSERVATIONS_JSON_URL') ?? null,
     smnAlerts: optionalHttpsConfigUrl(env.SMN_ALERTS_JSON_URL, 'SMN_ALERTS_JSON_URL') ?? null,
+    googleFloodConfigured: Boolean(env.GOOGLE_FLOOD_API_KEY?.trim()),
   });
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(config)));
   return Array.from(bytes.slice(0, 12), (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -557,10 +560,15 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
 
   const [stationResults, smnAlerts, optionalSources] = await Promise.all([stationPromise, smnAlertPromise, optionalPromise]);
   const systems = Object.freeze(stationResults.map((item) => item.system));
+  const alertPreview = Object.freeze(smnAlerts.alerts.filter((alert) => alert.appliesToSantaFe));
+  const alertStatusPreview = alertVerificationState(smnAlerts.source, alertPreview);
+  const nasaPreview = optionalSources.find((source) => source.id === 'nasa-gpm-imerg-early');
+  const google = await buildGoogleFloodFusion(env.GOOGLE_FLOOD_API_KEY, systems, alertStatusPreview, nasaPreview?.connected === true, now);
   const sources = Object.freeze([
     ...stationResults.map((item) => item.source),
     ...optionalSources,
     smnAlerts.source,
+    google.source,
     ...humanVerificationSources(now),
   ]);
   const alerts = Object.freeze(smnAlerts.alerts.filter((alert) => alert.appliesToSantaFe));
@@ -581,6 +589,7 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
       timeline: timelineFor(systems, alerts, sources, now),
       serviceStatus: { worker: 'OPERATIONAL' as const, api: 'OPERATIONAL' as const, checkedAt: now.toISOString(), note: 'El servicio técnico responde; esto no prueba vigencia ni ausencia de peligro.' },
       systems,
+      ...(google.fusion ? { googleFlood: google.fusion } : {}),
       recommendedAction: alertAction(alertStatus, alerts),
     });
   }
@@ -656,6 +665,7 @@ async function buildUncached(env: LiveDataEnv, now: Date): Promise<Snapshot> {
       points: Object.freeze([]),
     }),
     sources,
+    ...(google.fusion ? { googleFlood: google.fusion } : {}),
     contradictions,
     shelters: Object.freeze([]),
     actions: Object.freeze(['Consultá la alerta oficial y su vigencia.', 'Llamá al servicio de emergencias correspondiente ante peligro inmediato.']),

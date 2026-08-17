@@ -1,0 +1,9 @@
+{
+  "productionUrl": "https://sos-sf.simondalmasso44.workers.dev/",
+  "firebaseAlias": "https://sos-sf.web.app",
+  "workerHttp": 200,
+  "healthHttp": 200,
+  "aliasHttp": 200,
+  "deployPerformed": false,
+  "reason": "GOOGLE_FLOOD_API_EXTERNAL_APPROVAL_OR_CREDENTIAL_ACCESS"
+}

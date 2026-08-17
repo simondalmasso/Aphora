@@ -210,6 +210,19 @@ export function validateSnapshot(value: unknown): Snapshot {
   if (river.systemId !== undefined && systems.length && !systemIds.has(String(river.systemId))) throw new TypeError('snapshot.river.systemId no corresponde a un sistema');
   if (river.available === true && !sourceIds.has(String(river.sourceId))) throw new TypeError('snapshot.river.sourceId no corresponde a una fuente');
 
+  if (record.googleFlood !== undefined) {
+    const f = plain(record.googleFlood, 'googleFlood');
+    if (f.schemaVersion !== '029.1' || f.license !== 'CC_BY_4_0' || (f.accessMode !== 'APPROVED_LIVE_API' && f.accessMode !== 'NOT_CONFIGURED_EXTERNAL_APPROVAL') || !Array.isArray(f.mappings) || !Array.isArray(f.signals)) throw new TypeError('googleFlood inválido');
+    iso(f.retrievedAt, 'googleFlood.retrievedAt');
+    for (const value of f.signals) {
+      const s = plain(value, 'googleFlood.signal');
+      if (s.provider !== 'GOOGLE_FLOOD_FORECASTING' || s.semanticRole !== 'SUPPLEMENTARY_MODEL_FORECAST' || s.canDetermineOfficialWarning !== false || s.canDetermineOfficialEmergency !== false) throw new TypeError('googleFlood signal inválida');
+      iso(s.issuedAt, 'googleFlood.issuedAt'); iso(s.validFrom, 'googleFlood.validFrom'); iso(s.validTo, 'googleFlood.validTo');
+    }
+    const r = plain(f.reconciliation, 'googleFlood.reconciliation');
+    if (r.rawMetreSubtractionPerformed !== false || r.officialEmergencyDeclaredByGoogle !== false) throw new TypeError('googleFlood reconciliation inválida');
+  }
+
   const rain = plain(record.rain, 'snapshot.rain');
   finiteOrNull(rain.accumulated1hMm, 'snapshot.rain.accumulated1hMm'); finiteOrNull(rain.accumulated24hMm, 'snapshot.rain.accumulated24hMm'); text(rain.forecast, 'snapshot.rain.forecast', 1000); iso(rain.observedAt, 'snapshot.rain.observedAt'); iso(rain.fetchedAt, 'snapshot.rain.fetchedAt'); iso(rain.validUntil, 'snapshot.rain.validUntil'); text(rain.sourceId, 'snapshot.rain.sourceId', 160);
   if (rain.available === true && (rain.accumulated1hMm === null || rain.accumulated24hMm === null)) throw new TypeError('snapshot.rain disponible sin acumulados');

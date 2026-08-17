@@ -1,0 +1,16 @@
+{
+  "cases": [
+    "COINCIDENT_ELEVATED",
+    "MODEL_ELEVATED_LOCAL_NOT_AT_REFERENCE",
+    "LOCAL_ELEVATED_MODEL_NOT_ELEVATED",
+    "NO_CONFLICT",
+    "INSUFFICIENT_EVIDENCE",
+    "UNIT_MISMATCH",
+    "LOWER_CONFIDENCE",
+    "NO_MODEL",
+    "FUTURE_TIMESTAMP",
+    "EXPIRED_FORECAST"
+  ],
+  "officialEmergencyFalsePositives": 0,
+  "rawMetreSubtractions": 0
+}

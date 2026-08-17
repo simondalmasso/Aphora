@@ -1,0 +1,12 @@
+{
+  "schema": "sos-sf/029-google-access-probe/v1",
+  "actionsSecretPresent": false,
+  "runtimeSecretPresent": false,
+  "runtimeProbe": "CHECKED",
+  "liveCallAttempted": false,
+  "result": "NO_APPROVED_CREDENTIAL_AVAILABLE",
+  "credentialValueLogged": false,
+  "credentialValuePersisted": false,
+  "sourceRunId": 31986598381,
+  "sourceArtifactId": 9273961102
+}

@@ -15,6 +15,11 @@ export interface ProviderPolicy {
   readonly freshMs?: number;
   readonly staleMs?: number;
 }
+export interface ProviderRequestOptions {
+  readonly method?: 'GET' | 'POST';
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly body?: string;
+}
 export interface ProviderResult<T> {
   readonly value: T | null;
   readonly status: ProviderStatus;
@@ -69,8 +74,10 @@ function allowedUrl(raw: string, policy: ProviderPolicy): URL {
   if (url.protocol !== 'https:' || !policy.hosts.includes(url.hostname) || !policy.paths.some((path) => path.test(url.pathname))) throw new Error('PROVIDER_ALLOWLIST_REJECTED');
   return url;
 }
-async function fingerprint(policy: ProviderPolicy, url: URL): Promise<string> {
-  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${policy.id}\n${url.toString()}`)));
+async function fingerprint(policy: ProviderPolicy, url: URL, request: ProviderRequestOptions): Promise<string> {
+  const method = request.method ?? 'GET';
+  const body = request.body ?? '';
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${policy.id}\n${method}\n${url.toString()}\n${body}`)));
   return Array.from(bytes.slice(0, 16), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 async function cacheRead<T>(key: URL): Promise<T | null> {
@@ -118,7 +125,7 @@ export function publishProviderBlock(id: string, errorClass: Extract<ProviderErr
   health.set(id, Object.freeze({ id, status: 'UNAVAILABLE', lastSuccessAt: null, lastObservedAt: null, errorClass, circuitOpenUntil: null }));
 }
 
-export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, parse: (body: string, contentType: string) => ParsedProvider<T>): Promise<ProviderResult<T>> {
+export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, parse: (body: string, contentType: string) => ParsedProvider<T>, request: ProviderRequestOptions = {}): Promise<ProviderResult<T>> {
   const now = new Date();
   let url: URL;
   try { url = allowedUrl(rawUrl, policy); }
@@ -127,7 +134,7 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
     publishHealth(policy, result, defaultCircuit());
     return result;
   }
-  const key = await fingerprint(policy, url);
+  const key = await fingerprint(policy, url, request);
   const payloadKey = new URL(`https://cache.sos-sf.invalid/provider/${key}`);
   const circuitKey = new URL(`https://cache.sos-sf.invalid/circuit/${key}`);
   const cached = await cacheRead<CachedProvider<T>>(payloadKey);
@@ -154,7 +161,7 @@ export async function fetchProvider<T>(rawUrl: string, policy: ProviderPolicy, p
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error('PROVIDER_TIMEOUT')), policy.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    const requestInit: RequestInit = { signal: controller.signal, redirect: 'manual', headers: { Accept: policy.contentTypes.join(', ') } };
+    const requestInit: RequestInit = { signal: controller.signal, redirect: 'manual', method: request.method ?? 'GET', ...(request.body !== undefined ? { body: request.body } : {}), headers: { Accept: policy.contentTypes.join(', '), ...(request.headers ?? {}) } };
     let response = await fetch(url, requestInit);
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('Location');

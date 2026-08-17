@@ -1,0 +1,12 @@
+{
+  "INA": "OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION",
+  "SMN": "OFFICIAL_WARNING",
+  "IDESF": "OFFICIAL_STATIC_RISK_CONTEXT",
+  "NASA": "SUPPLEMENTARY_SATELLITE_ESTIMATE",
+  "GOOGLE_FLOOD": "SUPPLEMENTARY_MODEL_FORECAST",
+  "SOS_SF": "INTERNAL_DERIVATION",
+  "googleCanDeclareOfficialEmergency": false,
+  "googleReplacesINA": false,
+  "googleReplacesSMN": false,
+  "googleReplacesIDESF": false
+}

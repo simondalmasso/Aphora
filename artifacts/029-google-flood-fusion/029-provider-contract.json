@@ -1,0 +1,19 @@
+{
+  "host": "floodforecasting.googleapis.com",
+  "httpsOnly": true,
+  "serverSideKeyHeader": "x-goog-api-key",
+  "redirect": "manual-max-1-revalidated",
+  "bodyCapBytes": 1500000,
+  "timeoutMs": 4000,
+  "cacheKeyIncludesMethodAndBody": true,
+  "cacheKeyIncludesSecret": false,
+  "operations": [
+    "SEARCH_GAUGES_BY_AREA",
+    "GET_GAUGE_MODEL",
+    "QUERY_GAUGE_FORECAST",
+    "QUERY_LATEST_FLOOD_STATUS",
+    "FETCH_SERIALIZED_INUNDATION_POLYGON",
+    "SEARCH_FLASH_FLOODS"
+  ],
+  "result": "PASS"
+}

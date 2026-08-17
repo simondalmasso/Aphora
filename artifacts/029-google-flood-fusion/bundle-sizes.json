@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-17T02:29:10.933Z",
+  "budgets": {
+    "initialJsGzipBytes": 97280,
+    "initialCssGzipBytes": 30720,
+    "lazyVisualJsGzipBytes": 174080
+  },
+  "actual": {
+    "jsGzipBytes": 97090,
+    "initialJsGzipBytes": 97090,
+    "lazyVisualJsGzipBytes": 46657,
+    "totalJsGzipBytes": 143747,
+    "cssGzipBytes": 17940,
+    "totalDistBytes": 2414786
+  },
+  "loading": {
+    "threeJs": "REMOVED",
+    "lazyJsGzipBytes": 46657,
+    "initialFiles": [
+      "assets/index-Dj3Jpb0y.js"
+    ]
+  },
+  "files": [
+    {
+      "path": ".vite/manifest.json",
+      "bytes": 907,
+      "gzipBytes": 287
+    },
+    {
+      "path": "assets/GoogleFloodFusionPanel-fNnuYm-d.js",
+      "bytes": 1159,
+      "gzipBytes": 669
+    },
+    {
+      "path": "assets/GoogleFloodFusionPanel-fNnuYm-d.js.map",
+      "bytes": 2117,
+      "gzipBytes": 1067
+    },
+    {
+      "path": "assets/SituationMap-AISxn1Bb.js",
+      "bytes": 152687,
+      "gzipBytes": 44702
+    },
+    {
+      "path": "assets/SituationMap-AISxn1Bb.js.map",
+      "bytes": 664283,
+      "gzipBytes": 156448
+    },
+    {
+      "path": "assets/index-Dj3Jpb0y.js",
+      "bytes": 325515,
+      "gzipBytes": 97090
+    },
+    {
+      "path": "assets/index-Dj3Jpb0y.js.map",
+      "bytes": 1163927,
+      "gzipBytes": 244329
+    },
+    {
+      "path": "assets/index-zDNXTLlj.css",
+      "bytes": 94949,
+      "gzipBytes": 17543
+    },
+    {
+      "path": "essential-contacts.json",
+      "bytes": 541,
+      "gzipBytes": 288
+    },
+    {
+      "path": "icons/icon.svg",
+      "bytes": 492,
+      "gzipBytes": 358
+    },
+    {
+      "path": "index.html",
+      "bytes": 997,
+      "gzipBytes": 557
+    },
+    {
+      "path": "lite.css",
+      "bytes": 665,
+      "gzipBytes": 397
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 716,
+      "gzipBytes": 395
+    },
+    {
+      "path": "offline-guidance.json",
+      "bytes": 445,
+      "gzipBytes": 305
+    },
+    {
+      "path": "offline.html",
+      "bytes": 1717,
+      "gzipBytes": 873
+    },
+    {
+      "path": "service-worker.js",
+      "bytes": 3238,
+      "gzipBytes": 1286
+    },
+    {
+      "path": "source-provenance.json",
+      "bytes": 431,
+      "gzipBytes": 335
+    }
+  ],
+  "externalFonts": false,
+  "thirdPartyTrackers": [],
+  "pass": true
+}

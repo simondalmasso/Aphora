@@ -1,0 +1,7 @@
+{
+  "networkFirst": true,
+  "expiredGoogleForecastPresentedCurrent": false,
+  "lastHydrometryRetainedWithTimestamp": true,
+  "officialSourcesAndContactsRetained": true,
+  "googleModuleHiddenWithoutCurrentSignal": true
+}
