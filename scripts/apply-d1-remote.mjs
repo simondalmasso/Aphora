@@ -1,0 +1,2 @@
+import fs from'node:fs';import{spawnSync}from'node:child_process';
+const files=process.argv.slice(2);for(const file of files){const statements=fs.readFileSync(file,'utf8').split(';').map(s=>s.trim()).filter(Boolean);for(const sql of statements){const r=spawnSync('npx',['wrangler','d1','execute','sos-sf-hazard','--remote','--command',sql+';'],{encoding:'utf8'});process.stdout.write(r.stdout||'');process.stderr.write(r.stderr||'');if(r.status!==0)process.exit(r.status||1)}}

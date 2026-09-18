@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS runtime_state(key TEXT PRIMARY KEY,payload_json TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS provider_verification(provider_id TEXT PRIMARY KEY,state TEXT NOT NULL,verified_at TEXT,active_count INTEGER,can_say_no_active INTEGER,parse_failures INTEGER,feed_item_count INTEGER,error_class TEXT,payload_json TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS push_read_credentials(subscription_id TEXT PRIMARY KEY,verifier_hash TEXT NOT NULL,created_at TEXT NOT NULL,rotated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS notification_snapshots(delivery_id TEXT PRIMARY KEY,subscription_id TEXT NOT NULL,event_id TEXT NOT NULL,warning_revision TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,hazard TEXT,official_state TEXT,deep_link_path TEXT NOT NULL,notification_tag TEXT NOT NULL,kind TEXT NOT NULL,created_at TEXT NOT NULL,consumed_at TEXT);
+CREATE TABLE IF NOT EXISTS push_rate_limits(bucket TEXT PRIMARY KEY,count INTEGER NOT NULL,window_start TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS provider_jobs_status_created ON provider_jobs(status,created_at);
+CREATE INDEX IF NOT EXISTS provider_jobs_finished ON provider_jobs(finished_at);
+CREATE INDEX IF NOT EXISTS hazard_records_fetched ON hazard_records(fetched_at);
+CREATE INDEX IF NOT EXISTS hazard_records_observed ON hazard_records(hazard_type,observed_at);
+CREATE INDEX IF NOT EXISTS hazard_events_lifecycle_changed ON hazard_events(lifecycle,last_changed_at);
+CREATE INDEX IF NOT EXISTS event_versions_event_changed ON event_versions(event_id,changed_at);
+CREATE INDEX IF NOT EXISTS event_versions_changed ON event_versions(changed_at);
+CREATE INDEX IF NOT EXISTS notification_deliveries_created ON notification_deliveries(created_at);
+CREATE INDEX IF NOT EXISTS notification_snapshots_pending ON notification_snapshots(subscription_id,consumed_at,created_at);

@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {distanceToRecordAreaKm,zoneMatchesRecord} from '../src/worker/push.js';
+
+const html=fs.readFileSync('public/index.html','utf8');
+const app=fs.readFileSync('public/app.js','utf8');
+const css=fs.readFileSync('public/app.css','utf8');
+const national=fs.readFileSync('src/worker/national.js','utf8');
+const order031=fs.readFileSync('src/worker/order031.js','utf8');
+const push=fs.readFileSync('src/worker/push.js','utf8');
+const rendered=html+'\n'+app;
+
+test('SITUATION_CANVAS_PRESENT',()=>{assert.match(html,/id="situation-canvas"/);assert.ok(html.indexOf('id="situation-canvas"')<html.indexOf('id="top-relevant-panel"'))});
+test('REAL_EVENTS_PROJECTED',()=>{assert.match(national,/situationEvents:events\.slice\(0,80\)\.map\(situationEvent\)/);assert.match(app,/renderSituationCanvas\(d\.situationEvents\|\|\[\]\)/);assert.match(app,/dataset\.situationEventId=e\.eventId/);assert.match(app,/e\.geometry\?\.type==='Point'/);assert.match(app,/validBbox\(e\.bbox\)/)});
+test('NO_FAKE_MARKERS',()=>{assert.doesNotMatch(app,/Math\.random\(/);assert.doesNotMatch(app,/demo-marker|fake-marker/i);assert.match(app,/if\(!node\)continue/)});
+test('HAZARD_SVG_ICONS',()=>{for(const id of ['fire','flood','rain','storm','lightning','wind','earthquake','snow','alert','location','zone'])assert.match(html,new RegExp(`id="i-${id}"`));assert.match(app,/hazardIconMap/);assert.match(app,/LIGHTNING:'lightning'/);assert.match(app,/<svg class=/);assert.match(html,/<use href="#i-verify"><\/use>/)});
+test('NO_EMOJIS',()=>{const emoji=/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;assert.equal(emoji.test(rendered),false)});
+test('PROXIMITY_POINT_EVENT_IMPLEMENTED',()=>{assert.match(app,/g\?\.type==='Point'.*distanceKm/s);assert.match(app,/precision:'exact'/)});
+test('PROXIMITY_AREA_EVENT_IMPLEMENTED',()=>{assert.match(app,/pointInRing/);assert.match(app,/distancePointToSegmentKm/);assert.match(app,/BBOX_AREA/);assert.match(app,/clampedLon/)});
+test('ZONE_INTERSECTION_LABEL_IMPLEMENTED',()=>{assert.match(app,/withinZone=.*info\.km<=ref\.radiusKm/);assert.match(app,/`Dentro de \$\{ref\.name\}`/)});
+test('NO_FAKE_DISTANCE',()=>{assert.match(app,/if\(!info\)return null/);assert.match(app,/return Number\.isFinite\(best\)\?\{km:best,inside:false,precision:'area'\}:null/);assert.doesNotMatch(app,/distanceKm[^\n]*\|\|\s*0/)});
+test('TOP_EVENT_RELEVANCE_DETERMINISTIC',()=>{assert.match(app,/function compareRelevant/);assert.match(app,/affB-affA/);assert.match(app,/sourceRoleRank/);assert.match(app,/severityRank/);assert.match(app,/da-db/);assert.match(app,/tb-ta/);assert.match(app,/localeCompare\(String\(b\.eventId/)});
+test('EVIDENCE_RAIL_RETAINED',()=>{assert.match(app,/QUIÉN/);assert.match(app,/CUÁNDO/);assert.match(app,/VERIFICACIÓN/)});
+test('HAZARD_BARS_REAL_DATA_WITH_ICON',()=>{assert.match(app,/renderBars\(d\.countsByHazard,\$\('#hazard-bars'\)\)/);assert.match(app,/hazardIcon\(k,'bar-icon'\)/)});
+test('INITIAL_ZERO_SIDE_EFFECTS_RETAINED',()=>{const init=app.slice(app.lastIndexOf("show('now')"));assert.doesNotMatch(init,/getCurrentPosition|Notification\.requestPermission|renderMap\(|loadGibsLayer\(/)});
+test('NO_INFINITE_RISK_ANIMATIONS',()=>{assert.doesNotMatch(css,/animation[^;}]*\(infinite\)/i);assert.doesNotMatch(css,/animation-iteration-count\s*:\s*infinite/i)});
+test('REDUCED_MOTION_DISARMS_VISUAL_MOTION',()=>{assert.match(css,/@media\(prefers-reduced-motion:reduce\).*refresh-success.*animation:none!important/s)});
+test('FAILED_FETCH_NO_SUCCESS_SWEEP',()=>{assert.match(app,/try\{const x=await api\('\/api\/overview'\);renderOverview.*refresh-success/s);assert.doesNotMatch(app,/catch\{[^}]*classList\.add\('refresh-success'\)/s)});
+test('REAL_ACTIONS_ONLY',()=>{assert.match(app,/const .*actions=\(e\.recommendedActions\|\|\[\]\)\.filter\(Boolean\)/);assert.match(app,/QUÉ HACER AHORA/)});
+test('MAP_LAYER_ROLE_PRIORITY',()=>{const iOfficial=html.indexOf('>Oficial<'),iObservation=html.indexOf('>Observación<'),iSupplementary=html.indexOf('>Complementaria<');assert.ok(iOfficial>0&&iObservation>iOfficial&&iSupplementary>iObservation)});
+test('APHORA_ORIGIN_PUSH_ALLOWED',()=>{assert.match(push,/https:\/\/aphora\.simondalmasso44\.workers\.dev/)});
+test('WATCH_ZONE_MATCH_USES_NEAREST_AREA_NOT_CENTROID',()=>{const zone={lon:-60.7,lat:-31.63,radius_km:25},wide={bbox:[-61.8,-32.0,-60.69,-31.6]};assert.ok(distanceToRecordAreaKm(zone,wide)<2);assert.equal(zoneMatchesRecord(zone,wide),true);const far={bbox:[-64.5,-32,-64.0,-31.5]};assert.equal(zoneMatchesRecord(zone,far),false)});
+test('PUSH_WATCH_ZONE_CONTEXT_TRUTHFUL',()=>{assert.match(push,/distanceToRecordAreaKm\(row,record\)/);assert.match(push,/Dentro de tu zona de seguimiento/)});
+test('PROXIMITY_POLYGON_HOLES_NOT_FALSE_INSIDE',()=>{assert.match(app,/function pointInPolygonCoords/);assert.match(app,/for\(let i=1;i<coords\.length;i\+\+\)if\(pointInRing\(lon,lat,coords\[i\]\)\)return false/);assert.match(app,/pointInGeoArea\(g,lon,lat\)/)});
+test('MAP_VIEW_IS_GEOGRAPHY_FIRST',()=>{assert.match(app,/\['national-overview','top-relevant-panel','hazard-overview','source-pulse-panel'\]/);assert.match(app,/\$\('#events'\)\.hidden=!now/);assert.match(app,/if\(v==='map'\)\{\$\('#map-view'\)\.hidden=false;applyMapRoleFilter\(\)\}/);assert.match(app,/\$\$\('\[data-map-role\]'\).*applyMapRoleFilter/s)});
+test('ICON_BUTTON_GLYPHS_DO_NOT_BLOCK_TOUCH_TARGETS',()=>{assert.match(css,/\.icon-button svg\{[^}]*pointer-events:none/)});

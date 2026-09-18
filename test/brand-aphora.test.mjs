@@ -1,0 +1,6 @@
+import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';
+const html=fs.readFileSync('public/index.html','utf8'),manifest=JSON.parse(fs.readFileSync('public/manifest.webmanifest','utf8')),sw=fs.readFileSync('public/service-worker.js','utf8'),push=fs.readFileSync('src/worker/push.js','utf8'),legacy=fs.readFileSync('src/worker/legacy-baseline.js','utf8'),svg=fs.readFileSync('public/icons/icon-master.svg','utf8');
+test('APHORA_PUBLIC_BRAND_TITLE_HEADER_METADATA',()=>{assert.match(html,/<title>APHORA/);assert.match(html,/<strong>APHORA<\/strong>/);assert.match(html,/application-name" content="APHORA"/);assert.doesNotMatch(html,/SOS SF/)});
+test('APHORA_PWA_INSTALLED_NAME_AND_ICON',()=>{assert.equal(manifest.name,'APHORA');assert.equal(manifest.short_name,'APHORA');assert.match(svg,/aria-label="APHORA"/);assert.doesNotMatch(JSON.stringify(manifest),/SOS SF/)});
+test('APHORA_NOTIFICATIONS_PUBLIC_COPY',()=>{assert.match(sw,/APHORA · aviso recibido/);assert.match(push,/PRUEBA · APHORA/);assert.match(push,/Abrí APHORA/);assert.doesNotMatch(sw,/SOS SF/);assert.doesNotMatch(push,/SOS SF/)});
+test('APHORA_FALLBACK_PUBLIC_SURFACE',()=>{assert.match(legacy,/class="brand">APHORA</);assert.doesNotMatch(legacy,/class="brand">SOS SF</)});

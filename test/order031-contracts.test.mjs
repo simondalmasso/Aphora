@@ -1,0 +1,16 @@
+import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';
+const app=fs.readFileSync('public/app.js','utf8'),sw=fs.readFileSync('public/service-worker.js','utf8'),push=fs.readFileSync('src/worker/push.js','utf8'),national=fs.readFileSync('src/worker/national.js','utf8'),domain=fs.readFileSync('src/domain/hazard.js','utf8');
+test('DISCONNECTED_SAME_PROVINCE_WARNINGS_SEPARATE',()=>{assert.match(domain,/function related\(a,b\).*temporalOverlap.*earthquakeCorrelated.*spatiallyRelated/s)});
+test('EARTHQUAKE_DISTINCT_EVENTS_NOT_MERGED',()=>{assert.match(domain,/earthquakeCorrelated/);assert.match(domain,/180000/);assert.match(domain,/haversineKm\(ac,bc\)>50/)});
+test('IGN_STATIC_NEVER_CURRENT',()=>assert.match(domain,/STATIC_RISK_CANNOT_BE_CURRENT/));
+test('NATIONAL_OVERVIEW_SEPARATE_FROM_LOCAL_BBOX',()=>{assert.match(national,/\/api\/overview/);assert.match(national,/\/api\/events/);assert.match(app,/\/api\/overview/);assert.match(app,/\/api\/events\?bbox=/)});
+test('LEGACY_SNAPSHOT_SCOPE_NOT_NATIONAL_WARNING',()=>{assert.match(national,/legacySpecialistScope:'SANTA_FE_HYDROLOGY'/);assert.match(national,/legacyAlertStatusNotNational:true/)});
+test('SERVICE_WORKER_UPGRADE_ROLLOVER',()=>{assert.match(sw,/activate/);assert.match(sw,/caches\.keys/);assert.match(sw,/clients\.claim/)});
+test('PUSH_PERMISSION_EXPLICIT_ONLY',()=>{assert.equal((app.match(/Notification\.requestPermission\(\)/g)||[]).length,1);assert.match(app,/push-optin.*enablePush/s)});
+test('PUSH_PENDING_CREDENTIAL_SCOPE',()=>{assert.match(push,/push_read_credentials/);assert.match(push,/verifier_hash/);assert.match(push,/credentialOk/);assert.match(push,/x-sos-read-credential/);assert.doesNotMatch(app,/sos-push-read-credential/)});
+test('PUSH_EVENT_SPECIFIC_NOTIFICATION',()=>{assert.match(push,/notification_snapshots/);assert.match(push,/deepLinkPath=`\/\?event=/);assert.match(push,/title=kind===/)});
+test('PUSH_GENERIC_FALLBACK_ON_PENDING_FETCH_FAILURE',()=>{assert.match(sw,/catch\{n=generic\(\)\}/);assert.match(sw,/FAIL_SAFE/)});
+test('PUSH_TEST_NEVER_CREATES_HAZARD',()=>{const a=push.indexOf("u.pathname==='/api/push/test'"),b=push.indexOf("return safeErr('METHOD_NOT_ALLOWED'",a);assert.doesNotMatch(push.slice(a,b),/hazard_records|hazard_events/)});
+test('PUSH_UPDATE_CANCEL_TAG',()=>{assert.match(push,/tag=`warning:\$\{stablePart\(eventId\)\}`/);assert.match(push,/kind=record\.capMsgType==='Cancel'/)});
+test('PUSH_410_DELETE',()=>{assert.match(push,/result\.deleteSubscription/);assert.match(push,/ENDPOINT_GONE/);assert.match(push,/deleteEndpointState/)});
+test('UNSUBSCRIBE_FULL_CLEANUP',()=>{for(const table of['push_zones','notification_snapshots','notification_deliveries','push_read_credentials','push_subscriptions'])assert.match(push,new RegExp(`DELETE FROM ${table}`))});

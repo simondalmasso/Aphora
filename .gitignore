@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+evidence/
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+*.bak.*
+*.tmp

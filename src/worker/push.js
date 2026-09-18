@@ -1,0 +1,81 @@
+import{j,safeErr}from'./national.js';
+const ORIGINS=new Set(['https://aphora.simondalmasso44.workers.dev','https://sos-sf.simondalmasso44.workers.dev','https://sos-sf.web.app']);
+const PUSH_HOSTS=['fcm.googleapis.com','updates.push.services.mozilla.com','push.apple.com','notify.windows.com'];
+const originOk=r=>ORIGINS.has(r.headers.get('origin')||'');
+const dbFor=env=>env.HAZARD_DB||null;
+async function body(r){const t=await r.text();if(t.length>8192)throw new Error('BODY_TOO_LARGE');return JSON.parse(t)}
+const b64u=b=>btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64u=s=>{const x=s.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(s.length/4)*4,'=');return Uint8Array.from(atob(x),c=>c.charCodeAt(0))};
+const hex=b=>Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');
+async function tokenHash(v){return hex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(v))))) }
+function readToken(){return b64u(crypto.getRandomValues(new Uint8Array(32)))}
+async function credentialOk(db,sid,token){if(!/^[a-f0-9]{64}$/.test(String(sid||''))||String(token||'').length<32)return false;const row=await db.prepare('SELECT verifier_hash FROM push_read_credentials WHERE subscription_id=?').bind(sid).first();return!!row&&row.verifier_hash===await tokenHash(token)}
+async function deleteSubscriptionState(db,sid){await db.prepare('DELETE FROM push_zones WHERE subscription_id=?').bind(sid).run();await db.prepare('DELETE FROM notification_snapshots WHERE subscription_id=?').bind(sid).run();await db.prepare('DELETE FROM notification_deliveries WHERE subscription_id=?').bind(sid).run();await db.prepare('DELETE FROM push_read_credentials WHERE subscription_id=?').bind(sid).run();await db.prepare('DELETE FROM push_subscriptions WHERE id=?').bind(sid).run()}
+async function deleteEndpointState(db,sid){await deleteSubscriptionState(db,sid)}
+async function storageKey(secret){if(!secret||secret.length<32)throw new Error('PUSH_STORAGE_KEY_NOT_CONFIGURED');return crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'AES-GCM'},false,['encrypt','decrypt'])}
+async function seal(value,secret){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await storageKey(secret),new TextEncoder().encode(value)));return `${b64u(iv)}.${b64u(ct)}`}
+async function open(value,secret){const[iv,ct]=String(value).split('.');if(!iv||!ct)throw new Error('PUSH_CIPHERTEXT_INVALID');const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64u(iv)},await storageKey(secret),unb64u(ct));return new TextDecoder().decode(pt)}
+export function validPushEndpoint(value){try{const u=new URL(value);if(u.protocol!=='https:'||u.username||u.password)return false;const h=u.hostname.toLowerCase();return PUSH_HOSTS.some(x=>h===x||h.endsWith(`.${x}`))}catch{return false}}
+export function notificationPolicy(record,prefs={officialWarnings:true,modelSignals:false,satellite:false}){if(record.lifecycle==='SUPPRESSED'||record.lifecycle==='EXPIRED'||record.capStatus==='Test'||record.capStatus==='Draft')return false;if(record.sourceRole==='OFFICIAL_STATIC_RISK_CONTEXT')return false;if(record.sourceRole==='OFFICIAL_WARNING')return!!prefs.officialWarnings;if(record.sourceRole==='SUPPLEMENTARY_MODEL_FORECAST')return!!prefs.modelSignals;if(record.sourceRole==='SUPPLEMENTARY_SATELLITE_ESTIMATE')return!!prefs.satellite;return false}
+function stablePart(value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return(h>>>0).toString(16)}
+export function logicalWarningId(record){return record.capReferences?.[0]?.identifier||record.capIdentifier||record.recordId}
+export function deliveryRevision(record){const material=JSON.stringify([record.capSeverity||null,record.capUrgency||null,record.capCertainty||null,record.headline||'',record.expiresAt||null,record.bbox||null,record.lifecycle||null]);return`${logicalWarningId(record)}:${record.capMsgType||record.lifecycle||'Alert'}:${stablePart(material)}`}
+function distanceKm(lon1,lat1,lon2,lat2){const d=Math.PI/180,r=6371,dp=(lat2-lat1)*d,dl=(lon2-lon1)*d,x=Math.sin(dp/2)**2+Math.cos(lat1*d)*Math.cos(lat2*d)*Math.sin(dl/2)**2;return 2*r*Math.asin(Math.min(1,Math.sqrt(x)))}
+export function distanceToRecordAreaKm(zone,record){const b=record?.bbox;if(!Array.isArray(b)||b.length!==4||!b.every(v=>Number.isFinite(Number(v))))return null;const lon=Number(zone?.lon),lat=Number(zone?.lat);if(!Number.isFinite(lon)||!Number.isFinite(lat))return null;const west=Number(b[0]),south=Number(b[1]),east=Number(b[2]),north=Number(b[3]);if(west>east||south>north)return null;const x=Math.max(west,Math.min(lon,east)),y=Math.max(south,Math.min(lat,north));return distanceKm(lon,lat,x,y)}
+export function centerOfRecord(record){const b=record.bbox;if(!Array.isArray(b)||b.length!==4)return null;return[(b[0]+b[2])/2,(b[1]+b[3])/2]}
+export function zoneMatchesRecord(zone,record){const d=distanceToRecordAreaKm(zone,record);if(d==null)return false;const radius=Math.min(100,Math.max(5,Number(zone.radius_km)||25));return d<=radius}
+export async function handlePush(r,env,u){
+if(!u.pathname.startsWith('/api/push/'))return null;
+const db=dbFor(env);
+if(u.pathname==='/api/push/config'&&r.method==='GET')return j({ok:true,data:{enabled:Boolean(db&&env.VAPID_PUBLIC_KEY&&env.VAPID_PUBLIC_KEY!=='UNCONFIGURED'&&env.VAPID_PRIVATE_JWK&&env.PUSH_STORAGE_KEY),publicKey:env.VAPID_PUBLIC_KEY||null,defaults:{officialWarnings:true,modelSignals:false,satelliteEstimates:false}}});
+if(u.pathname!=='/api/push/pending'&&!originOk(r))return safeErr('ORIGIN_REJECTED',403);
+if(!db||!env.PUSH_STORAGE_KEY)return safeErr('PUSH_STORAGE_NOT_CONFIGURED',503);
+if(u.pathname==='/api/push/pending'&&r.method==='GET'){
+ const sid=r.headers.get('x-sos-subscription-id')||'',token=r.headers.get('x-sos-read-credential')||'';
+ if(!await credentialOk(db,sid,token))return safeErr('PUSH_CREDENTIAL_REJECTED',403);
+ const row=await db.prepare('SELECT delivery_id,title,body,hazard,official_state,deep_link_path,notification_tag,kind,created_at FROM notification_snapshots WHERE subscription_id=? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1').bind(sid).first();
+ if(!row)return j({ok:true,data:{pending:null}});
+ await db.prepare('UPDATE notification_snapshots SET consumed_at=? WHERE delivery_id=? AND consumed_at IS NULL').bind(new Date().toISOString(),row.delivery_id).run();
+ return j({ok:true,data:{pending:{title:row.title,body:row.body,hazard:row.hazard,officialState:row.official_state,deepLinkPath:row.deep_link_path,tag:row.notification_tag,kind:row.kind,createdAt:row.created_at}}});
+}
+try{
+ const x=await body(r);
+ if(u.pathname==='/api/push/subscribe'&&r.method==='POST'){
+  if(!validPushEndpoint(x.endpoint)||String(x.endpoint).length>2048||String(x.keys?.p256dh||'').length<20||String(x.keys?.auth||'').length<8)return safeErr('SUBSCRIPTION_INVALID');
+  const sid=await tokenHash(x.endpoint),endpoint=await seal(x.endpoint,env.PUSH_STORAGE_KEY),p256dh=await seal(String(x.keys.p256dh).slice(0,200),env.PUSH_STORAGE_KEY),auth=await seal(String(x.keys.auth).slice(0,200),env.PUSH_STORAGE_KEY),now=new Date().toISOString(),credential=readToken(),verifier=await tokenHash(credential);
+  await db.prepare('INSERT OR REPLACE INTO push_subscriptions(id,endpoint,p256dh,auth,created_at,updated_at) VALUES(?,?,?,?,COALESCE((SELECT created_at FROM push_subscriptions WHERE id=?),?),?)').bind(sid,endpoint,p256dh,auth,sid,now,now).run();
+  await db.prepare('INSERT OR REPLACE INTO push_read_credentials(subscription_id,verifier_hash,created_at,rotated_at) VALUES(?,?,COALESCE((SELECT created_at FROM push_read_credentials WHERE subscription_id=?),?),?)').bind(sid,verifier,sid,now,now).run();
+  return j({ok:true,data:{subscriptionId:sid,readCredential:credential}},201);
+ }
+ if(u.pathname==='/api/push/subscribe'&&r.method==='DELETE'){
+  const sid=String(x.subscriptionId||''),token=String(x.readCredential||'');if(!await credentialOk(db,sid,token))return safeErr('PUSH_CREDENTIAL_REJECTED',403);
+  await deleteSubscriptionState(db,sid);
+  return j({ok:true,data:{deleted:true}});
+ }
+ if(u.pathname==='/api/push/zones'&&(r.method==='POST'||r.method==='PUT')){
+  const sid=String(x.subscriptionId||''),token=String(x.readCredential||''),lat=Number(x.lat),lon=Number(x.lon),radius=Math.min(100,Math.max(5,Number(x.radiusKm)||25));
+  if(!await credentialOk(db,sid,token)||!Number.isFinite(lat)||!Number.isFinite(lon)||lat< -90||lat>90||lon< -180||lon>180)return safeErr('ZONE_INVALID');
+  const requestedId=typeof x.zoneId==='string'&&/^[a-zA-Z0-9-]{8,80}$/.test(x.zoneId)?x.zoneId:null,id=requestedId||crypto.randomUUID();
+  if(requestedId){const existing=await db.prepare('SELECT subscription_id FROM push_zones WHERE id=?').bind(id).first();if(existing&&existing.subscription_id!==sid)return safeErr('PUSH_ZONE_SCOPE_REJECTED',403)}
+  await db.prepare('INSERT INTO push_zones(id,subscription_id,lat,lon,radius_km,official_warnings,model_signals,satellite_estimates,created_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET lat=excluded.lat,lon=excluded.lon,radius_km=excluded.radius_km,official_warnings=excluded.official_warnings,model_signals=excluded.model_signals,satellite_estimates=excluded.satellite_estimates WHERE push_zones.subscription_id=excluded.subscription_id').bind(id,sid,Math.round(lat*10)/10,Math.round(lon*10)/10,radius,x.officialWarnings!==false?1:0,x.modelSignals===true?1:0,x.satelliteEstimates===true?1:0,new Date().toISOString()).run();
+  return j({ok:true,data:{zoneId:id}},requestedId?200:201);
+ }
+ if(u.pathname==='/api/push/zones'&&r.method==='DELETE'){const sid=String(x.subscriptionId||''),token=String(x.readCredential||''),zoneId=String(x.zoneId||'');if(!/^[a-zA-Z0-9-]{8,80}$/.test(zoneId)||!await credentialOk(db,sid,token))return safeErr('PUSH_CREDENTIAL_REJECTED',403);const existing=await db.prepare('SELECT subscription_id FROM push_zones WHERE id=?').bind(zoneId).first();if(existing&&existing.subscription_id!==sid)return safeErr('PUSH_ZONE_SCOPE_REJECTED',403);await db.prepare('DELETE FROM push_zones WHERE id=? AND subscription_id=?').bind(zoneId,sid).run();return j({ok:true,data:{deleted:true}})}
+ if(u.pathname==='/api/push/test'&&r.method==='POST'){
+  const sid=String(x.subscriptionId||''),token=String(x.readCredential||'');if(!await credentialOk(db,sid,token))return safeErr('PUSH_CREDENTIAL_REJECTED',403);
+  const now=new Date(),bucket=`push-test:${sid}:${now.toISOString().slice(0,13)}`,row=await db.prepare('SELECT count FROM push_rate_limits WHERE bucket=?').bind(bucket).first(),count=Number(row?.count||0);if(count>=3)return safeErr('PUSH_TEST_RATE_LIMIT',429);
+  await db.prepare('INSERT INTO push_rate_limits(bucket,count,window_start,updated_at) VALUES(?,?,?,?) ON CONFLICT(bucket) DO UPDATE SET count=count+1,updated_at=excluded.updated_at').bind(bucket,1,now.toISOString(),now.toISOString()).run();
+  const deliveryId=`test:${sid}:${crypto.randomUUID()}`,createdAt=now.toISOString();
+  await db.prepare('INSERT INTO notification_snapshots(delivery_id,subscription_id,event_id,warning_revision,title,body,hazard,official_state,deep_link_path,notification_tag,kind,created_at,consumed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)').bind(deliveryId,sid,'SELF_TEST','SELF_TEST','PRUEBA · APHORA','Prueba de avisos. No representa una emergencia ni una alerta oficial.',null,'TEST','/','sos-self-test','SELF_TEST',createdAt).run();
+  const sub=await db.prepare('SELECT endpoint FROM push_subscriptions WHERE id=?').bind(sid).first();if(!sub)return safeErr('SUBSCRIPTION_NOT_FOUND',404);
+  const result=await sendEmptyWebPush(await open(sub.endpoint,env.PUSH_STORAGE_KEY),env);
+  if(result.deleteSubscription)await deleteSubscriptionState(db,sid)
+  return j({ok:true,data:{queued:result.ok,kind:'SELF_TEST'}},result.ok?200:502);
+ }
+ return safeErr('METHOD_NOT_ALLOWED',405);
+}catch{return safeErr('PUSH_REQUEST_INVALID',400)}
+}
+export async function vapidAuthorization(endpoint,env,now=Math.floor(Date.now()/1000)){if(!validPushEndpoint(endpoint))throw new Error('PUSH_ENDPOINT_REJECTED');if(!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_JWK)throw new Error('VAPID_NOT_CONFIGURED');const head=b64u(new TextEncoder().encode(JSON.stringify({typ:'JWT',alg:'ES256'}))),payload=b64u(new TextEncoder().encode(JSON.stringify({aud:new URL(endpoint).origin,exp:now+3600,sub:'mailto:aphora@invalid.local'}))),input=`${head}.${payload}`,key=await crypto.subtle.importKey('jwk',JSON.parse(env.VAPID_PRIVATE_JWK),{name:'ECDSA',namedCurve:'P-256'},false,['sign']),sig=new Uint8Array(await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,new TextEncoder().encode(input)));return{Authorization:`vapid t=${input}.${b64u(sig)}, k=${env.VAPID_PUBLIC_KEY}`,TTL:'300'}}
+export async function sendEmptyWebPush(endpoint,env){const headers=await vapidAuthorization(endpoint,env),r=await fetch(endpoint,{method:'POST',headers,redirect:'manual'});return{ok:r.ok,status:r.status,deleteSubscription:r.status===404||r.status===410}}
+export async function loadPushEndpoint(row,env){return open(row.endpoint,env.PUSH_STORAGE_KEY)}
+export async function dispatchRecordNotifications(record,env,{sender=sendEmptyWebPush}={}){const db=dbFor(env);if(!db||!env.PUSH_STORAGE_KEY||!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_JWK||!notificationPolicy(record))return{sent:0,skipped:0,deleted:0};const rows=(await db.prepare('SELECT z.*,s.endpoint FROM push_zones z JOIN push_subscriptions s ON s.id=z.subscription_id ORDER BY z.created_at LIMIT 500').all()).results||[];let sent=0,skipped=0,deleted=0;const eventId=logicalWarningId(record),revision=deliveryRevision(record);for(const row of rows){const prefs={officialWarnings:row.official_warnings===1,modelSignals:row.model_signals===1,satellite:row.satellite_estimates===1};if(!notificationPolicy(record,prefs)||!zoneMatchesRecord(row,record)){skipped++;continue}if(record.capMsgType==='Cancel'){const prior=await db.prepare('SELECT id FROM notification_deliveries WHERE subscription_id=? AND event_id=? AND status=? LIMIT 1').bind(row.subscription_id,eventId,'SENT').first();if(!prior){skipped++;continue}}const id=`${row.subscription_id}:${stablePart(revision)}`;const inserted=await db.prepare("INSERT OR IGNORE INTO notification_deliveries(id,subscription_id,event_id,warning_revision,status,created_at) VALUES(?,?,?,?,?,?)").bind(id,row.subscription_id,eventId,revision,'PENDING',new Date().toISOString()).run();if((inserted.meta?.changes??1)<1){skipped++;continue}const kind=record.capMsgType==='Cancel'?'CANCEL':record.capMsgType==='Update'?'UPDATE':'ALERT',tag=`warning:${stablePart(eventId)}`,title=kind==='CANCEL'?`Alerta finalizada · ${record.headline||'APHORA'}`:`${record.headline||'Alerta oficial · APHORA'}`,zoneDistance=distanceToRecordAreaKm(row,record),zoneContext=zoneDistance!=null&&zoneDistance<=Number(row.radius_km)?'Dentro de tu zona de seguimiento. ':'' ,body=kind==='CANCEL'?'La fuente oficial informó la finalización. Abrí APHORA para verificar el estado.':(zoneContext+String(record.description||'Abrí APHORA para verificar la alerta oficial y sus fuentes.')).slice(0,240),deepLinkPath=`/?event=${encodeURIComponent(eventId)}`;await db.prepare('INSERT OR REPLACE INTO notification_snapshots(delivery_id,subscription_id,event_id,warning_revision,title,body,hazard,official_state,deep_link_path,notification_tag,kind,created_at,consumed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL)').bind(id,row.subscription_id,eventId,revision,title,body,record.hazardType||null,record.lifecycle||'ACTIVE',deepLinkPath,tag,kind,new Date().toISOString()).run();try{const endpoint=await loadPushEndpoint(row,env),result=await sender(endpoint,env);if(result.deleteSubscription){await db.prepare("UPDATE notification_deliveries SET status='ENDPOINT_GONE' WHERE id=?").bind(id).run();await deleteEndpointState(db,row.subscription_id);deleted++;continue}await db.prepare('UPDATE notification_deliveries SET status=? WHERE id=?').bind(result.ok?'SENT':`HTTP_${result.status}`,id).run();if(result.ok)sent++;else skipped++}catch{await db.prepare("UPDATE notification_deliveries SET status='FAILED' WHERE id=?").bind(id).run();skipped++}}return{sent,skipped,deleted}}

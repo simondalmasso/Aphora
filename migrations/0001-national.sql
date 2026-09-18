@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS provider_registry(provider_id TEXT PRIMARY KEY,next_due_at TEXT,refresh_seconds INTEGER NOT NULL,last_attempt_at TEXT,last_success_at TEXT,last_observed_at TEXT,failure_count INTEGER NOT NULL DEFAULT 0,circuit_open_until TEXT,etag TEXT,last_modified TEXT,last_payload_hash TEXT,status TEXT NOT NULL,error_class TEXT);
+CREATE TABLE IF NOT EXISTS provider_jobs(id TEXT PRIMARY KEY,provider_id TEXT NOT NULL,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at TEXT NOT NULL,last_error TEXT,created_at TEXT NOT NULL,finished_at TEXT);
+CREATE INDEX IF NOT EXISTS provider_jobs_due ON provider_jobs(status,next_attempt_at);
+CREATE TABLE IF NOT EXISTS hazard_records(record_id TEXT PRIMARY KEY,provider_id TEXT NOT NULL,provider_record_id TEXT NOT NULL,hazard_type TEXT NOT NULL,source_role TEXT NOT NULL,official INTEGER NOT NULL,issued_at TEXT,observed_at TEXT,expires_at TEXT,fetched_at TEXT NOT NULL,freshness TEXT NOT NULL,raw_hash TEXT NOT NULL,payload_json TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS hazard_records_active ON hazard_records(hazard_type,expires_at,provider_id);
+CREATE TABLE IF NOT EXISTS hazard_events(event_id TEXT PRIMARY KEY,hazard_type TEXT NOT NULL,lifecycle TEXT NOT NULL,verification_state TEXT NOT NULL,first_seen_at TEXT,last_changed_at TEXT,expires_at TEXT,payload_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS event_record_links(event_id TEXT NOT NULL,record_id TEXT NOT NULL,PRIMARY KEY(event_id,record_id));
+CREATE TABLE IF NOT EXISTS event_versions(id INTEGER PRIMARY KEY AUTOINCREMENT,event_id TEXT NOT NULL,changed_at TEXT NOT NULL,payload_json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS push_subscriptions(id TEXT PRIMARY KEY,endpoint TEXT NOT NULL,p256dh TEXT NOT NULL,auth TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS push_zones(id TEXT PRIMARY KEY,subscription_id TEXT NOT NULL,lat REAL NOT NULL,lon REAL NOT NULL,radius_km REAL NOT NULL,official_warnings INTEGER NOT NULL DEFAULT 1,model_signals INTEGER NOT NULL DEFAULT 0,satellite_estimates INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS notification_deliveries(id TEXT PRIMARY KEY,subscription_id TEXT NOT NULL,event_id TEXT NOT NULL,warning_revision TEXT NOT NULL,status TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(subscription_id,event_id,warning_revision));
+CREATE TABLE IF NOT EXISTS coverage_registry(provider_id TEXT PRIMARY KEY,payload_json TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS release_manifest(release_id TEXT PRIMARY KEY,source_sha256 TEXT NOT NULL,dist_sha256 TEXT NOT NULL,built_at TEXT NOT NULL);

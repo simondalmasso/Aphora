@@ -1,0 +1,35 @@
+import test from'node:test';
+import assert from'node:assert/strict';
+import{parseCap,rejectUnsafeXml,applyCapLifecycle,capPublicActive}from'../src/providers/cap.js';
+import{freshness,nullableNumber,publicRecord,reconcile,parseBbox,pointInPolygon}from'../src/domain/hazard.js';
+import{parseGauge,parseFlashFloodSearch,canCompareMetres,skillSegmentKey}from'../src/providers/google-flood.js';
+const URL='https://ssl.smn.gob.ar/feeds/CAP/xml_generados/test.xml';
+const FETCH='2026-08-27T00:00:00.000Z';
+function cap({id='id-alert',msgType='Alert',status='Actual',scope='Public',sent='2026-08-26T20:00:00-03:00',expires='2026-08-28T20:00:00-03:00',references='',polygon='-29.5,-60.3 -29.4,-60.3 -29.4,-60.2 -29.5,-60.3'}={}){return `<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2"><identifier>${id}</identifier><sender>smn@smn.gob.ar</sender><sent>${sent}</sent><status>${status}</status><msgType>${msgType}</msgType><scope>${scope}</scope>${references?`<references>${references}</references>`:''}<info><language>es-AR</language><category>Met</category><event>Tormentas</event><urgency>Immediate</urgency><severity>Severe</severity><certainty>Likely</certainty><expires>${expires}</expires><headline>Tormentas fuertes</headline><description>Evento de prueba</description><instruction>Seguí indicaciones oficiales</instruction><area><areaDesc>Vera</areaDesc><polygon>${polygon}</polygon></area></info></alert>`}
+const parse=(xml,at=FETCH)=>parseCap(xml,{sourceUrl:URL,fetchedAt:at,rawHash:'a'.repeat(64)});
+test('CAP_ALERT_PARSES',()=>{const r=parse(cap());assert.equal(r.sourceRole,'OFFICIAL_WARNING');assert.equal(r.publicMessage,true);assert.equal(r.lifecycle,'ACTIVE');assert.equal(r.official,true);assert.deepEqual(r.bbox,[-60.3,-29.5,-60.2,-29.4])});
+test('CAP_UPDATE_SUPERSEDES_REFERENCE',()=>{const base=parse(cap({id:'base'}));const upd=parse(cap({id:'update',msgType:'Update',references:'smn@smn.gob.ar,base,2026-08-26T20:00:00-03:00'}));const result=applyCapLifecycle([base,upd]);assert.equal(result.find(x=>x.capIdentifier==='base').lifecycle,'SUPERSEDED');assert.equal(result.find(x=>x.capIdentifier==='base').supersededBy,'update')});
+test('CAP_CANCEL_CLOSES_EVENT',()=>{const base=parse(cap({id:'base'}));const cancel=parse(cap({id:'cancel',msgType:'Cancel',references:'smn@smn.gob.ar,base,2026-08-26T20:00:00-03:00'}));const result=applyCapLifecycle([base,cancel]);assert.equal(result.find(x=>x.capIdentifier==='base').lifecycle,'CANCELLED');assert.equal(capPublicActive(cancel),false)});
+test('CAP_TEST_NOT_PUBLIC',()=>{const r=parse(cap({status:'Test'}));assert.equal(r.publicMessage,false);assert.equal(r.lifecycle,'SUPPRESSED')});
+test('CAP_DRAFT_NOT_PUBLIC',()=>{const r=parse(cap({status:'Draft'}));assert.equal(r.publicMessage,false);assert.equal(r.lifecycle,'SUPPRESSED')});
+test('CAP_NONPUBLIC_SCOPE_NOT_PUBLIC',()=>{const r=parse(cap({scope:'Restricted'}));assert.equal(r.publicMessage,false);assert.equal(r.lifecycle,'SUPPRESSED')});
+test('CAP_EXPIRED_NOT_ACTIVE',()=>{const r=parse(cap({expires:'2026-08-26T21:00:00-03:00'}));assert.equal(r.lifecycle,'EXPIRED');assert.equal(capPublicActive(r,Date.parse(FETCH)),false);assert.equal(reconcile([r],new Date(FETCH)).length,0)});
+test('CAP_MALFORMED_FAILS_CLOSED',()=>assert.throws(()=>parse('<alert><identifier>x</identifier></alert>')));
+test('XXE_REJECTED',()=>assert.throws(()=>rejectUnsafeXml('<!DOCTYPE x [<!ENTITY a SYSTEM "file:///etc/passwd">]><alert/>'),/CAP_XML_UNSAFE/));
+test('DTD_REJECTED',()=>assert.throws(()=>rejectUnsafeXml('<!DOCTYPE alert><alert/>'),/CAP_XML_UNSAFE/));
+test('ENTITY_EXPANSION_REJECTED',()=>assert.throws(()=>rejectUnsafeXml('<!ENTITY a "aaaaaaaa"><alert>&a;</alert>'),/CAP_XML_UNSAFE/));
+test('CAP_POLYGON_VERTEX_CAP',()=>{const p=Array.from({length:2001},(_,i)=>`-29.${i%9},-60.${i%9}`).join(' ');assert.throws(()=>parse(cap({polygon:p})),/CAP_POLYGON_VERTEX_CAP/)});
+test('FUTURE_3H_REJECTED_OR_DEGRADED',()=>assert.equal(freshness('2026-08-27T03:01:00Z',Date.parse(FETCH)),'FUTURE_REJECTED'));
+test('UNKNOWN_NUMERIC_NEVER_ZERO',()=>{for(const x of[null,undefined,'',NaN,'x'])assert.equal(nullableNumber(x),null)});
+test('STALE_SOURCE_NEVER_NOW',()=>assert.equal(freshness('2026-08-20T00:00:00Z',Date.parse(FETCH),3600000,2*86400000),'UNAVAILABLE'));
+test('MODEL_EXTREME_NEVER_OFFICIAL_EMERGENCY',()=>assert.throws(()=>publicRecord({recordId:'m:1',providerId:'model',providerRecordId:'1',hazardType:'FLOOD',sourceRole:'SUPPLEMENTARY_MODEL_FORECAST',sourceOrganization:'Model',official:true,fetchedAt:FETCH,headline:'Extreme',sourceUrl:'https://example.invalid/model',attribution:'model'}),/CANNOT_BE_OFFICIAL/));
+test('STATIC_RISK_NEVER_CURRENT_IMPACT',()=>assert.throws(()=>publicRecord({recordId:'s:1',providerId:'ign-risk',providerRecordId:'1',hazardType:'FLOOD',sourceRole:'OFFICIAL_STATIC_RISK_CONTEXT',sourceOrganization:'IGN',official:true,fetchedAt:FETCH,headline:'Risk',sourceUrl:'https://riesgo.ign.gob.ar/',attribution:'IGN',currentImpact:true}),/STATIC_RISK_CANNOT_BE_CURRENT/));
+test('STATIC_RISK_ALONE_NEVER_CURRENT_EVENT',()=>{const r=publicRecord({recordId:'s:1',providerId:'ign-risk',providerRecordId:'1',hazardType:'FLOOD',sourceRole:'OFFICIAL_STATIC_RISK_CONTEXT',sourceOrganization:'IGN',official:true,issuedAt:FETCH,observedAt:null,effectiveAt:null,onsetAt:null,expiresAt:null,fetchedAt:FETCH,freshness:'FRESH',verificationState:'STATIC_CONTEXT',geometry:null,bbox:[-61,-32,-60,-31],regionCodes:['AR-S'],headline:'Riesgo histórico',description:'contexto',instruction:null,sourceUrl:'https://riesgo.ign.gob.ar/',attribution:'IGN',rawHash:'x',lifecycle:'ACTIVE',currentImpact:false});assert.equal(reconcile([r],new Date(FETCH)).length,0)});
+test('GOOGLE_RIVER_SCHEMA_OFFICIAL',()=>{assert.equal(parseGauge({gaugeId:'g1',river:'Salado'}).river,'Salado');assert.equal(parseGauge({gaugeId:'g1',riverName:'invented'}).river,null)});
+test('GOOGLE_FLASH_FLOOD_EVENTS_SCHEMA_OFFICIAL',()=>{assert.equal(parseFlashFloodSearch({flashFloodEvents:[{id:'f1'}]}).length,1);assert.throws(()=>parseFlashFloodSearch({events:[{id:'bad'}]}))});
+test('GOOGLE_MODEL_ID_CHANGE_SEGMENTS_SKILL',()=>assert.notEqual(skillSegmentKey({river:'Paraná',area:'SF',hazardType:'FLOOD',leadBucket:'0-24h',gaugeModelId:'m1',qualityVerified:true}),skillSegmentKey({river:'Paraná',area:'SF',hazardType:'FLOOD',leadBucket:'0-24h',gaugeModelId:'m2',qualityVerified:true})));
+test('METERS_NOT_SUBTRACTED_WITHOUT_DATUM',()=>{assert.equal(canCompareMetres({measurementReference:'A'},{measurementReference:'B'}),false);assert.equal(canCompareMetres({measurementReference:'A'},{measurementReference:'A'}),true)});
+test('POINT_IN_POLYGON_BOUNDARY',()=>{const p=[[0,0],[2,0],[2,2],[0,2],[0,0]];assert.equal(pointInPolygon([1,1],p),true);assert.equal(pointInPolygon([2,1],p),true);assert.equal(pointInPolygon([3,1],p),false)});
+test('BBOX_LIMIT_ENFORCED',()=>{assert.throws(()=>parseBbox('-180,-90,180,90'),/BBOX_TOO_LARGE/);assert.deepEqual(parseBbox('-62,-32,-60,-30'),[-62,-32,-60,-30])});
+
+test('CAP_OVERSIZE_XML_REJECTED',()=>{assert.throws(()=>rejectUnsafeXml('<alert>'+('x'.repeat(1500001))+'</alert>'),/CAP_SIZE/)});

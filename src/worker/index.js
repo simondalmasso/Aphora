@@ -1,0 +1,8 @@
+import legacy from'./legacy-baseline.js';
+import{handleNational,enhancedHealth,enhancedSources}from'./national.js';
+import{handlePush}from'./push.js';
+import{scheduledCycle}from'./runtime.js';
+const sec={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Permissions-Policy':'geolocation=(self), camera=(), microphone=()','Cross-Origin-Opener-Policy':'same-origin','Cross-Origin-Resource-Policy':'same-origin','Content-Security-Policy':"default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; img-src 'self' data: https://wms.ign.gob.ar https://gibs.earthdata.nasa.gov; style-src 'self'; script-src 'self'; connect-src 'self' https://gibs.earthdata.nasa.gov; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests"};
+const withSec=r=>{const h=new Headers(r.headers);for(const[k,v]of Object.entries(sec))h.set(k,v);return new Response(r.body,{status:r.status,statusText:r.statusText,headers:h})};
+async function fetchHandler(request,env){const u=new URL(request.url),push=await handlePush(request,env,u);if(push)return withSec(push);const nat=await handleNational(request,env,legacy);if(nat)return withSec(nat);if(u.pathname==='/api/health'&&request.method==='GET')return withSec(await enhancedHealth(legacy,env));if(u.pathname==='/api/sources'&&request.method==='GET')return withSec(await enhancedSources(legacy,env));return withSec(await legacy.fetch(request,env))}
+export default{fetch:fetchHandler,async scheduled(controller,env,ctx){const operation=scheduledCycle(env,controller.scheduledTime).catch(error=>{console.error(JSON.stringify({level:'error',event:'order031_scheduler_failed',errorClass:String(error?.message||'UNKNOWN').slice(0,80)}));throw error});ctx.waitUntil(operation)}};
