@@ -1,4 +1,4 @@
-export const SOURCE_REGISTRY_VERSION='2026-10-13.order032.v1';
+export const SOURCE_REGISTRY_VERSION='2026-10-13.order031.v3';
 const machineStatuses=new Set(['LIVE_MACHINE','STATIC_LAYER']);
 const blockedStatuses=new Set(['BLOCKED_EXTERNAL_CREDENTIAL','BLOCKED_EXTERNAL_APPROVAL_OR_CREDENTIAL']);
 const capability=(providerId,organization,sourceRole,hazards,coverage,transport,status,limitations,publicHumanUrl,machineEndpointAllowlist=[],extra={})=>Object.freeze({providerId,organization,sourceRole,hazards:Object.freeze(hazards),coverage,transport,machineReadable:machineStatuses.has(status),freshnessContract:status==='STATIC_LAYER'?'Static/historical context only; never current impact.':'Provider timestamps and fetch state must be validated before current claims.',licenseOrTerms:'Official/public-source terms; attribution retained.',attribution:organization,cost:0,requiresCredential:blockedStatuses.has(status),credentialState:blockedStatuses.has(status)?'NOT_CONFIGURED':'NONE',status,limitations:Object.freeze(limitations),publicHumanUrl,machineEndpointAllowlist:Object.freeze(machineEndpointAllowlist),...extra});
