@@ -33,15 +33,15 @@ class MockD1Statement{
     return null;
   }
   async all(){
-    if(this.sql.includes("FROM hazard_events WHERE lifecycle='ACTIVE'"))return{results:[{payload_json:JSON.stringify(EVENT)}]};
+    if(this.sql.includes("FROM hazard_events WHERE lifecycle='ACTIVE'"))return{results:[{payload_json:JSON.stringify(this.db.event)}]};
     if(this.sql.includes('FROM provider_verification ORDER BY provider_id'))return{results:[{provider_id:'smn-cap',state:'FRESH_PARSED',verified_at:'2026-08-31T22:06:00.000Z',error_class:null,payload_json:JSON.stringify({state:'FRESH_PARSED',activeCount:1,canSayNoActiveOfficialWarnings:true,fetchedAt:new Date().toISOString()})}]};
     return{results:[]};
   }
 }
-class MockD1{constructor(stale=false){this.stale=stale}prepare(sql){return new MockD1Statement(this,sql)}}
+class MockD1{constructor(stale=false,event=EVENT){this.stale=stale;this.event=event}prepare(sql){return new MockD1Statement(this,sql)}}
 
-async function runtimeOverview(stale=false){
-  const response=await worker.fetch(new Request('https://aphora.test/api/overview'),{HAZARD_DB:new MockD1(stale)});
+async function runtimeOverview(stale=false,event=EVENT){
+  const response=await worker.fetch(new Request('https://aphora.test/api/overview'),{HAZARD_DB:new MockD1(stale,event)});
   assert.equal(response.status,200);
   return response.json();
 }
@@ -71,6 +71,8 @@ test('DEFAULT_WORKER_OVERVIEW_HAS_SITUATION_EVENTS',async()=>{
   assert.equal(d.situationEvents[0].freshness,'FRESH');
   assert.equal(d.situationEvents[0].capSeverity,'Severe');
 });
+
+test('EXPIRED_DURABLE_EVENT_IS_NOT_COUNTED_AS_CURRENT',async()=>{const expired={...EVENT,expiresAt:'2026-08-31T22:30:00.000Z'};const d=(await runtimeOverview(false,expired)).data;assert.equal(d.nationalEventCount,0);assert.equal(d.situationEvents.length,0)});
 
 test('STALE_OFFICIAL_FEED_VERIFICATION_CANNOT_CLAIM_CURRENT_STATUS',async()=>{const d=(await runtimeOverview(true)).data;assert.equal(d.verification.officialWarningFeed,'DEGRADED_CANNOT_VERIFY');assert.equal(d.verification.canSayNoActiveOfficialWarnings,false);assert.equal(d.verification.activeCount,null);assert.equal(d.verification.errorClass,'STALE_PROVIDER_VERIFICATION')});
 
