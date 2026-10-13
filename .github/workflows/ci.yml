@@ -43,14 +43,14 @@ jobs:
           done
           cat /tmp/aphora-static-preview.log
           exit 1
-      - name: Run responsive, accessibility and offline browser gate
-        run: node scripts/order032-visual.mjs
+      - name: Run current responsive and accessibility browser gate
+        run: node scripts/aphora-current-browser-qa.mjs
       - name: Upload browser acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: aphora-browser-acceptance
-          path: evidence/order032-visual-final/
+          name: aphora-current-browser-acceptance
+          path: evidence/aphora-current-browser/
           if-no-files-found: warn
           retention-days: 14
       - name: Upload build manifest
