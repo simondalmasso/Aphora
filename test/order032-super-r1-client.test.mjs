@@ -98,10 +98,15 @@ test('MAP_LIST_CANONICAL_PARITY_REMAINS_REAL_EVENTS',()=>{
   assert.doesNotMatch(app,/function renderMapMarkers\(\).*presentationClusters/s);
 });
 
-test('NO_FAKE_RIVER_SEVERITY_OR_THRESHOLD',()=>{
+test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_AND_REFERENCE_LEVELS',()=>{
   const m=app.match(/function riverCard\([\s\S]*?\nfunction /)?.[0]||'';
   assert.ok(m.length>0);
-  assert.doesNotMatch(m,/severity|threshold|alertLevel|evacuation/i);
+  assert.doesNotMatch(m,/severity/i);
+  assert.match(m,/officialStatus/);
+  assert.match(m,/alertLevel/);
+  assert.match(m,/evacuationLevel/);
+  assert.match(m,/NO ES UNA ALERTA DE INUNDACIÓN/);
+  assert.match(m,/status published|Estado publicado por Prefectura/);
 });
 
 test('SOURCE_FAILURE_DOES_NOT_POISON_OTHER_SOURCE',()=>{
@@ -120,3 +125,11 @@ test('CLIENT_PRESENTATION_CLUSTERING_ONLY_CLUSTERS_OFFICIAL_WARNINGS',()=>{asser
 test('SITUATION_RIVER_MARKER_KEYBOARD_ACCESSIBLE',()=>{assert.match(app,/situationObservationId[\s\S]{0,900}tabindex[\s\S]{0,900}onkeydown/);});
 
 test('CLIENT_EVIDENCE_KIND_PRESERVES_WARNING_OBSERVATION_SUPPLEMENTARY_ROLES',()=>{assert.match(app,/function evidenceKindForRole\(/);assert.match(app,/OFFICIAL_WARNING.*WARNING/);assert.match(app,/startsWith\('SUPPLEMENTARY_'\).*SUPPLEMENTARY/);});
+
+test('PREFECTURA_SOURCE_AND_MEASUREMENT_AGE_VISIBLE',()=>{
+  assert.match(app,/Prefectura Naval Argentina/);
+  assert.match(app,/ageMinutes/);
+  assert.match(app,/Abrir fuente original/);
+  assert.match(app,/RÍOS \/ PREFECTURA/);
+  assert.match(app,/providerVerification\.prefectura/);
+});
