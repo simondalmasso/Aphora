@@ -163,3 +163,8 @@ test('CLOUDFLARE_DEPLOY_IS_EXPLICIT_MANUAL_APHORA_CONFIG_WITHOUT_CRON',()=>{
   assert.doesNotMatch(workflow,/schedule:|cron:/i);
   assert.doesNotMatch(workflow,/wrangler\.jsonc/);
 });
+
+test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
+  assert.match(app,/Promise\.all\(\[loadOverview\(\{animate:true\}\),load\(\)\]\)/);
+  assert.doesNotMatch(app,/Promise\.all\(\[loadOverview\(\{animate:true\}\),load\(\),loadSourcesData\(\)\]\)/);
+});
