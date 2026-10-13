@@ -98,10 +98,14 @@ test('MAP_LIST_CANONICAL_PARITY_REMAINS_REAL_EVENTS',()=>{
   assert.doesNotMatch(app,/function renderMapMarkers\(\).*presentationClusters/s);
 });
 
-test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_AND_REFERENCE_LEVELS',()=>{
+test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_REFERENCE_LEVELS_AND_CAUTION',()=>{
   const m=app.match(/function riverCard\([\s\S]*?\nfunction /)?.[0]||'';
   assert.ok(m.length>0);
   assert.doesNotMatch(m,/severity/i);
+  assert.match(m,/riverGuidance/);
+  assert.match(m,/Cota de alerta publicada/);
+  assert.match(m,/cota de evacuación publicada/);
+  assert.match(m,/mantener cautela/);
   assert.match(m,/officialStatus/);
   assert.match(m,/alertLevel/);
   assert.match(m,/evacuationLevel/);
