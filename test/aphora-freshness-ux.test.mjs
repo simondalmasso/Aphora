@@ -31,7 +31,7 @@ test('SEISMIC_COUNTS_EXPLICITLY_STATE_THE_SEVEN_DAY_WINDOW',()=>{
   assert.ok(national.includes('cut=now.getTime()-7*86400000'));
 });
 
-test('RIVER_STATIONS_OVER_100_KM_ARE_NOT_LABELLED_NEARBY',()=>{
+test('DEGRADED_SMN_ATTEMPT_NEVER_LABELLED_AS_SUCCESSFUL_VERIFICATION',()=>{assert.match(app,/officialFeedVerified=/);assert.match(app,/SMN no verificable/);assert.match(app,/Verificación exitosa del feed oficial SMN/);assert.match(app,/Último intento de consulta al feed oficial SMN/);assert.doesNotMatch(app,/title='Última verificación del feed oficial SMN:/)});\n\ntest('RIVER_STATIONS_OVER_100_KM_ARE_NOT_LABELLED_NEARBY',()=>{
   assert.match(app,/distanceKm<=100/);
   assert.match(app,/ESTACIONES REGIONALES/);
   assert.match(app,/RÍOS A MENOS DE 100 KM/);
