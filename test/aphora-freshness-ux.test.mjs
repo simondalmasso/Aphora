@@ -18,7 +18,7 @@ test('WEATHER_VISIBILITY_MATCHES_LAST_AVAILABLE_HOUR_AND_NEVER_COERCES_NULL_TO_Z
 test('EXPIRED_DURABLE_EVENTS_ARE_EXCLUDED_FROM_CURRENT_OVERVIEW_AND_LOCAL_FEED',()=>{
   assert.match(national,/function eventIsCurrent\\(/);
   assert.match(national,/eventIsCurrent\\(e/);
-  assert.match(national,/now-Date\\.parse\\(stamp\\)>7\\*86400000/);
+  assert.match(national,/now-stamp>7\\*86400000/);
 });
 
 test('RIVER_STATIONS_OVER_100_KM_ARE_NOT_LABELLED_NEARBY',()=>{
