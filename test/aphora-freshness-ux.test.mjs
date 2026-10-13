@@ -19,6 +19,8 @@ test('EXPIRED_DURABLE_EVENTS_ARE_EXCLUDED_FROM_CURRENT_OVERVIEW_AND_LOCAL_FEED',
   assert.match(national,/function eventIsCurrent\(/);
   assert.match(national,/eventIsCurrent\(e/);
   assert.match(national,/now-stamp>7\*86400000/);
+  assert.match(national,/age>6\*3600000/);
+  assert.match(app,/relativeTime\(d\.verifiedAt\)/);
 });
 
 test('RIVER_STATIONS_OVER_100_KM_ARE_NOT_LABELLED_NEARBY',()=>{
