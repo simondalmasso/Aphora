@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://aphora.simondalmasso44.workers.dev/sitemap.xml
