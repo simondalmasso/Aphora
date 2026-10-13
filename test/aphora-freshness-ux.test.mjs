@@ -8,6 +8,7 @@ const runtime=fs.readFileSync(new URL('../src/worker/runtime.js',import.meta.url
 const config=fs.readFileSync(new URL('../wrangler.aphora.jsonc',import.meta.url),'utf8');
 const deploy=fs.readFileSync(new URL('../.github/workflows/deploy-aphora.yml',import.meta.url),'utf8');
 const css=fs.readFileSync(new URL('../public/app.css',import.meta.url),'utf8');
+const schedulerWorkflow=fs.readFileSync(new URL('../.github/workflows/aphora-scheduler.yml',import.meta.url),'utf8');
 
 test('WEATHER_VISIBILITY_MATCHES_LAST_AVAILABLE_HOUR_AND_NEVER_COERCES_NULL_TO_ZERO',()=>{
   assert.match(app,/function visibilityAtOrBefore\(/);
@@ -36,8 +37,11 @@ test('WEATHER_AND_CIVIC_RISK_SHARE_ONE_STABLE_VISUAL_THEME',()=>{
 });
 
 test('APHORA_SCHEDULER_IS_FIVE_MINUTES_AND_STAYS_WITHIN_FREE_D1_BUDGET',()=>{
-  assert.match(config,/"crons":\["\*\/5 \* \* \* \*"/);
-  assert.match(deploy,/five-minute scheduler/i);
+  assert.match(config,/"crons":\[\]/);
+  assert.ok(schedulerWorkflow.includes('cron: "*/5 * * * *"'));
+  assert.ok(schedulerWorkflow.includes('/api/internal/scheduled-cycle'));
+  assert.ok(schedulerWorkflow.includes('APHORA_SCHEDULER_TOKEN'));
+  assert.ok(deploy.includes('APHORA_SCHEDULER_TOKEN'));
   assert.match(runtime,/MAX_JOBS_PER_CYCLE=3/);
   const budget=fs.readFileSync(new URL('../scripts/d1-budget-24h.mjs',import.meta.url),'utf8');
   assert.match(budget,/fixedRows<=2_500_000/);

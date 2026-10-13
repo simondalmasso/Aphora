@@ -1,0 +1,50 @@
+name: APHORA free external scheduler
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aphora-external-scheduler
+  cancel-in-progress: false
+
+jobs:
+  scheduled-cycle:
+    name: Trigger authenticated APHORA ingestion
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Invoke bounded ingestion cycle
+        env:
+          APHORA_SCHEDULER_TOKEN: ${{ secrets.APHORA_SCHEDULER_TOKEN }}
+        shell: bash
+        run: |
+          if [[ ${#APHORA_SCHEDULER_TOKEN} -lt 32 ]]; then
+            echo "APHORA_SCHEDULER_TOKEN is missing or too short" >&2
+            exit 1
+          fi
+          response="$(curl --silent --show-error --fail-with-body \
+            --connect-timeout 10 --max-time 210 \
+            --request POST \
+            --header "Authorization: Bearer $APHORA_SCHEDULER_TOKEN" \
+            --header "Accept: application/json" \
+            https://aphora.simondalmasso44.workers.dev/api/internal/scheduled-cycle)"
+          printf '%s' "$response" | node --input-type=module -e '
+            import fs from "node:fs";
+            const payload = JSON.parse(fs.readFileSync(0, "utf8"));
+            if (payload?.ok !== true || payload?.data?.mode !== "SINGLE_CRON_PLUS_D1_DURABLE_JOB_TABLE") {
+              console.error(JSON.stringify({ok:false,error:payload?.error?.code||"INVALID_SCHEDULER_RESPONSE"}));
+              process.exit(1);
+            }
+            console.log(JSON.stringify({
+              ok:true,
+              scheduledCount:payload.data.scheduledCount,
+              jobs:(payload.data.jobs||[]).map(({providerId,status,records})=>({providerId,status,records})),
+              eventCount:payload.data.eventCount,
+              retentionDeleted:payload.data.retentionDeleted
+            }));
+          '

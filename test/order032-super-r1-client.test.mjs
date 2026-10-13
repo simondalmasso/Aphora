@@ -158,7 +158,8 @@ test('CLOUDFLARE_DEPLOY_IS_MANUAL_AND_APHORA_SCHEDULER_IS_BUDGETED',()=>{
   assert.match(workflow,/CLOUDFLARE_API_TOKEN/);
   assert.match(workflow,/wrangler\.aphora\.jsonc/);
   assert.match(workflow,/confirm_production/);
-  assert.deepEqual(JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8')).triggers?.crons,['*/5 * * * *']);
+  assert.deepEqual(JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8')).triggers?.crons,[]);
+  assert.ok(fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8').includes('cron: "*/5 * * * *"'));
   assert.doesNotMatch(workflow,/wrangler\.jsonc/);
 });
 
@@ -169,11 +170,12 @@ test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
   assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),loadSourcesData()])"));
 });
 
-test('APHORA_CRON_IS_ENABLED_BUT_LEGACY_SOS_SF_STAYS_DISABLED',()=>{
+test('LEGACY_SOS_SF_CRON_STAYS_DISABLED_AND_APHORA_USES_EXTERNAL_SCHEDULER',()=>{
   const legacyConfig=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
   const aphoraConfig=JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8'));
   assert.equal(legacyConfig.triggers,undefined);
-  assert.deepEqual(aphoraConfig.triggers?.crons,['*/5 * * * *']);
+  assert.deepEqual(aphoraConfig.triggers?.crons,[]);
+  assert.ok(fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8').includes('/api/internal/scheduled-cycle'));
 });
 
 
