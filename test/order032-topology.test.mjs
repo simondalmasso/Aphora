@@ -9,7 +9,7 @@ test('NO_AUTOMATIC_CRON_TOPOLOGY',()=>{
   assert.equal(scheduler.name,'sos-sf');
   assert.equal(scheduler.triggers,undefined,'legacy SOS-SF five-minute cron must stay disabled');
   assert.equal(publicWorker.name,'aphora');
-  assert.equal(publicWorker.triggers,undefined,'APHORA stays within the Cloudflare Free cron quota');
+  assert.deepEqual(publicWorker.triggers?.crons,[],'APHORA explicitly removes Cloudflare cron triggers to stay within the Free quota');
   const external=fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8');
   assert.ok(external.includes('cron: "*/5 * * * *"'));
   assert.ok(external.includes('/api/internal/scheduled-cycle'));
