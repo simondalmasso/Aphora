@@ -166,7 +166,7 @@ test('CLOUDFLARE_DEPLOY_IS_EXPLICIT_MANUAL_APHORA_CONFIG_WITHOUT_CRON',()=>{
 
 test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
   const reconnect=app.slice(app.indexOf("addEventListener('online'"),app.indexOf("addEventListener('offline'"));
-  assert.match(reconnect,/Promise\\.all\\(\\[loadOverview\\(\\{animate:true\\}\\),load\\(\\)\\]\\)/);
-  assert.doesNotMatch(reconnect,/loadSourcesData/);
-  assert.match(app,/\\$\\('#refresh'\\)\\.onclick=\\(\\)=>Promise\\.all\\(\\[loadOverview\\(\\{animate:true\\}\\),load\\(\\),loadSourcesData\\(\\)\\]\\)/);
+  assert.ok(reconnect.includes("Promise.all([loadOverview({animate:true}),load()])"));
+  assert.ok(!reconnect.includes("loadSourcesData"));
+  assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),loadSourcesData()])"));
 });
