@@ -37,7 +37,7 @@ test('WEATHER_AND_CIVIC_RISK_SHARE_ONE_STABLE_VISUAL_THEME',()=>{
 });
 
 test('APHORA_SCHEDULER_IS_FIVE_MINUTES_AND_STAYS_WITHIN_FREE_D1_BUDGET',()=>{
-  assert.doesNotMatch(config,/"triggers"\s*:/);
+  assert.match(config,/"crons":\[\]/);
   assert.ok(schedulerWorkflow.includes('cron: "*/5 * * * *"'));
   assert.ok(schedulerWorkflow.includes('/api/internal/scheduled-cycle'));
   assert.ok(schedulerWorkflow.includes('APHORA_SCHEDULER_TOKEN'));
