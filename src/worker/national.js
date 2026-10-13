@@ -12,7 +12,7 @@ const GEO={hosts:['apis.datos.gob.ar'],paths:[/^\/georef\/api\/localidades$/],ma
 const INPRES={hosts:['www.inpres.gob.ar'],paths:[/^\/sismos_consultados$/],maxBytes:900000,timeoutMs:8000,contentTypes:['html'],accept:'text/html'};
 const USGS={hosts:['earthquake.usgs.gov'],paths:[/^\/fdsnws\/event\/1\/query$/],maxBytes:1000000,timeoutMs:8000,contentTypes:['json'],accept:'application/geo+json,application/json'};
 const EONET={hosts:['eonet.gsfc.nasa.gov'],paths:[/^\/api\/v3\/events$/],maxBytes:1000000,timeoutMs:8000,contentTypes:['json','rss+xml'],accept:'application/json'};
-const SMN_CHUNK=20;
+const SMN_CHUNK=5;
 const NASA_POINT={lon:-60.7,lat:-31.63,bbox:[-60.75,-31.68,-60.65,-31.58],regionCodes:['AR-S']};
 export const j=(data,status=200,cache='no-store')=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':cache}});
 export const safeErr=(code,status=400,detail=null)=>j({ok:false,error:{code,...(detail?{detail}: {})}},status);
