@@ -9,7 +9,7 @@ test('NO_AUTOMATIC_CRON_TOPOLOGY',()=>{
   assert.equal(scheduler.name,'sos-sf');
   assert.equal(scheduler.triggers,undefined,'legacy SOS-SF five-minute cron must stay disabled');
   assert.equal(publicWorker.name,'aphora');
-  assert.equal(publicWorker.triggers,undefined,'APHORA must not schedule recurring Worker invocations');
+  assert.deepEqual(publicWorker.triggers?.crons,['*/5 * * * *'],'APHORA uses only its budgeted five-minute ingestion cron');
 });
 
 test('APHORA_PUBLIC_WORKER_USES_CANONICAL_HAZARD_DB_WITHOUT_PRIVATE_BINDING',()=>{
