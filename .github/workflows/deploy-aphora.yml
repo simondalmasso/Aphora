@@ -44,7 +44,7 @@ jobs:
           echo "SOURCE_MANIFEST_SHA256=$(git ls-files src public migrations | LC_ALL=C sort | xargs -r sha256sum | sha256sum | awk '{print $1}')" >> "$GITHUB_ENV"
       - name: Run complete release gate
         run: npm run gate
-      - name: Prepare deployment-only config (APHORA, no cron)
+      - name: Prepare deployment-only config (APHORA, five-minute scheduler)
         shell: bash
         run: |
           export DIST_MANIFEST_SHA256="$(sha256sum dist/manifest.json | awk '{print $1}')"
