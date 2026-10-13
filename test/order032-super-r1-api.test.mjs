@@ -8,3 +8,18 @@ const legacy={async fetch(request){const p=new URL(request.url).pathname;if(p===
 test('OBSERVATIONS_ENDPOINT_EXPOSES_CANONICAL_HYDROLOGY_WITH_PROVIDER_GEOMETRY',async()=>{const env={SOS_TEST_INA_SERIES_GEOJSON:JSON.stringify(geo),SOS_TEST_NOW:NOW};const r=await handleNational(new Request('https://aphora.test/api/observations?type=RIVER_LEVEL&limit=10'),env,legacy);assert.equal(r.status,200);const p=await r.json();assert.equal(p.ok,true);assert.equal(p.data.observations.length,2);assert.equal(p.data.observations[0].providerId,'ina');assert.equal(p.data.observations[0].coordinateSource,'INA_SIYAH_SERIES_GEOJSON');assert.equal(p.data.sourceState.providerId,'ina');assert.notEqual(p.data.sourceState.state,'GLOBAL_DEGRADED')});
 test('OBSERVATIONS_ENDPOINT_BBOX_FILTERS_GEOGRAPHICALLY_NOT_BY_PROVINCE',async()=>{const env={SOS_TEST_INA_SERIES_GEOJSON:JSON.stringify(geo),SOS_TEST_NOW:NOW};const r=await handleNational(new Request('https://aphora.test/api/observations?type=RIVER_LEVEL&bbox=-60.80,-31.70,-60.65,-31.60&limit=10'),env,legacy);const p=await r.json();assert.equal(p.data.observations.length,2);assert.equal(p.data.coverage.adminBoundaryFilter,false)});
 test('OBSERVATIONS_ENDPOINT_FAILS_SOFT_WHEN_COORDINATE_METADATA_UNAVAILABLE',async()=>{const env={SOS_TEST_INA_SERIES_GEOJSON:'{"type":"FeatureCollection","features":[]}',SOS_TEST_NOW:NOW};const r=await handleNational(new Request('https://aphora.test/api/observations?type=RIVER_LEVEL&limit=10'),env,legacy);assert.equal(r.status,200);const p=await r.json();assert.equal(p.data.observations.length,2);assert.equal(p.data.observations[0].geometry,null);assert.equal(p.data.sourceState.coordinateState,'UNAVAILABLE')});
+
+test('OBSERVATIONS_ENDPOINT_MERGES_PREFECTURA_WITHOUT_REPLACING_INA',async()=>{
+ const html='<table><tr><th>Puerto</th><th>Río</th><th>Ult. registro</th><th>Variación</th><th>Periodo</th><th>Fecha Hora</th><th>Estado</th><th></th><th>Registro Anterior</th><th>Fecha Anterior</th><th>Alerta</th><th>Evacuación</th></tr><tr><td>SANTA FE</td><td>PARANA</td><td>3.56</td><td>0.00</td><td>2</td><td>13/OCT/26 - 1200</td><td>ESTAC.</td><td></td><td>3.56</td><td>13/OCT/26 - 1000</td><td>5.30</td><td>5.70</td></tr><tr><td>IGUAZU</td><td>IGUAZU</td><td>29.20</td><td>0.55</td><td>4</td><td>13/OCT/26 - 1000</td><td>EVACUACION CRECE</td><td></td><td>28.65</td><td>13/OCT/26 - 0600</td><td>25.00</td><td>28.00</td></tr></table>';
+ const env={SOS_TEST_INA_SERIES_GEOJSON:JSON.stringify(geo),SOS_TEST_PREFECTURA_HTML:html,SOS_TEST_NOW:NOW};
+ const r=await handleNational(new Request('https://aphora.test/api/observations?type=RIVER_LEVEL&limit=10'),env,legacy);
+ const p=await r.json();
+ assert.equal(r.status,200);
+ assert.equal(p.data.observations.length,4);
+ assert.equal(p.data.observations.filter(o=>o.providerId==='ina').length,2);
+ assert.equal(p.data.observations.filter(o=>o.providerId==='prefectura').length,2);
+ assert.equal(p.data.sourceState.providers.prefectura.state,'FIXTURE_PARSED');
+ const santaFe=p.data.observations.find(o=>o.providerId==='prefectura'&&o.locationLabel==='SANTA FE');
+ assert.deepEqual(santaFe.geometry.coordinates,[-60.684,-31.659]);
+ assert.equal(santaFe.isWarning,false);
+});
