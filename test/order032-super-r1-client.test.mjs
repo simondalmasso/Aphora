@@ -177,3 +177,20 @@ test('NO_CRON_IN_LEGACY_OR_APHORA_CONFIG',()=>{
   assert.equal(legacyConfig.triggers,undefined);
   assert.equal(aphoraConfig.triggers,undefined);
 });
+
+
+test('WEATHER_FIRST_HERO_SHOWS_REAL_CURRENT_METRICS_AND_FOUR_DAY_FORECAST',()=>{
+  assert.match(app,/id="weather-hero"/);
+  assert.match(app,/weather-daily-summary/);
+  assert.match(app,/relative_humidity_2m/);
+  assert.match(app,/apparent_temperature/);
+  assert.match(app,/wind_speed_10m/);
+  assert.match(app,/visibility/);
+  assert.match(app,/forecast_days=4/);
+  assert.match(app,/temperature_2m_max/);
+  assert.match(app,/No se muestran valores estimados/);
+  assert.match(css,/\.weather-hero/);
+  assert.match(css,/\.weather-daily-summary/);
+  assert.match(css,/data-weather-theme="sunny"/);
+  assert.match(css,/data-weather-theme="night"/);
+});
