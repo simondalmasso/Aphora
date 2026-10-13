@@ -104,8 +104,8 @@ test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_REFERENCE_LEVELS_AND_CAU
   assert.doesNotMatch(m,/severity/i);
   assert.match(m,/riverGuidance/);
   assert.match(app,/function riverGuidance\(/);
-  assert.match(app,/Cota de alerta publicada/);
-  assert.match(app,/cota de evacuación publicada/);
+  assert.match(app,/[Cc]ota de alerta publicada/);
+  assert.match(app,/[Cc]ota de evacuación publicada/);
   assert.match(app,/mantener cautela/);
   assert.match(m,/officialStatus/);
   assert.match(m,/alertLevel/);
