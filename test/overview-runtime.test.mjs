@@ -15,12 +15,12 @@ const EVENT={
   officialWarningState:'ACTIVE',
   observationState:'NONE',
   displaySeverity:'SEVERE',
-  lastChangedAt:'2026-08-31T22:10:00.000Z',
+  lastChangedAt:new Date().toISOString(),
   records:[{
     recordId:'smn:cap-1',providerId:'smn-cap',sourceRole:'OFFICIAL_WARNING',
     sourceOrganization:'Servicio Meteorológico Nacional',verificationState:'VERIFIED_MACHINE',
-    freshness:'FRESH',capSeverity:'Severe',issuedAt:'2026-08-31T22:05:00.000Z',
-    observedAt:null,fetchedAt:'2026-08-31T22:06:00.000Z'
+    freshness:'FRESH',capSeverity:'Severe',issuedAt:new Date(Date.now()-60_000).toISOString(),
+    observedAt:null,fetchedAt:new Date().toISOString()
   }]
 };
 
@@ -28,13 +28,13 @@ class MockD1Statement{
   constructor(db,sql){this.db=db;this.sql=sql;this.args=[]}
   bind(...args){this.args=args;return this}
   async first(){
-    if(this.sql.includes("FROM runtime_state WHERE key='scheduler:last_cycle'"))return{updated_at:'2026-08-31T22:11:00.000Z'};
-    if(this.sql.includes("FROM provider_verification WHERE provider_id='smn-cap'"))return{state:'FRESH_PARSED',verified_at:'2026-08-31T22:06:00.000Z',active_count:1,can_say_no_active:1,error_class:null};
+    if(this.sql.includes("FROM runtime_state WHERE key='scheduler:last_cycle'"))return{updated_at:new Date().toISOString()};
+    if(this.sql.includes("FROM provider_verification WHERE provider_id='smn-cap'"))return{state:'FRESH_PARSED',verified_at:new Date().toISOString(),active_count:1,can_say_no_active:1,error_class:null};
     return null;
   }
   async all(){
     if(this.sql.includes("FROM hazard_events WHERE lifecycle='ACTIVE'"))return{results:[{payload_json:JSON.stringify(EVENT)}]};
-    if(this.sql.includes('FROM provider_verification ORDER BY provider_id'))return{results:[{provider_id:'smn-cap',state:'FRESH_PARSED',verified_at:'2026-08-31T22:06:00.000Z',error_class:null,payload_json:JSON.stringify({state:'FRESH_PARSED',activeCount:1,canSayNoActiveOfficialWarnings:true,fetchedAt:'2026-08-31T22:06:00.000Z'})}]};
+    if(this.sql.includes('FROM provider_verification ORDER BY provider_id'))return{results:[{provider_id:'smn-cap',state:'FRESH_PARSED',verified_at:'2026-08-31T22:06:00.000Z',error_class:null,payload_json:JSON.stringify({state:'FRESH_PARSED',activeCount:1,canSayNoActiveOfficialWarnings:true,fetchedAt:new Date().toISOString()})}]};
     return{results:[]};
   }
 }
