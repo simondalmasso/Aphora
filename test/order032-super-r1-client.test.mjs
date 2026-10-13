@@ -159,7 +159,7 @@ test('CLOUDFLARE_DEPLOY_IS_MANUAL_AND_APHORA_SCHEDULER_IS_BUDGETED',()=>{
   assert.match(workflow,/wrangler\.aphora\.jsonc/);
   assert.match(workflow,/confirm_production/);
   assert.deepEqual(JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8')).triggers?.crons,[]);
-  assert.ok(fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8').includes('cron: "*/5 * * * *"'));
+  assert.ok(fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8').includes('cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"'));
   assert.doesNotMatch(workflow,/wrangler\.jsonc/);
 });
 
