@@ -170,3 +170,10 @@ test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
   assert.ok(!reconnect.includes("loadSourcesData"));
   assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),loadSourcesData()])"));
 });
+
+test('NO_CRON_IN_LEGACY_OR_APHORA_CONFIG',()=>{
+  const legacyConfig=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+  const aphoraConfig=JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8'));
+  assert.equal(legacyConfig.triggers,undefined);
+  assert.equal(aphoraConfig.triggers,undefined);
+});
