@@ -144,23 +144,21 @@ test('WEATHER_SKIN_IS_BROWSER_SIDE_CACHED_AND_NOT_A_WORKER_ENDPOINT',()=>{
   assert.match(app,/WEATHER_TTL_MS=30\*60\*1000/);
   assert.match(app,/WEATHER_MIN_FETCH_GAP_MS=5\*60\*1000/);
   assert.match(app,/weatherThemeFromCurrent/);
-  assert.match(css,/data-weather-theme="sunny"/);
-  assert.match(css,/data-weather-theme="cloudy"/);
-  assert.match(css,/data-weather-theme="rain"/);
-  assert.match(css,/data-weather-theme="night"/);
+  assert.doesNotMatch(css,/data-weather-theme=/);
+  assert.match(css,/\.weather-hero\{[^}]*background:var\(--surface\)/);
   const worker=fs.readFileSync('src/worker/index.js','utf8');
   assert.match(worker,/https:\/\/api\.open-meteo\.com/);
   assert.doesNotMatch(app,/\/api\/weather/);
 });
 
-test('CLOUDFLARE_DEPLOY_IS_EXPLICIT_MANUAL_APHORA_CONFIG_WITHOUT_CRON',()=>{
+test('CLOUDFLARE_DEPLOY_IS_MANUAL_AND_APHORA_SCHEDULER_IS_BUDGETED',()=>{
   const workflow=fs.readFileSync('.github/workflows/deploy-aphora.yml','utf8');
   assert.match(workflow,/workflow_dispatch/);
   assert.match(workflow,/CLOUDFLARE_ACCOUNT_ID/);
   assert.match(workflow,/CLOUDFLARE_API_TOKEN/);
   assert.match(workflow,/wrangler\.aphora\.jsonc/);
   assert.match(workflow,/confirm_production/);
-  assert.doesNotMatch(workflow,/schedule:|cron:/i);
+  assert.deepEqual(JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8')).triggers?.crons,['*/5 * * * *']);
   assert.doesNotMatch(workflow,/wrangler\.jsonc/);
 });
 
@@ -171,11 +169,11 @@ test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
   assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),loadSourcesData()])"));
 });
 
-test('NO_CRON_IN_LEGACY_OR_APHORA_CONFIG',()=>{
+test('APHORA_CRON_IS_ENABLED_BUT_LEGACY_SOS_SF_STAYS_DISABLED',()=>{
   const legacyConfig=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
   const aphoraConfig=JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8'));
   assert.equal(legacyConfig.triggers,undefined);
-  assert.equal(aphoraConfig.triggers,undefined);
+  assert.deepEqual(aphoraConfig.triggers?.crons,['*/5 * * * *']);
 });
 
 
@@ -192,8 +190,8 @@ test('WEATHER_FIRST_HERO_SHOWS_REAL_CURRENT_METRICS_AND_FOUR_DAY_FORECAST',()=>{
   assert.match(app,/No se muestran valores estimados/);
   assert.match(css,/\.weather-hero/);
   assert.match(css,/\.weather-daily-summary/);
-  assert.match(css,/data-weather-theme="sunny"/);
-  assert.match(css,/data-weather-theme="night"/);
+  assert.doesNotMatch(css,/data-weather-theme=/);
+  assert.match(css,/\.weather-daily-summary\{[^}]*background:var\(--surface\)/);
 });
 
 

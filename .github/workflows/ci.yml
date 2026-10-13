@@ -17,7 +17,7 @@ jobs:
   gate:
     name: Typecheck, lint, tests and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,6 +30,29 @@ jobs:
         run: npm ci
       - name: Run project gate
         run: npm run gate
+      - name: Install Chromium for browser acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Start exact built artifact preview
+        shell: bash
+        run: |
+          node scripts/static-qa-server.mjs > /tmp/aphora-static-preview.log 2>&1 &
+          echo $! > /tmp/aphora-static-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8790/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/aphora-static-preview.log
+          exit 1
+      - name: Run current responsive and accessibility browser gate
+        run: node scripts/aphora-current-browser-qa.mjs
+      - name: Upload browser acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aphora-current-browser-acceptance
+          path: evidence/aphora-current-browser/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload build manifest
         uses: actions/upload-artifact@v4
         with:
