@@ -5,11 +5,11 @@ import fs from 'node:fs';
 const scheduler=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
 const publicWorker=JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8'));
 
-test('ONE_ACTIVE_SCHEDULER_TOPOLOGY',()=>{
+test('NO_AUTOMATIC_CRON_TOPOLOGY',()=>{
   assert.equal(scheduler.name,'sos-sf');
-  assert.deepEqual(scheduler.triggers?.crons,['*/5 * * * *']);
+  assert.equal(scheduler.triggers,undefined,'legacy SOS-SF five-minute cron must stay disabled');
   assert.equal(publicWorker.name,'aphora');
-  assert.ok(!publicWorker.triggers||!Array.isArray(publicWorker.triggers.crons)||publicWorker.triggers.crons.length===0);
+  assert.equal(publicWorker.triggers,undefined,'APHORA must not schedule recurring Worker invocations');
 });
 
 test('APHORA_PUBLIC_WORKER_USES_CANONICAL_HAZARD_DB_WITHOUT_PRIVATE_BINDING',()=>{
