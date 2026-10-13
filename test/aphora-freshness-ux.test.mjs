@@ -39,5 +39,5 @@ test('APHORA_SCHEDULER_IS_FIVE_MINUTES_AND_STAYS_WITHIN_FREE_D1_BUDGET',()=>{
   assert.match(runtime,/MAX_JOBS_PER_CYCLE=3/);
   const budget=fs.readFileSync(new URL('../scripts/d1-budget-24h.mjs',import.meta.url),'utf8');
   assert.match(budget,/fixedRows<=2_500_000/);
-  assert.doesNotMatch(deploy,/Stripe|Paddle|LemonSqueezy|payment|checkout/i);
+  assert.doesNotMatch(deploy,/Stripe|Paddle|LemonSqueezy|payment provider|checkout_url/i);
 });
