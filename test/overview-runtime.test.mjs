@@ -29,7 +29,7 @@ class MockD1Statement{
   bind(...args){this.args=args;return this}
   async first(){
     if(this.sql.includes("FROM runtime_state WHERE key='scheduler:last_cycle'"))return{updated_at:new Date().toISOString()};
-    if(this.sql.includes("FROM provider_verification WHERE provider_id='smn-cap'"))return{state:'FRESH_PARSED',verified_at:new Date().toISOString(),active_count:1,can_say_no_active:1,error_class:null};
+    if(this.sql.includes("FROM provider_verification WHERE provider_id='smn-cap'"))return{state:'FRESH_PARSED',verified_at:this.db.stale?'2026-08-31T22:06:00.000Z':new Date().toISOString(),active_count:1,can_say_no_active:1,error_class:null};
     return null;
   }
   async all(){
@@ -38,10 +38,10 @@ class MockD1Statement{
     return{results:[]};
   }
 }
-class MockD1{prepare(sql){return new MockD1Statement(this,sql)}}
+class MockD1{constructor(stale=false){this.stale=stale}prepare(sql){return new MockD1Statement(this,sql)}}
 
-async function runtimeOverview(){
-  const response=await worker.fetch(new Request('https://aphora.test/api/overview'),{HAZARD_DB:new MockD1()});
+async function runtimeOverview(stale=false){
+  const response=await worker.fetch(new Request('https://aphora.test/api/overview'),{HAZARD_DB:new MockD1(stale)});
   assert.equal(response.status,200);
   return response.json();
 }
@@ -71,6 +71,8 @@ test('DEFAULT_WORKER_OVERVIEW_HAS_SITUATION_EVENTS',async()=>{
   assert.equal(d.situationEvents[0].freshness,'FRESH');
   assert.equal(d.situationEvents[0].capSeverity,'Severe');
 });
+
+test('STALE_OFFICIAL_FEED_VERIFICATION_CANNOT_CLAIM_CURRENT_STATUS',async()=>{const d=(await runtimeOverview(true)).data;assert.equal(d.verification.officialWarningFeed,'DEGRADED_CANNOT_VERIFY');assert.equal(d.verification.canSayNoActiveOfficialWarnings,false);assert.equal(d.verification.activeCount,null);assert.equal(d.verification.errorClass,'STALE_PROVIDER_VERIFICATION')});
 
 test('NATIONAL_EVENT_COUNT_RUNTIME',async()=>{
   const d=(await runtimeOverview()).data;
