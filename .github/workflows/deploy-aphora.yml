@@ -1,0 +1,62 @@
+name: Deploy APHORA (manual only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Confirm deploying APHORA Worker production"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aphora-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: inputs.confirm_production == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Checkout canonical commit
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Prepare immutable release metadata
+        shell: bash
+        run: |
+          echo "ORDER031_RELEASE_ID=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+          echo "ORDER031_BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          echo "SOURCE_MANIFEST_SHA256=$(git ls-files src public migrations | LC_ALL=C sort | xargs -r sha256sum | sha256sum | awk '{print $1}')" >> "$GITHUB_ENV"
+      - name: Run complete release gate
+        run: npm run gate
+      - name: Prepare deployment-only config (APHORA, no cron)
+        shell: bash
+        run: |
+          export DIST_MANIFEST_SHA256="$(sha256sum dist/manifest.json | awk '{print $1}')"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const config = JSON.parse(fs.readFileSync('wrangler.aphora.jsonc', 'utf8'));
+          config.assets.directory = './dist/public';
+          config.vars.ORDER031_RELEASE_ID = process.env.ORDER031_RELEASE_ID;
+          config.vars.SOURCE_MANIFEST_SHA256 = process.env.SOURCE_MANIFEST_SHA256;
+          config.vars.DIST_MANIFEST_SHA256 = process.env.DIST_MANIFEST_SHA256;
+          config.vars.ORDER031_BUILT_AT = process.env.ORDER031_BUILT_AT;
+          fs.writeFileSync('.wrangler.aphora.deploy.jsonc', JSON.stringify(config, null, 2) + '\n');
+          NODE
+      - name: Deploy Worker and static assets
+        run: npx wrangler deploy --config .wrangler.aphora.deploy.jsonc

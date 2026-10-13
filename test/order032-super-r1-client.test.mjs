@@ -98,10 +98,15 @@ test('MAP_LIST_CANONICAL_PARITY_REMAINS_REAL_EVENTS',()=>{
   assert.doesNotMatch(app,/function renderMapMarkers\(\).*presentationClusters/s);
 });
 
-test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_AND_REFERENCE_LEVELS',()=>{
+test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_REFERENCE_LEVELS_AND_CAUTION',()=>{
   const m=app.match(/function riverCard\([\s\S]*?\nfunction /)?.[0]||'';
   assert.ok(m.length>0);
   assert.doesNotMatch(m,/severity/i);
+  assert.match(m,/riverGuidance/);
+  assert.match(app,/function riverGuidance\(/);
+  assert.match(app,/[Cc]ota de alerta publicada/);
+  assert.match(app,/[Cc]ota de evacuación publicada/);
+  assert.match(app,/mantener cautela/);
   assert.match(m,/officialStatus/);
   assert.match(m,/alertLevel/);
   assert.match(m,/evacuationLevel/);
@@ -132,4 +137,61 @@ test('PREFECTURA_SOURCE_AND_MEASUREMENT_AGE_VISIBLE',()=>{
   assert.match(app,/Abrir fuente original/);
   assert.match(app,/RÍOS \/ PREFECTURA/);
   assert.match(app,/providerVerification\.prefectura/);
+});
+
+test('WEATHER_SKIN_IS_BROWSER_SIDE_CACHED_AND_NOT_A_WORKER_ENDPOINT',()=>{
+  assert.match(app,/api\.open-meteo\.com\/v1\/forecast/);
+  assert.match(app,/WEATHER_TTL_MS=30\*60\*1000/);
+  assert.match(app,/WEATHER_MIN_FETCH_GAP_MS=5\*60\*1000/);
+  assert.match(app,/weatherThemeFromCurrent/);
+  assert.match(css,/data-weather-theme="sunny"/);
+  assert.match(css,/data-weather-theme="cloudy"/);
+  assert.match(css,/data-weather-theme="rain"/);
+  assert.match(css,/data-weather-theme="night"/);
+  const worker=fs.readFileSync('src/worker/index.js','utf8');
+  assert.match(worker,/https:\/\/api\.open-meteo\.com/);
+  assert.doesNotMatch(app,/\/api\/weather/);
+});
+
+test('CLOUDFLARE_DEPLOY_IS_EXPLICIT_MANUAL_APHORA_CONFIG_WITHOUT_CRON',()=>{
+  const workflow=fs.readFileSync('.github/workflows/deploy-aphora.yml','utf8');
+  assert.match(workflow,/workflow_dispatch/);
+  assert.match(workflow,/CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(workflow,/CLOUDFLARE_API_TOKEN/);
+  assert.match(workflow,/wrangler\.aphora\.jsonc/);
+  assert.match(workflow,/confirm_production/);
+  assert.doesNotMatch(workflow,/schedule:|cron:/i);
+  assert.doesNotMatch(workflow,/wrangler\.jsonc/);
+});
+
+test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
+  const reconnect=app.slice(app.indexOf("addEventListener('online'"),app.indexOf("addEventListener('offline'"));
+  assert.ok(reconnect.includes("Promise.all([loadOverview({animate:true}),load()])"));
+  assert.ok(!reconnect.includes("loadSourcesData"));
+  assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),loadSourcesData()])"));
+});
+
+test('NO_CRON_IN_LEGACY_OR_APHORA_CONFIG',()=>{
+  const legacyConfig=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+  const aphoraConfig=JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8'));
+  assert.equal(legacyConfig.triggers,undefined);
+  assert.equal(aphoraConfig.triggers,undefined);
+});
+
+
+test('WEATHER_FIRST_HERO_SHOWS_REAL_CURRENT_METRICS_AND_FOUR_DAY_FORECAST',()=>{
+  assert.match(app,/id="weather-hero"/);
+  assert.match(app,/weather-daily-summary/);
+  assert.match(app,/relative_humidity_2m/);
+  assert.match(app,/apparent_temperature/);
+  assert.match(app,/wind_speed_10m/);
+  assert.match(app,/hourly=visibility/);
+  assert.match(app,/currentWithVisibility/);
+  assert.match(app,/forecast_days=4/);
+  assert.match(app,/temperature_2m_max/);
+  assert.match(app,/No se muestran valores estimados/);
+  assert.match(css,/\.weather-hero/);
+  assert.match(css,/\.weather-daily-summary/);
+  assert.match(css,/data-weather-theme="sunny"/);
+  assert.match(css,/data-weather-theme="night"/);
 });
