@@ -30,6 +30,8 @@ jobs:
         run: npm ci
       - name: Run project gate
         run: npm run gate
+      - name: Verify APHORA-only 24h D1 read budget
+        run: node scripts/d1-budget-24h.mjs
       - name: Install Chromium for browser acceptance
         run: npx playwright install --with-deps chromium
       - name: Start exact built artifact preview
