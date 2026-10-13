@@ -1,93 +1,91 @@
-# APHORA
+# APHORA — Radar cívico de riesgos para Argentina
 
+**APHORA** es una aplicación web progresiva (PWA) para explorar riesgos y eventos relevantes en Argentina, consultar observaciones y revisar evidencia con su fuente, vigencia y estado de verificación claramente diferenciados.
 
+- **Aplicación en producción:** https://aphora.simondalmasso44.workers.dev/
+- **Repositorio canónico:** https://github.com/simondalmasso/Aphora
+- **Espejo heredado de GitLab:** https://gitlab.com/simondalmasso/aphora
 
-## Getting started
+> APHORA organiza información para facilitar la observación cívica; no sustituye las alertas oficiales, los servicios de emergencia ni las instrucciones de las autoridades.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Qué ofrece
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Radar nacional y exploración por área o localidad.
+- Eventos relacionados con riesgos meteorológicos, inundaciones, sismos e incendios, según la disponibilidad de cada fuente.
+- Contexto geográfico, actividad reciente y evidencia asociada a los eventos.
+- Separación explícita entre fuente oficial, observación y fuente complementaria.
+- Indicadores de frescura y verificación: una observación, una alerta publicada y una confirmación no son equivalentes.
+- Interfaz adaptable y capacidades de aplicación web progresiva (PWA).
 
-## Add your files
+La cobertura y la actualización dependen de las fuentes externas. La ausencia de un evento en APHORA no demuestra que una zona sea segura.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Fuentes de datos
 
+El código integra proveedores y adaptadores para fuentes públicas como el Servicio Meteorológico Nacional (SMN/CAP), el Instituto Nacional del Agua (INA), INPRES, USGS, NASA EONET y datos complementarios de inundaciones. La fuente concreta y su función deben evaluarse en cada evento; no todas las fuentes tienen el mismo alcance, autoridad o frecuencia de actualización.
+
+## Arquitectura
+
+- **Frontend:** JavaScript, CSS y HTML en `public/` y `src/client/`.
+- **Dominio:** normalización de riesgos y observaciones en `src/domain/`.
+- **Proveedores:** adaptadores de fuentes externas en `src/providers/`.
+- **Backend:** Cloudflare Worker en `src/worker/`.
+- **Persistencia:** Cloudflare D1 y migraciones SQL en `migrations/`.
+- **PWA:** manifiesto, iconos y service worker en `public/`.
+- **Pruebas y herramientas:** `test/` y `scripts/`.
+
+## Desarrollo local
+
+Requisitos: Node.js compatible con las dependencias del proyecto y npm.
+
+```bash
+npm ci
+npm run gate
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/simondalmasso/aphora.git
-git branch -M main
-git push -uf origin main
+
+La compuerta ejecuta comprobación sintáctica, lint, pruebas automatizadas y build. Para ejecutar tareas individuales:
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
-## Integrate with your tools
+La ejecución local del Worker y el acceso a D1 pueden requerir configuración de Cloudflare y credenciales propias. No compartas secretos ni los agregues al repositorio.
 
-* [Set up project integrations](https://gitlab.com/simondalmasso/aphora/-/settings/integrations)
+## Estructura del repositorio
 
-## Collaborate with your team
+```text
+docs/          Contratos, planes, autoridad y estrategia SEO
+migrations/    Migraciones de base de datos
+public/        Interfaz web, estilos, PWA y recursos públicos
+scripts/       Build, validación, diagnóstico y mantenimiento
+src/client/    Lógica de interfaz
+src/domain/    Modelo y normalización de riesgos
+src/providers/ Adaptadores de fuentes
+src/worker/    API y lógica del Cloudflare Worker
+test/          Pruebas automatizadas y fixtures
+```
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## Fuente de verdad y GitLab
 
-## Test and Deploy
+GitHub `main` es la fuente canónica para código, ramas, revisiones y linaje de releases. GitLab es un espejo downstream: no desarrolles cambios independientes allí. Consulta [docs/REPOSITORY_AUTHORITY.md](docs/REPOSITORY_AUTHORITY.md).
 
-Use the built-in continuous integration in GitLab.
+## SEO y descubrimiento
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+La estrategia SEO está en [docs/SEO_STRATEGY.md](docs/SEO_STRATEGY.md). Incluye intención de búsqueda, metadatos, rastreo, enlaces canónicos y medición. El posicionamiento no puede garantizarse: requiere rastreo e indexación por buscadores y señales externas.
 
-***
+## Seguridad y uso responsable
 
-# Editing this README
+- No publiques tokens, claves privadas, credenciales ni datos personales.
+- No uses el radar como única fuente para decisiones de emergencia.
+- Verifica avisos y recomendaciones directamente con los organismos oficiales.
+- Reporta errores mediante [GitHub Issues](https://github.com/simondalmasso/Aphora/issues).
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Estado del proyecto
 
-## Suggestions for a good README
+APHORA está desplegado públicamente y continúa en desarrollo. La disponibilidad de la aplicación no implica que todas las fuentes externas estén activas ni que cada evento esté confirmado.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## Licencia
 
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+No se declara una licencia en este README. Hasta que se añada un archivo de licencia explícito, no debe asumirse que el código puede reutilizarse bajo una licencia open source determinada.
