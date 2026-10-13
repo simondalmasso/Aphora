@@ -152,3 +152,14 @@ test('WEATHER_SKIN_IS_BROWSER_SIDE_CACHED_AND_NOT_A_WORKER_ENDPOINT',()=>{
   assert.match(worker,/https:\/\/api\.open-meteo\.com/);
   assert.doesNotMatch(app,/\/api\/weather/);
 });
+
+test('CLOUDFLARE_DEPLOY_IS_EXPLICIT_MANUAL_APHORA_CONFIG_WITHOUT_CRON',()=>{
+  const workflow=fs.readFileSync('.github/workflows/deploy-aphora.yml','utf8');
+  assert.match(workflow,/workflow_dispatch/);
+  assert.match(workflow,/CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(workflow,/CLOUDFLARE_API_TOKEN/);
+  assert.match(workflow,/wrangler\.aphora\.jsonc/);
+  assert.match(workflow,/confirm_production/);
+  assert.doesNotMatch(workflow,/schedule:|cron:/i);
+  assert.doesNotMatch(workflow,/wrangler\.jsonc/);
+});
