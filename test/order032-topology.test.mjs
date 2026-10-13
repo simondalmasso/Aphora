@@ -11,9 +11,9 @@ test('NO_AUTOMATIC_CRON_TOPOLOGY',()=>{
   assert.equal(publicWorker.name,'aphora');
   assert.equal(publicWorker.triggers,undefined,'APHORA stays within the Cloudflare Free cron quota');
   const external=fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8');
-  assert.match(external,/cron: ".\\*\\/5 \\* \\* \\* \\*"/);
-  assert.match(external,/api\\/internal\\/scheduled-cycle/);
-  assert.match(external,/Authorization: Bearer \\$APHORA_SCHEDULER_TOKEN/);
+  assert.ok(external.includes('cron: "*/5 * * * *"'));
+  assert.ok(external.includes('/api/internal/scheduled-cycle'));
+  assert.ok(external.includes('Authorization: Bearer $APHORA_SCHEDULER_TOKEN'));
 });
 
 test('APHORA_PUBLIC_WORKER_USES_CANONICAL_HAZARD_DB_WITHOUT_PRIVATE_BINDING',()=>{
