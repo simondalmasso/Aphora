@@ -24,6 +24,13 @@ test('EXPIRED_DURABLE_EVENTS_ARE_EXCLUDED_FROM_CURRENT_OVERVIEW_AND_LOCAL_FEED',
   assert.match(app,/relativeTime\(d\.verifiedAt\)/);
 });
 
+test('SEISMIC_COUNTS_EXPLICITLY_STATE_THE_SEVEN_DAY_WINDOW',()=>{
+  assert.ok(app.includes('<span>sismos (7 días)</span>'));
+  assert.doesNotMatch(app,/sismos vigentes/);
+  assert.ok(national.includes('now.getTime()-7*86400000'));
+  assert.ok(national.includes('cut=now.getTime()-7*86400000'));
+});
+
 test('RIVER_STATIONS_OVER_100_KM_ARE_NOT_LABELLED_NEARBY',()=>{
   assert.match(app,/distanceKm<=100/);
   assert.match(app,/ESTACIONES REGIONALES/);

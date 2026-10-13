@@ -51,7 +51,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('#weather-visibility')?.textContent.includes('5,3 km'),null,{timeout:10000});
   await page.waitForFunction(()=>document.querySelector('#nearby-evidence')?.textContent.includes('ESTACIONES REGIONALES'),null,{timeout:10000});
   assert.equal(await page.title(),'APHORA · Radar cívico de riesgo en Argentina');
-  assert.match(await page.locator('#national-counts').textContent(),/sismos vigentes/);
+  assert.ok((await page.locator('#national-counts').textContent()).includes('sismos (7 días)'));
   assert.match(await page.locator('#overview-generated').textContent(),/^SMN /);
   assert.match(await page.locator('#nearby-evidence').textContent(),/RÍOS A MENOS DE 100 KM/);
   assert.match(await page.locator('#nearby-evidence').textContent(),/ESTACIONES REGIONALES/);
