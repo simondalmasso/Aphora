@@ -5,13 +5,13 @@ import fs from 'node:fs';
 const scheduler=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
 const publicWorker=JSON.parse(fs.readFileSync('wrangler.aphora.jsonc','utf8'));
 
-test('NO_AUTOMATIC_CRON_TOPOLOGY',()=>{
+test('NO_CLOUDFLARE_CRON_AND_GITHUB_EXTERNAL_SCHEDULE_OFF_TOP_OF_HOUR',()=>{
   assert.equal(scheduler.name,'sos-sf');
   assert.equal(scheduler.triggers,undefined,'legacy SOS-SF five-minute cron must stay disabled');
   assert.equal(publicWorker.name,'aphora');
   assert.deepEqual(publicWorker.triggers?.crons,[],'APHORA explicitly removes Cloudflare cron triggers to stay within the Free quota');
   const external=fs.readFileSync('.github/workflows/aphora-scheduler.yml','utf8');
-  assert.ok(external.includes('cron: "*/5 * * * *"'));
+  assert.ok(external.includes('cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"'));
   assert.ok(external.includes('/api/internal/scheduled-cycle'));
   assert.ok(external.includes('Authorization: Bearer $APHORA_SCHEDULER_TOKEN'));
 });
