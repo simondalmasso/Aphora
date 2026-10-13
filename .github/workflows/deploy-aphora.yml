@@ -58,5 +58,28 @@ jobs:
           config.vars.ORDER031_BUILT_AT = process.env.ORDER031_BUILT_AT;
           fs.writeFileSync('.wrangler.aphora.deploy.jsonc', JSON.stringify(config, null, 2) + '\n');
           NODE
+      - name: Install Chromium for exact-artifact acceptance
+        run: npx playwright install --with-deps chromium
+      - name: Start exact release preview
+        shell: bash
+        run: |
+          node scripts/static-qa-server.mjs > /tmp/aphora-static-preview.log 2>&1 &
+          echo $! > /tmp/aphora-static-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8790/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/aphora-static-preview.log
+          exit 1
+      - name: Verify exact release in responsive browser and accessibility checks
+        run: node scripts/aphora-current-browser-qa.mjs
+      - name: Upload exact-release browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aphora-release-browser-acceptance
+          path: evidence/aphora-current-browser/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Deploy Worker and static assets
         run: npx wrangler deploy --config .wrangler.aphora.deploy.jsonc
