@@ -58,6 +58,8 @@ jobs:
           config.vars.ORDER031_BUILT_AT = process.env.ORDER031_BUILT_AT;
           fs.writeFileSync('.wrangler.aphora.deploy.jsonc', JSON.stringify(config, null, 2) + '\n');
           NODE
+      - name: Verify APHORA-only 24h D1 read budget
+        run: node scripts/d1-budget-24h.mjs
       - name: Install Chromium for exact-artifact acceptance
         run: npx playwright install --with-deps chromium
       - name: Start exact release preview
