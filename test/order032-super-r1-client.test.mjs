@@ -195,3 +195,9 @@ test('WEATHER_FIRST_HERO_SHOWS_REAL_CURRENT_METRICS_AND_FOUR_DAY_FORECAST',()=>{
   assert.match(css,/data-weather-theme="sunny"/);
   assert.match(css,/data-weather-theme="night"/);
 });
+
+
+test('PREFECTURA_MONTH_ALIASES_HAVE_NO_DUPLICATE_KEYS',()=>{
+  const provider=fs.readFileSync('src/providers/prefectura-observations.js','utf8');
+  assert.doesNotMatch(provider,/OCT:10\s*,\s*OCT:10/);
+});
