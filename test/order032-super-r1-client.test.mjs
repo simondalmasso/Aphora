@@ -103,9 +103,10 @@ test('PREFECTURA_RIVER_CARD_DISTINGUISHES_SOURCE_STATUS_REFERENCE_LEVELS_AND_CAU
   assert.ok(m.length>0);
   assert.doesNotMatch(m,/severity/i);
   assert.match(m,/riverGuidance/);
-  assert.match(m,/Cota de alerta publicada/);
-  assert.match(m,/cota de evacuación publicada/);
-  assert.match(m,/mantener cautela/);
+  assert.match(app,/function riverGuidance\(/);
+  assert.match(app,/Cota de alerta publicada/);
+  assert.match(app,/cota de evacuación publicada/);
+  assert.match(app,/mantener cautela/);
   assert.match(m,/officialStatus/);
   assert.match(m,/alertLevel/);
   assert.match(m,/evacuationLevel/);
@@ -136,4 +137,18 @@ test('PREFECTURA_SOURCE_AND_MEASUREMENT_AGE_VISIBLE',()=>{
   assert.match(app,/Abrir fuente original/);
   assert.match(app,/RÍOS \/ PREFECTURA/);
   assert.match(app,/providerVerification\.prefectura/);
+});
+
+test('WEATHER_SKIN_IS_BROWSER_SIDE_CACHED_AND_NOT_A_WORKER_ENDPOINT',()=>{
+  assert.match(app,/api\.open-meteo\.com\/v1\/forecast/);
+  assert.match(app,/WEATHER_TTL_MS=30\*60\*1000/);
+  assert.match(app,/WEATHER_MIN_FETCH_GAP_MS=5\*60\*1000/);
+  assert.match(app,/weatherThemeFromCurrent/);
+  assert.match(css,/data-weather-theme="sunny"/);
+  assert.match(css,/data-weather-theme="cloudy"/);
+  assert.match(css,/data-weather-theme="rain"/);
+  assert.match(css,/data-weather-theme="night"/);
+  const worker=fs.readFileSync('src/worker/index.js','utf8');
+  assert.match(worker,/https:\/\/api\.open-meteo\.com/);
+  assert.doesNotMatch(app,/\/api\/weather/);
 });
