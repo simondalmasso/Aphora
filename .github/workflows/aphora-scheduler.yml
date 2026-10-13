@@ -20,10 +20,10 @@ jobs:
     steps:
       - name: Invoke bounded ingestion cycle
         env:
-          APHORA_SCHEDULER_TOKEN: \${{ secrets.APHORA_SCHEDULER_TOKEN }}
+          APHORA_SCHEDULER_TOKEN: ${{ secrets.APHORA_SCHEDULER_TOKEN }}
         shell: bash
         run: |
-          if [[ \${#APHORA_SCHEDULER_TOKEN} -lt 32 ]]; then
+          if [[ ${#APHORA_SCHEDULER_TOKEN} -lt 32 ]]; then
             echo "APHORA_SCHEDULER_TOKEN is missing or too short" >&2
             exit 1
           fi
