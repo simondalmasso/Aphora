@@ -1,5 +1,8 @@
 # APHORA — Radar cívico de riesgos para Argentina
 
+[![CI](https://github.com/simondalmasso/Aphora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/simondalmasso/Aphora/actions/workflows/ci.yml)
+
+
 **APHORA** es una aplicación web progresiva (PWA) para explorar riesgos y eventos relevantes en Argentina, consultar observaciones y revisar evidencia con su fuente, vigencia y estado de verificación claramente diferenciados.
 
 - **Aplicación en producción:** https://aphora.simondalmasso44.workers.dev/
