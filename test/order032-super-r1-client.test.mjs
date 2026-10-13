@@ -185,7 +185,8 @@ test('WEATHER_FIRST_HERO_SHOWS_REAL_CURRENT_METRICS_AND_FOUR_DAY_FORECAST',()=>{
   assert.match(app,/relative_humidity_2m/);
   assert.match(app,/apparent_temperature/);
   assert.match(app,/wind_speed_10m/);
-  assert.match(app,/visibility/);
+  assert.match(app,/hourly=visibility/);
+  assert.match(app,/currentWithVisibility/);
   assert.match(app,/forecast_days=4/);
   assert.match(app,/temperature_2m_max/);
   assert.match(app,/No se muestran valores estimados/);
