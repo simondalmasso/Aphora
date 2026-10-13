@@ -4,7 +4,7 @@ import{safeFetch}from'../worker/transport.js';
 
 export const PREFECTURA_URL='https://contenidosweb.prefecturanaval.gob.ar/alturas/';
 const POLICY={hosts:['contenidosweb.prefecturanaval.gob.ar'],paths:[/^\/alturas\/?$/],maxBytes:2500000,timeoutMs:10000,contentTypes:['html'],accept:'text/html,application/xhtml+xml'};
-const MONTHS={JAN:1,ENE:1,FEB:2,MAR:3,APR:4,ABR:4,MAY:5,JUN:6,JUL:7,AUG:8,AGO:8,SEP:9,SET:9,OCT:10,OCT:10,NOV:11,DEC:12,DIC:12};
+const MONTHS={JAN:1,ENE:1,FEB:2,MAR:3,APR:4,ABR:4,MAY:5,JUN:6,JUL:7,AUG:8,AGO:8,SEP:9,SET:9,OCT:10,NOV:11,DEC:12,DIC:12};
 let htmlCache={expiresAt:0,html:null,fetchedAt:null};
 const cleanText=value=>String(value??'').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/&nbsp;|&#160;|&#xA0;/gi,' ').replace(/&amp;/gi,'&').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([\da-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16))).replace(/\s+/g,' ').trim();
 const numberOrNull=value=>{const s=cleanText(value).replace(/\s/g,'');if(!s||/^(?:-|S\/?E\.?|N\/?D\.?|N\/A)$/i.test(s))return null;const n=Number(s.replace(',','.'));return Number.isFinite(n)?n:null};
