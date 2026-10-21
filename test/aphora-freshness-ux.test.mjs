@@ -10,10 +10,11 @@ const deploy=fs.readFileSync(new URL('../.github/workflows/deploy-aphora.yml',im
 const css=fs.readFileSync(new URL('../public/app.css',import.meta.url),'utf8');
 const schedulerWorkflow=fs.readFileSync(new URL('../.github/workflows/aphora-scheduler.yml',import.meta.url),'utf8');
 
-test('WEATHER_VISIBILITY_MATCHES_LAST_AVAILABLE_HOUR_AND_NEVER_COERCES_NULL_TO_ZERO',()=>{
-  assert.match(app,/function visibilityAtOrBefore\(/);
-  assert.doesNotMatch(app,/hourlyTimes\.indexOf\(String\(current\.time\|\|''\)\.slice\(0,16\)\)/);
-  assert.match(app,/visibility!==null&&visibility!==undefined&&Number\.isFinite\(Number\(visibility\)\)/);
+test('TERRITORIAL_OVERVIEW_DOES_NOT_DEPEND_ON_WEATHER_FORECAST',()=>{
+  for(const token of ['visibilityAtOrBefore','api.open-meteo.com','weather-hero','weatherThemeFromCurrent','WEATHER_CACHE_KEY'])assert.ok(!app.includes(token),token);
+  assert.ok(!css.includes('data-weather-theme='));
+  assert.ok(!css.includes('.weather-hero'));
+  assert.ok(!css.includes('weather-first redesign'));
 });
 
 test('EXPIRED_DURABLE_EVENTS_ARE_EXCLUDED_FROM_CURRENT_OVERVIEW_AND_LOCAL_FEED',()=>{
@@ -37,10 +38,12 @@ test('RIVER_STATIONS_OVER_100_KM_ARE_NOT_LABELLED_NEARBY',()=>{
   assert.match(app,/RÍOS A MENOS DE 100 KM/);
 });
 
-test('WEATHER_AND_CIVIC_RISK_SHARE_ONE_STABLE_VISUAL_THEME',()=>{
-  assert.doesNotMatch(css,/:root\[data-weather-theme=/);
-  assert.match(css,/.weather-daily-summary\{[^}]*background:var\(--surface\)/);
-  assert.match(css,/.weather-hero\{[^}]*background:var\(--surface\)/);
+test('TERRITORIAL_UI_USES_A_STABLE_CIVIC_PALETTE',()=>{
+  assert.ok(css.includes('--brand:#173e63'));
+  assert.ok(css.includes('.territory-intro'));
+  assert.ok(!css.includes('data-weather-theme='));
+  assert.ok(!css.includes('.weather-hero'));
+  assert.ok(!css.includes('.weather-daily-summary'));
 });
 
 test('APHORA_SCHEDULER_IS_FIVE_MINUTES_AND_STAYS_WITHIN_FREE_D1_BUDGET',()=>{
