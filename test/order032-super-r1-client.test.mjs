@@ -139,16 +139,13 @@ test('PREFECTURA_SOURCE_AND_MEASUREMENT_AGE_VISIBLE',()=>{
   assert.match(app,/providerVerification\.prefectura/);
 });
 
-test('WEATHER_SKIN_IS_BROWSER_SIDE_CACHED_AND_NOT_A_WORKER_ENDPOINT',()=>{
-  assert.match(app,/api\.open-meteo\.com\/v1\/forecast/);
-  assert.match(app,/WEATHER_TTL_MS=30\*60\*1000/);
-  assert.match(app,/WEATHER_MIN_FETCH_GAP_MS=5\*60\*1000/);
-  assert.match(app,/weatherThemeFromCurrent/);
-  assert.doesNotMatch(css,/data-weather-theme=/);
-  assert.match(css,/\.weather-hero\{[^}]*background:var\(--surface\)/);
+test('TERRITORIAL_OVERVIEW_DOES_NOT_CALL_A_WEATHER_PROVIDER',()=>{
+  assert.doesNotMatch(app,/api\\.open-meteo\\.com|refreshWeatherTheme|weatherThemeFromCurrent|WEATHER_CACHE_KEY|weather-hero|weather-forecast/);
+  assert.doesNotMatch(css,/data-weather-theme=|\\.weather-hero|weather-first redesign/);
   const worker=fs.readFileSync('src/worker/index.js','utf8');
-  assert.match(worker,/https:\/\/api\.open-meteo\.com/);
-  assert.doesNotMatch(app,/\/api\/weather/);
+  assert.doesNotMatch(worker,/https:\\/\\/api\\.open-meteo\\.com/);
+  assert.match(html,/<h1 id="territory-title">Situación del territorio<\\/h1>/);
+  assert.match(html,/<h2 id="national-title">Mapa de situación<\\/h2>/);
 });
 
 test('CLOUDFLARE_DEPLOY_IS_MANUAL_AND_APHORA_SCHEDULER_IS_BUDGETED',()=>{
@@ -179,23 +176,12 @@ test('LEGACY_SOS_SF_CRON_STAYS_DISABLED_AND_APHORA_USES_EXTERNAL_SCHEDULER',()=>
 });
 
 
-test('WEATHER_FIRST_HERO_SHOWS_REAL_CURRENT_METRICS_AND_FOUR_DAY_FORECAST',()=>{
-  assert.match(app,/id="weather-hero"/);
-  assert.match(app,/weather-daily-summary/);
-  assert.match(app,/relative_humidity_2m/);
-  assert.match(app,/apparent_temperature/);
-  assert.match(app,/wind_speed_10m/);
-  assert.match(app,/hourly=visibility/);
-  assert.match(app,/currentWithVisibility/);
-  assert.match(app,/forecast_days=4/);
-  assert.match(app,/temperature_2m_max/);
-  assert.match(app,/No se muestran valores estimados/);
-  assert.match(css,/\.weather-hero/);
-  assert.match(css,/\.weather-daily-summary/);
-  assert.doesNotMatch(css,/data-weather-theme=/);
-  assert.match(css,/\.weather-daily-summary\{[^}]*background:var\(--surface\)/);
+test('WEATHER_FIRST_HERO_IS_REMOVED_FROM_THE_TERRITORIAL_HOME',()=>{
+  assert.doesNotMatch(app,/id="weather-hero"|weather-daily-summary|relative_humidity_2m|apparent_temperature|wind_speed_10m|forecast_days=4|temperature_2m_max/);
+  assert.doesNotMatch(css,/\\.weather-hero|\\.weather-daily-summary/);
+  assert.match(css,/:root\\{[^}]*--brand:#173e63/);
+  assert.match(html,/Situación del territorio/);
 });
-
 
 test('PREFECTURA_MONTH_ALIASES_HAVE_NO_DUPLICATE_KEYS',()=>{
   const provider=fs.readFileSync('src/providers/prefectura-observations.js','utf8');
