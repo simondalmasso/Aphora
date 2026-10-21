@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#153e44">
-  <meta name="description" content="Radar cívico de riesgos en Argentina: explorá alertas, observaciones públicas y evidencia con fuente, vigencia y verificación diferenciadas.">
+  <meta name="theme-color" content="#173e63">
+  <meta name="description" content="Situación del territorio en Argentina: alertas, niveles de ríos, eventos y observaciones con fuente, vigencia y estado de verificación.">
   <meta name="application-name" content="APHORA">
   <meta name="apple-mobile-web-app-title" content="APHORA">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,11 +12,11 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/app.css?v=__ORDER031_RELEASE_ID__">
-  <title>APHORA · Radar cívico de riesgo en Argentina</title>
+  <title>APHORA · Situación del territorio</title>
   <link rel="canonical" href="https://aphora.simondalmasso44.workers.dev/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="APHORA">
-  <meta property="og:title" content="APHORA · Radar cívico de riesgo en Argentina">
+  <meta property="og:title" content="APHORA · Situación del territorio">
   <meta property="og:description" content="Explorá riesgos, observaciones públicas y evidencia con fuente, vigencia y verificación diferenciadas.">
   <meta property="og:url" content="https://aphora.simondalmasso44.workers.dev/">
   <meta property="og:locale" content="es_AR">
@@ -47,6 +47,7 @@
 <a class="skip" href="#main">Saltar al contenido</a>
 <header class="app-header"><a class="brand-lockup" href="#main" aria-label="APHORA · Radar cívico de riesgo"><span class="brand-mark" aria-hidden="true">A</span><strong>APHORA</strong></a><div class="header-status"><span id="header-state-dot" class="header-state-dot state-unknown" aria-hidden="true"></span><span id="header-freshness" class="mono">—</span><button id="refresh" class="icon-button" type="button" aria-label="Actualizar información"><svg aria-hidden="true"><use href="#i-refresh"></use></svg></button><button id="install-app" class="quiet compact" type="button" hidden>Instalar</button></div></header>
 <main id="main" class="app-shell">
+  <section class="territory-intro" aria-labelledby="territory-title"><div class="territory-intro-copy"><p class="eyebrow">APHORA · INFORMACIÓN TERRITORIAL</p><h1 id="territory-title">Situación del territorio</h1><p>Entender qué pasa. Saber qué hacer.</p></div><div class="territory-intro-note"><span class="territory-intro-mark" aria-hidden="true"><svg><use href="#i-map"></use></svg></span><span>Datos con fuente, fecha y límites visibles. La información disponible puede ser parcial.</span></div></section>
   <section class="area-shell" aria-labelledby="local-title" data-scope-contract="Área seleccionada · eventos y evidencia"><h1 id="local-title" class="visually-hidden">Referencia y situación actual</h1><div class="area-selector area-now"><div class="area-context-copy"><span id="reference-kind">ÁREA DE EXPLORACIÓN</span><strong id="selected-location">Área inicial · centro del país (recorte local)</strong><span id="area-event-context" class="area-event-context">Verificando actividad cercana</span></div><button id="manual-location" class="area-chip" type="button">Cambiar</button></div><div id="search-panel" class="search-panel" hidden><label for="place">Elegir localidad o provincia</label><div class="row"><input id="place" autocomplete="off" inputmode="search" placeholder="Ej. Santa Fe"><button id="search" type="button">Buscar</button></div><div class="location-shortcuts"><button id="use-location" class="quiet" type="button">Usar mi ubicación</button><button id="zones" class="quiet" type="button">Mis zonas</button></div><ul id="search-results" class="plain-list"></ul></div></section>
   <section id="verification-strip" class="verification-strip state-unknown" aria-label="Estado de verificación"><span class="status-symbol" aria-hidden="true"><svg><use href="#i-verify"></use></svg></span><div><strong id="verification-title">Verificando alertas SMN</strong><p id="verification" aria-live="polite">Comprobando el estado actual…</p></div><button id="verification-details" class="text-button" type="button">Detalles</button></section>
   <p id="network-state" class="network-state" aria-live="polite"></p>
