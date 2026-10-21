@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const html=fs.readFileSync('public/index.html','utf8');
 const app=fs.readFileSync('public/app.js','utf8');
+const map=fs.readFileSync('public/map-view.js','utf8');
 const css=fs.readFileSync('public/app.css','utf8');
 const sw=fs.readFileSync('public/service-worker.js','utf8');
 
@@ -121,7 +122,7 @@ test('ATOMIC_PWA_SIMULATION_NEVER_READS_OLD_CSS_OR_JS',async()=>{
 
 test('MAP_LIST_PARITY_AND_ZERO_INITIAL_SIDE_EFFECTS_PRESERVED',()=>{
   assert.match(app,/for\(const e of events\).*dataset\.eventId=e\.eventId/s);
-  assert.match(app,/for\(const e of events\).*dataset\.mapEventId=e\.eventId/s);
+  assert.match(map,/for\(const e of events\).*dataset\.mapEventId=e\.eventId/s);
   const init=app.slice(app.lastIndexOf("show('now')"));
   assert.doesNotMatch(init,/getCurrentPosition|Notification\.requestPermission|renderMap\(|loadGibsLayer\(/);
 });

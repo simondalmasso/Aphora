@@ -1,1 +1,20 @@
-{"name":"sos-sf-order031-product-complete","version":"31.0.0-rc","private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","test":"node --test test/*.test.mjs","typecheck":"node --check src/worker/index.js && node --check src/client/app.js && node --check src/providers/inpres.js && node --check src/providers/usgs.js && node --check src/providers/eonet.js","lint":"node scripts/lint.mjs","gate":"npm run typecheck && npm run lint && npm test && npm run build"},"devDependencies":{"@axe-core/playwright":"4.10.2","axe-core":"4.10.2","playwright":"1.62.1","wrangler":"4.125.0"}}
+{
+  "name": "sos-sf-order031-product-complete",
+  "version": "31.0.0-rc",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "node --check src/worker/index.js && node --check src/client/app.js && node --check src/client/map-view.js && node --check src/client/zones-view.js && node --check scripts/build.mjs && node --check scripts/aphora-current-browser-qa.mjs && node --check scripts/static-qa-server.mjs && node --check src/providers/inpres.js && node --check src/providers/usgs.js && node --check src/providers/eonet.js",
+    "lint": "node scripts/lint.mjs",
+    "gate": "npm run typecheck && npm run lint && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "axe-core": "4.10.2",
+    "esbuild": "^0.28.2",
+    "playwright": "1.62.1",
+    "wrangler": "4.125.0"
+  }
+}

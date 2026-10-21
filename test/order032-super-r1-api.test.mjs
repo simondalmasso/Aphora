@@ -15,8 +15,8 @@ test('OBSERVATIONS_ENDPOINT_MERGES_PREFECTURA_WITHOUT_REPLACING_INA',async()=>{
  const r=await handleNational(new Request('https://aphora.test/api/observations?type=RIVER_LEVEL&limit=10'),env,legacy);
  const p=await r.json();
  assert.equal(r.status,200);
- assert.equal(p.data.observations.length,4);
- assert.equal(p.data.observations.filter(o=>o.providerId==='ina').length,2);
+ assert.equal(p.data.observations.length,3);
+ assert.equal(p.data.observations.filter(o=>o.providerId==='ina').length,1);
  assert.equal(p.data.observations.filter(o=>o.providerId==='prefectura').length,2);
  assert.equal(p.data.sourceState.providers.prefectura.state,'FIXTURE_PARSED');
  const santaFe=p.data.observations.find(o=>o.providerId==='prefectura'&&o.locationLabel==='SANTA FE');

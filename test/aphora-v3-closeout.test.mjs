@@ -5,6 +5,7 @@ import {distanceToRecordAreaKm,zoneMatchesRecord} from '../src/worker/push.js';
 
 const html=fs.readFileSync('public/index.html','utf8');
 const app=fs.readFileSync('public/app.js','utf8');
+const map=fs.readFileSync('public/map-view.js','utf8');
 const css=fs.readFileSync('public/app.css','utf8');
 const national=fs.readFileSync('src/worker/national.js','utf8');
 const order031=fs.readFileSync('src/worker/order031.js','utf8');
@@ -33,5 +34,5 @@ test('APHORA_ORIGIN_PUSH_ALLOWED',()=>{assert.match(push,/https:\/\/aphora\.simo
 test('WATCH_ZONE_MATCH_USES_NEAREST_AREA_NOT_CENTROID',()=>{const zone={lon:-60.7,lat:-31.63,radius_km:25},wide={bbox:[-61.8,-32.0,-60.69,-31.6]};assert.ok(distanceToRecordAreaKm(zone,wide)<2);assert.equal(zoneMatchesRecord(zone,wide),true);const far={bbox:[-64.5,-32,-64.0,-31.5]};assert.equal(zoneMatchesRecord(zone,far),false)});
 test('PUSH_WATCH_ZONE_CONTEXT_TRUTHFUL',()=>{assert.match(push,/distanceToRecordAreaKm\(row,record\)/);assert.match(push,/Dentro de tu zona de seguimiento/)});
 test('PROXIMITY_POLYGON_HOLES_NOT_FALSE_INSIDE',()=>{assert.match(app,/function pointInPolygonCoords/);assert.match(app,/for\(let i=1;i<coords\.length;i\+\+\)if\(pointInRing\(lon,lat,coords\[i\]\)\)return false/);assert.match(app,/pointInGeoArea\(g,lon,lat\)/)});
-test('MAP_VIEW_IS_GEOGRAPHY_FIRST',()=>{assert.match(app,/\['national-overview','top-relevant-panel','hazard-overview','source-pulse-panel'\]/);assert.match(app,/\$\('#events'\)\.hidden=!now/);assert.match(app,/if\(v==='map'\)\{\$\('#map-view'\)\.hidden=false;applyMapRoleFilter\(\)\}/);assert.match(app,/\$\$\('\[data-map-role\]'\).*applyMapRoleFilter/s)});
+test('MAP_VIEW_IS_GEOGRAPHY_FIRST',()=>{assert.match(app,/\['national-overview','top-relevant-panel','hazard-overview','source-pulse-panel'\]/);assert.match(app,/\$\('#events'\)\.hidden=!now/);assert.ok(app.includes("if(v==='map'){$('#map-view').hidden=false;ensureMapView().then(m=>m.show())"));assert.ok(app.includes('ensureMapView().then(m=>m.setRoleFilter(filter))'));assert.match(map,/function applyMapRoleFilter\(\)/)});
 test('ICON_BUTTON_GLYPHS_DO_NOT_BLOCK_TOUCH_TARGETS',()=>{assert.match(css,/\.icon-button svg\{[^}]*pointer-events:none/)});
