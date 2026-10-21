@@ -3,7 +3,7 @@
 [![CI](https://github.com/simondalmasso/Aphora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/simondalmasso/Aphora/actions/workflows/ci.yml)
 
 
-**APHORA** es una aplicación web progresiva (PWA) para consultar la situación territorial: alertas, eventos, niveles de ríos y observaciones con fuente, fecha, vigencia y estado de verificación visibles. No ofrece predicciones propias ni afirma capacidades de inteligencia artificial.
+**APHORA** es una aplicación web progresiva (PWA) para consultar la situación territorial: alertas, eventos, niveles de ríos y observaciones con fuente, fecha, vigencia y estado de verificación visibles. No ofrece predicciones propias.
 
 - **Aplicación en producción:** https://aphora.simondalmasso44.workers.dev/
 - **Repositorio canónico:** https://github.com/simondalmasso/Aphora
