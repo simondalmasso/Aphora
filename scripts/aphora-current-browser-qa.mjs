@@ -23,7 +23,6 @@ const observations=[
  {observationId:'obs:near',observationType:'RIVER_LEVEL',hazardType:'FLOOD',providerId:'ina',sourceOrganization:'Instituto Nacional del Agua',sourceRole:'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION',label:'Río de referencia',locationLabel:'Estación cercana de prueba',geometry:{type:'Point',coordinates:[-62.2,-33.0]},value:2.4,unit:'m',delta24h:0.03,trend:'RISING',observedAt:iso(now-3600000),fetchedAt:iso(now-30000),freshness:'FRESH',verificationState:'PUBLISHED_OPERATIONAL',ageMinutes:60},
  {observationId:'obs:regional',observationType:'RIVER_LEVEL',hazardType:'FLOOD',providerId:'ina',sourceOrganization:'Instituto Nacional del Agua',sourceRole:'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION',label:'Río regional',locationLabel:'Estación regional de prueba',geometry:{type:'Point',coordinates:[-60.7,-31.63]},value:3.1,unit:'m',delta24h:null,trend:'UNKNOWN',observedAt:iso(now-3600000),fetchedAt:iso(now-30000),freshness:'FRESH',verificationState:'PUBLISHED_OPERATIONAL',ageMinutes:60}
 ];
-const weather={current:{time:'2026-10-13T14:45',temperature_2m:22,apparent_temperature:23,relative_humidity_2m:61,precipitation:0,weather_code:1,cloud_cover:20,is_day:1,wind_speed_10m:12},hourly:{time:['2026-10-13T14:00','2026-10-13T15:00'],visibility:[5300,12000]},daily:{time:['2026-10-13','2026-10-14','2026-10-15','2026-10-16'],weather_code:[1,2,3,0],temperature_2m_max:[25,26,22,24],temperature_2m_min:[15,16,13,14]}};
 const viewports=[[320,568],[390,844],[768,1024],[1440,900]];
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||chromium.executablePath()});
 const results=[];
@@ -32,7 +31,6 @@ try{
   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
   await context.addInitScript(()=>{window.__geoCalls=0;window.__permissionCalls=0;Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(){window.__geoCalls++}}});class N{};N.requestPermission=async()=>{window.__permissionCalls++;return'denied'};Object.defineProperty(window,'Notification',{configurable:true,value:N})});
   const page=await context.newPage();
-  await page.route('**/v1/forecast**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(weather)}));
   await page.route('**/api/**',async r=>{
    const u=new URL(r.request().url());let body={ok:true,data:{}};
    if(u.pathname==='/api/overview')body=overview;
@@ -45,27 +43,30 @@ try{
    else if(u.pathname==='/api/push/config')body={ok:true,data:{enabled:false,publicKey:null,defaults:{officialWarnings:true,modelSignals:false,satelliteEstimates:false}}};
    await r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
   });
-  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const errors=[],weatherRequests=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes('api.open-meteo.com'))weatherRequests.push(r.url())});
   await page.goto(BASE+'/',{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForSelector('#event-list .event-row',{timeout:15000});
-  await page.waitForFunction(()=>document.querySelector('#weather-visibility')?.textContent.includes('5,3 km'),null,{timeout:10000});
+  
   await page.waitForFunction(()=>document.querySelector('#nearby-evidence')?.textContent.includes('ESTACIONES REGIONALES'),null,{timeout:10000});
-  assert.equal(await page.title(),'APHORA · Radar cívico de riesgo en Argentina');
+  assert.equal(await page.title(),'APHORA · Situación del territorio');
+  assert.equal(await page.locator('#territory-title').textContent(),'Situación del territorio');
+  assert.equal(await page.locator('#weather-hero').count(),0,'weather-first hero must not be injected');
   assert.ok((await page.locator('#national-counts').textContent()).includes('sismos (7 días)'));
   assert.match(await page.locator('#overview-generated').textContent(),/^SMN /);
   assert.match(await page.locator('#nearby-evidence').textContent(),/RÍOS A MENOS DE 100 KM/);
   assert.match(await page.locator('#nearby-evidence').textContent(),/ESTACIONES REGIONALES/);
   assert.equal(await page.evaluate(()=>window.__geoCalls),0,'location must not be requested on load');
   assert.equal(await page.evaluate(()=>window.__permissionCalls),0,'push permission must not be requested on load');
-  const palette=await page.evaluate(()=>({root:getComputedStyle(document.documentElement).backgroundColor,hero:getComputedStyle(document.querySelector('.weather-hero')).backgroundColor,daily:getComputedStyle(document.querySelector('.weather-daily-summary')).backgroundColor,scrollWidth:document.documentElement.scrollWidth,innerWidth:window.innerWidth}));
-  assert.equal(palette.hero,palette.daily,'weather/risk cards use one surface at '+width+'px');
+  const palette=await page.evaluate(()=>({root:getComputedStyle(document.documentElement).backgroundColor,brand:getComputedStyle(document.documentElement).getPropertyValue('--brand').trim(),intro:getComputedStyle(document.querySelector('.territory-intro')).backgroundColor,scrollWidth:document.documentElement.scrollWidth,innerWidth:window.innerWidth}));
+  assert.equal(palette.brand,'#173e63','civic-blue brand palette at '+width+'px');
+  assert.deepEqual(weatherRequests,[],'no weather-provider calls on the territory overview');
   assert.ok(palette.scrollWidth<=palette.innerWidth+1,'horizontal overflow at '+width+'px: '+JSON.stringify(palette));
   assert.deepEqual(errors,[],'browser errors at '+width+'px');
   const axe=await new AxeBuilder({page}).analyze();
   const serious=axe.violations.filter(v=>v.impact==='serious'||v.impact==='critical');
   assert.equal(serious.length,0,'serious accessibility violations at '+width+'px: '+serious.map(v=>v.id).join(','));
   if(width===390||width===1440)await page.screenshot({path:OUT+'/aphora-'+width+'.png',fullPage:true});
-  results.push({viewport:width+'x'+height,visibility:await page.locator('#weather-visibility').textContent(),nationalCounts:await page.locator('#national-counts').textContent(),regionalStations:(await page.locator('#nearby-evidence').textContent()).includes('ESTACIONES REGIONALES'),palette,seriousAccessibilityViolations:serious.length,pass:true});
+  results.push({viewport:width+'x'+height,title:await page.title(),nationalCounts:await page.locator('#national-counts').textContent(),regionalStations:(await page.locator('#nearby-evidence').textContent()).includes('ESTACIONES REGIONALES'),weatherHeroCount:await page.locator('#weather-hero').count(),weatherRequests:weatherRequests.length,palette,seriousAccessibilityViolations:serious.length,pass:true});
   await context.close();
  }
 }finally{await browser.close()}
