@@ -62,3 +62,19 @@ dialog{border:0;border-radius:var(--radius-lg);box-shadow:0 24px 70px rgba(13,43
 @media(min-width:700px){.weather-hero{padding:1.5rem 1.7rem}.weather-main{padding:1.2rem 0 1.5rem}.weather-daily-summary{padding:1.15rem 1.3rem}.weather-metrics>div{padding:.65rem}.weather-forecast-days{gap:.6rem}.weather-day{padding:.8rem .4rem}.weather-day-icon{width:30px;height:30px}}
 @media(max-width:370px){.weather-hero{padding:.85rem;border-radius:20px}.weather-date{font-size:.58rem}.weather-metrics>div{padding:.4rem .05rem}.weather-day{border-radius:12px}.weather-day>span:first-child{font-size:.58rem}}
 @media(prefers-reduced-motion:reduce){.weather-hero,.weather-day{transition:none!important}}
+
+
+/* APHORA territorial dashboard: neutral surfaces, civic-blue hierarchy, no weather-first hero. */
+:root{--canvas:#f4f7fa;--surface:#fff;--surface-elevated:#fff;--surface-muted:#eaf0f7;--text-primary:#172c42;--text-secondary:#506579;--text-muted:#607286;--border-subtle:#d6e0ea;--risk-normal:#2f7463;--risk-watch:#b77a24;--risk-alert:#ad4938;--risk-critical:#7e2330;--source-official:#a64135;--source-observation:#286a8b;--source-supplementary:#71849a;--brand:#173e63;--brand-strong:#102e4b;--focus:#7ca7cc;--shadow-soft:0 12px 32px rgba(23,44,66,.07)}
+.app-header{background:color-mix(in srgb,var(--canvas) 95%,transparent);border-bottom-color:var(--border-subtle)}
+.app-shell{max-width:1360px;padding:clamp(12px,2vw,26px) clamp(12px,2.2vw,30px) 28px}
+.territory-intro{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(240px,.75fr);align-items:end;gap:1rem;margin:6px 0 18px;padding:clamp(18px,3vw,34px);border:1px solid #d8e3ed;border-radius:24px;background:linear-gradient(115deg,#fff 0%,#f1f6fb 100%);box-shadow:0 8px 26px rgba(23,44,66,.035)}
+.territory-intro-copy h1{margin:.32rem 0 .35rem;font-size:clamp(1.75rem,4vw,3rem);line-height:1.04;letter-spacing:-.055em;color:#142e49}
+.territory-intro-copy>p:last-child{margin:0;font-size:clamp(.9rem,1.7vw,1.12rem);color:#4d647a}
+.territory-intro-note{display:flex;align-items:center;gap:.7rem;max-width:360px;justify-self:end;padding:.8rem .9rem;border:1px solid #d5e1ed;border-radius:14px;background:rgba(255,255,255,.82);color:#52687c;font-size:.77rem;line-height:1.45}
+.territory-intro-mark{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:12px;background:#e5eef8;color:#173e63}.territory-intro-mark svg{width:22px;height:22px}
+.verification-strip{box-shadow:none;border-radius:12px}.panel,.content-section{box-shadow:0 2px 8px rgba(23,44,66,.025);border-radius:16px}.situation-panel{padding:.85rem}.situation-canvas{height:clamp(280px,38vw,470px);background:linear-gradient(180deg,#eaf1f8,#f8fafc);border-color:#d7e2ed}.argentina-shape{fill:#d9e6f1;stroke:#7d9dbb}
+.top-relevant-panel,.nearby-panel,.hazard-panel{padding:.85rem}.source-pulse-row{padding:.6rem 0}.bottom-nav{background:color-mix(in srgb,#fff 97%,transparent);border-top-color:#d6e0ea}
+@media(min-width:900px){.now-grid{grid-template-columns:minmax(0,1.65fr) minmax(290px,.75fr);gap:12px;margin-top:12px}.primary-column{gap:12px}.trust-column{display:grid;align-content:start;gap:12px}.app-shell{padding-top:22px}.territory-intro{margin-bottom:20px}}
+@media(max-width:699px){.territory-intro{grid-template-columns:1fr;gap:.9rem;margin:5px 0 12px;padding:18px;border-radius:18px}.territory-intro-copy h1{font-size:1.85rem}.territory-intro-note{justify-self:stretch;max-width:none;padding:.65rem}.territory-intro-mark{flex-basis:36px;width:36px;height:36px}.situation-canvas{height:310px}}
+@media(prefers-reduced-motion:reduce){.territory-intro,.panel,.content-section{transition:none!important}}
