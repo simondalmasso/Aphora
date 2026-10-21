@@ -1,9 +1,9 @@
-# APHORA — Radar cívico de riesgos para Argentina
+# APHORA — Situación del territorio
 
 [![CI](https://github.com/simondalmasso/Aphora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/simondalmasso/Aphora/actions/workflows/ci.yml)
 
 
-**APHORA** es una aplicación web progresiva (PWA) para explorar riesgos y eventos relevantes en Argentina, consultar observaciones y revisar evidencia con su fuente, vigencia y estado de verificación claramente diferenciados.
+**APHORA** es una aplicación web progresiva (PWA) para consultar la situación territorial: alertas, eventos, niveles de ríos y observaciones con fuente, fecha, vigencia y estado de verificación visibles. No ofrece predicciones propias ni afirma capacidades de inteligencia artificial.
 
 - **Aplicación en producción:** https://aphora.simondalmasso44.workers.dev/
 - **Repositorio canónico:** https://github.com/simondalmasso/Aphora
@@ -13,7 +13,7 @@
 
 ## Qué ofrece
 
-- Radar nacional y exploración por área o localidad.
+- Panorama territorial nacional y exploración por área o localidad.
 - Eventos relacionados con riesgos meteorológicos, inundaciones, sismos e incendios, según la disponibilidad de cada fuente.
 - Contexto geográfico, actividad reciente y evidencia asociada a los eventos.
 - Separación explícita entre fuente oficial, observación y fuente complementaria.
@@ -21,6 +21,10 @@
 - Interfaz adaptable y capacidades de aplicación web progresiva (PWA).
 
 La cobertura y la actualización dependen de las fuentes externas. La ausencia de un evento en APHORA no demuestra que una zona sea segura.
+
+## API de observaciones
+
+El endpoint común `GET /api/observations` combina observaciones hidrométricas normalizadas de INA y Prefectura, con fuente, fecha de medición, fecha de recepción, vigencia y estado por proveedor. Acepta `type=RIVER_LEVEL`, `limit` y `bbox=minLon,minLat,maxLon,maxLat`. El contrato y los endpoints de origen están documentados en [docs/OBSERVATIONS_API.md](docs/OBSERVATIONS_API.md). La respuesta técnica HTTP 200 no garantiza que las fuentes entreguen mediciones actuales; hay que comprobar `sourceState`, `freshness` y `observedAt`.
 
 ## Fuentes de datos
 
