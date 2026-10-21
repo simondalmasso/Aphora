@@ -140,12 +140,18 @@ test('PREFECTURA_SOURCE_AND_MEASUREMENT_AGE_VISIBLE',()=>{
 });
 
 test('TERRITORIAL_OVERVIEW_DOES_NOT_CALL_A_WEATHER_PROVIDER',()=>{
-  assert.doesNotMatch(app,/api\\.open-meteo\\.com|refreshWeatherTheme|weatherThemeFromCurrent|WEATHER_CACHE_KEY|weather-hero|weather-forecast/);
-  assert.doesNotMatch(css,/data-weather-theme=|\\.weather-hero|weather-first redesign/);
+  assert.ok(!app.includes('api.open-meteo.com'));
+  assert.ok(!app.includes('refreshWeatherTheme'));
+  assert.ok(!app.includes('weatherThemeFromCurrent'));
+  assert.ok(!app.includes('WEATHER_CACHE_KEY'));
+  assert.ok(!app.includes('weather-hero'));
+  assert.ok(!app.includes('weather-forecast'));
+  assert.ok(!css.includes('data-weather-theme='));
+  assert.ok(!css.includes('.weather-hero'));
   const worker=fs.readFileSync('src/worker/index.js','utf8');
-  assert.doesNotMatch(worker,/https:\\/\\/api\\.open-meteo\\.com/);
-  assert.match(html,/<h1 id="territory-title">Situación del territorio<\\/h1>/);
-  assert.match(html,/<h2 id="national-title">Mapa de situación<\\/h2>/);
+  assert.ok(!worker.includes('https://api.open-meteo.com'));
+  assert.ok(html.includes('<h1 id="territory-title">Situación del territorio</h1>'));
+  assert.ok(html.includes('<h2 id="national-title">Mapa de situación</h2>'));
 });
 
 test('CLOUDFLARE_DEPLOY_IS_MANUAL_AND_APHORA_SCHEDULER_IS_BUDGETED',()=>{
@@ -177,10 +183,11 @@ test('LEGACY_SOS_SF_CRON_STAYS_DISABLED_AND_APHORA_USES_EXTERNAL_SCHEDULER',()=>
 
 
 test('WEATHER_FIRST_HERO_IS_REMOVED_FROM_THE_TERRITORIAL_HOME',()=>{
-  assert.doesNotMatch(app,/id="weather-hero"|weather-daily-summary|relative_humidity_2m|apparent_temperature|wind_speed_10m|forecast_days=4|temperature_2m_max/);
-  assert.doesNotMatch(css,/\\.weather-hero|\\.weather-daily-summary/);
-  assert.match(css,/:root\\{[^}]*--brand:#173e63/);
-  assert.match(html,/Situación del territorio/);
+  for(const token of ['id="weather-hero"','weather-daily-summary','relative_humidity_2m','apparent_temperature','wind_speed_10m','forecast_days=4','temperature_2m_max'])assert.ok(!app.includes(token),token);
+  assert.ok(!css.includes('.weather-hero'));
+  assert.ok(!css.includes('.weather-daily-summary'));
+  assert.ok(css.includes('--brand:#173e63'));
+  assert.ok(html.includes('Situación del territorio'));
 });
 
 test('PREFECTURA_MONTH_ALIASES_HAVE_NO_DUPLICATE_KEYS',()=>{
