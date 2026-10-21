@@ -46,7 +46,7 @@ El repositorio canónico ya contiene un cliente REST en el worker legado que con
 
 - Página pública consultada por el adaptador: <https://contenidosweb.prefecturanaval.gob.ar/alturas/>
 
-La página publica una tabla HTML, no una API JSON documentada que se haya confirmado aquí. APHORA extrae sus filas mediante un parser estricto. Si la estructura cambia, debe informar degradación o falta de datos; no se deben inventar valores ni asumir que el sitio está operativo cuando no responde.
+La página publica una tabla HTML; no se encontró una API JSON propia documentada en sus scripts públicos. APHORA la consulta mediante un parser estricto. Si el Worker no puede acceder a esa página, puede usar una serie identificada por INA/SIyAH como originada en Prefectura (por ejemplo, `fuente=alturas_prefe`) y marcarla como `MIRROR_AVAILABLE` / `INA_SIYAH_MIRROR`. Esa copia no es una corroboración independiente y no se presenta como una conexión directa a Prefectura. Si no existe una serie de respaldo válida, el estado queda degradado o no disponible.
 
 ## Límites de esta integración
 
