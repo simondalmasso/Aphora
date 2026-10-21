@@ -12,7 +12,11 @@ http.createServer(async(req,res)=>{
   try{pathname=decodeURIComponent(new URL(req.url||'/',base).pathname)}catch{res.writeHead(400);res.end('bad request');return}
   if(pathname.startsWith('/api/')){
     try{
-      const request=new Request(new URL(req.url||'/',base),{method:req.method||'GET',headers:req.headers});
+      const method=req.method||'GET';
+      let body;
+      if(method!=='GET'&&method!=='HEAD'){const chunks=[];for await(const chunk of req)chunks.push(chunk);body=Buffer.concat(chunks)}
+      const init={method,headers:req.headers};if(body&&body.length)init.body=body;
+      const request=new Request(new URL(req.url||'/',base),init);
       const response=await worker.fetch(request,{});
       const headers=Object.fromEntries(response.headers.entries());
       headers['cache-control']='no-store';

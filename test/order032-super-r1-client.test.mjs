@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const app=fs.readFileSync('public/app.js','utf8');
+const map=fs.readFileSync('public/map-view.js','utf8');
 const html=fs.readFileSync('public/index.html','utf8');
 const css=fs.readFileSync('public/app.css','utf8');
 
@@ -94,7 +95,7 @@ test('PRESENTATION_CLUSTER_UI_PRESERVES_REAL_IDS',()=>{
 });
 
 test('MAP_LIST_CANONICAL_PARITY_REMAINS_REAL_EVENTS',()=>{
-  assert.match(app,/function renderMapMarkers\(\).*for\(const e of events\)/s);
+  assert.match(map,/function renderMapMarkers\(\).*for\(const e of events\)/s);
   assert.doesNotMatch(app,/function renderMapMarkers\(\).*presentationClusters/s);
 });
 
@@ -170,7 +171,7 @@ test('RECONNECT_DOES_NOT_DUPLICATE_SOURCE_REGISTRY_FETCH',()=>{
   const reconnect=app.slice(app.indexOf("addEventListener('online'"),app.indexOf("addEventListener('offline'"));
   assert.ok(reconnect.includes("Promise.all([loadOverview({animate:true}),load()])"));
   assert.ok(!reconnect.includes("loadSourcesData"));
-  assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),loadSourcesData()])"));
+  assert.ok(app.includes("$('#refresh').onclick=()=>Promise.all([loadOverview({animate:true}),load(),currentView==='sources'?loadSources(true):Promise.resolve()])"));
 });
 
 test('LEGACY_SOS_SF_CRON_STAYS_DISABLED_AND_APHORA_USES_EXTERNAL_SCHEDULER',()=>{

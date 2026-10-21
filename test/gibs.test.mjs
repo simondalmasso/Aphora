@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const app=fs.readFileSync('public/app.js','utf8');
+const map=fs.readFileSync('public/map-view.js','utf8');
 const html=fs.readFileSync('public/index.html','utf8');
 const domain=fs.readFileSync('src/domain/hazard.js','utf8');
 const national=fs.readFileSync('src/worker/national.js','utf8');
@@ -20,33 +21,33 @@ test('GIBS_ZERO_INITIAL_REQUESTS',()=>{
   assert.match(html,/id="gibs-layer-select"[^>]*><option value="">Apagado<\/option>/);
   assert.match(html,/id="gibs-overlay"[^>]*hidden/);
   assert.doesNotMatch(html,/id="gibs-overlay"[^>]+src=/);
-  assert.match(app,/let selectedGibsKey=''/);
+  assert.match(map,/let selectedGibsKey=''/);assert.match(app,/import\('.\/map-view\.js\?v='/);
   assert.match(app,/show\('now'\);loadOverview\(\);load\(\);\s*$/);
   assert.doesNotMatch(app,/show\('now'\);.*loadGibsLayer/s);
 });
 
 test('GIBS_ONLY_AFTER_LAYER_SELECTION',()=>{
-  assert.match(app,/function loadGibsLayer\(key\).*currentView!=='map'.*\$\('#map-view'\)\.hidden.*return/s);
-  assert.match(app,/\$\('#gibs-layer-select'\)\.onchange=.*selectedGibsKey=e\.target\.value.*currentView==='map'.*loadGibsLayer\(selectedGibsKey\)/s);
-  assert.match(app,/function renderMap\(\).*if\(selectedGibsKey\)/s);
-  assert.equal((app.match(/fetch\(gibsDomainUrl\(layer\)/g)||[]).length,1);
+  assert.match(map,/async function loadGibsLayer\(key\).*currentView!=='map'.*\$\('#map-view'\)\.hidden.*return/s);
+  assert.match(app,/\$\('#gibs-layer-select'\)\.onchange=e=>ensureMapView\(\)\.then\(m=>m\.setGibsLayer\(e\.target\.value\)\)/);
+  assert.match(map,/function renderMap\(\).*if\(selectedGibsKey\)/s);
+  assert.equal((map.match(/fetch\(gibsDomainUrl\(layer\)/g)||[]).length,1);
 });
 
 test('GIBS_TIMESTAMP_VISIBLE',()=>{
   assert.match(html,/id="gibs-time"/);
-  assert.match(app,/Tiempo de observación\/producto: \$\{time\}/);
-  assert.match(app,/DimensionDomain Domain/);
+  assert.match(map,/Tiempo de observación\/producto: '\+time/);
+  assert.match(map,/DimensionDomain Domain/);
 });
 
 test('GIBS_NO_DATA_FAILS_CLOSED',()=>{
-  assert.match(app,/function setGibsUnavailable/);
-  assert.match(app,/overlay\.hidden=true;overlay\.removeAttribute\('src'\)/);
-  assert.match(app,/No se interpreta como ausencia de inundación ni de riesgo/);
-  assert.match(app,/overlay\.onerror=\(\)=>setGibsUnavailable\(\)/);
+  assert.match(map,/function setGibsUnavailable/);
+  assert.match(map,/overlay\.hidden=true;overlay\.removeAttribute\('src'\)/);
+  assert.match(map,/No se interpreta como ausencia de inundación ni de riesgo/);
+  assert.match(map,/overlay\.onerror=\(\)=>setGibsUnavailable\(\)/);
 });
 
 test('GIBS_STALE_NOT_CURRENT',()=>{
-  assert.match(app,/state:'STALE',text:'Desactualizado: no representa el estado actual\.'/);
+  assert.match(map,/state:'STALE',text:'Desactualizado: no representa el estado actual\.'/);
   assert.match(html,/Una imagen desactualizada no representa el estado actual/);
 });
 
@@ -64,11 +65,11 @@ test('GIBS_NEVER_CURRENT_IMPACT_ALONE',()=>{
 });
 
 test('GIBS selected layer identifiers match verified capabilities',()=>{
-  for(const id of selectedIds) assert.match(app,new RegExp(id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
-  assert.match(app,/GoogleMapsCompatible_Level9/);
-  assert.match(app,/GoogleMapsCompatible_Level6/);
-  assert.match(app,/format:'image\/jpeg'/);
-  assert.match(app,/format:'image\/png'/);
+  for(const id of selectedIds) assert.ok(map.includes(id));
+  assert.match(map,/GoogleMapsCompatible_Level9/);
+  assert.match(map,/GoogleMapsCompatible_Level6/);
+  assert.match(map,/format:'image\/jpeg'/);
+  assert.match(map,/format:'image\/png'/);
 });
 
 test('GIBS CSP permits only the verified NASA host for visual/domain requests',()=>{
