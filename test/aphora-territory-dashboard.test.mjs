@@ -37,3 +37,7 @@ test('resources panel exposes distinct, safe external reference links', () => {
   assert.equal((html.match(/id="source-pulse-panel"/g) || []).length, 1);
   assert.doesNotMatch(html, /id="source-pulse-panel"<section/);
 });
+test('long live observation labels stay inside the mobile content width', () => {
+  assert.match(css, /#nearby-evidence\s*\{\s*width:100%;grid-template-columns:minmax\(0,1fr\)\s*\}/);
+  assert.match(css, /\.nearby-group-title small\s*\{\s*min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left\s*\}/);
+});
