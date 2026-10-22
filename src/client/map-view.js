@@ -1,4 +1,4 @@
-﻿const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const GIBS_LAYERS=Object.freeze({
  trueColor:{id:'MODIS_Terra_CorrectedReflectance_TrueColor',product:'Color real · MODIS Terra',service:'best',matrix:'GoogleMapsCompatible_Level9',format:'image/jpeg',maxZoom:9,freshMs:48*3600e3},
  flood1:{id:'MODIS_Combined_Flood_1-Day',product:'Inundación · ventana 1 día',service:'best',matrix:'GoogleMapsCompatible_Level9',format:'image/png',maxZoom:9,freshMs:48*3600e3},
@@ -11,7 +11,7 @@ export function createMapView(ctx){
  const gibsTimeCache=new Map(),gibsPending=new Map();
  const sync=()=>{bbox=ctx.getBBox();events=ctx.getEvents();rawEvents=ctx.getRawEvents();currentView=ctx.getCurrentView()};
  function mapImageSize(){const cssWidth=Math.min(900,Math.max(320,(window.innerWidth||900)-32)),dpr=Math.min(2,Math.max(1,window.devicePixelRatio||1)),width=Math.min(1200,Math.round(cssWidth*dpr));return{width,height:Math.round(width*500/900)}}
- function mapUrl(){sync();const b=bbox,s=mapImageSize();return'https://wms.ign.gob.ar/geoserver/wms?service=WMS&version=1.1.1&request=GetMap&layers=capabaseargenmap&styles=&bbox='+b.join(',')+'&width='+s.width+'&height='+s.height+'&srs=EPSG:4326&format=image/png'}
+ function mapUrl(){sync();const b=bbox,s=mapImageSize();return'https://ows.terrestris.de/osm/service?service=WMS&version=1.1.1&request=GetMap&layers=OSM-WMS&styles=&bbox='+b.join(',')+'&width='+s.width+'&height='+s.height+'&srs=EPSG:4326&format=image/png'}
  function mercatorX(lon){return lon*20037508.342789244/180}
  function mercatorY(lat){const y=Math.max(-85.05112878,Math.min(85.05112878,lat));return Math.log(Math.tan((90+y)*Math.PI/360))*20037508.342789244/Math.PI}
  function gibsDomainUrl(layer){const end=new Date(Date.now()+864e5).toISOString().replace(/.d{3}Z$/,'Z');return'https://gibs.earthdata.nasa.gov/wmts/epsg3857/'+layer.service+'/1.0.0/'+layer.id+'/default/'+layer.matrix+'/all/--'+end+'.xml'}

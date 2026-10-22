@@ -225,3 +225,5 @@ dialog{border:0;border-radius:var(--radius-lg);box-shadow:0 24px 70px rgba(13,43
  .app-shell[data-view="now"] .nearby-group-title{width:100%;flex-wrap:wrap;align-items:flex-start;gap:.25rem}
  .app-shell[data-view="now"] .nearby-group-title small{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 }
+.map-attribution{display:block;max-width:100%;font-size:.62rem;line-height:1.4;color:#60778a;overflow-wrap:anywhere}
+.map-attribution a{color:#235b7c;text-decoration:underline;text-underline-offset:2px}

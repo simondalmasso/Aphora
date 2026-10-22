@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const html = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../public/app.css', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+const worker = fs.readFileSync(new URL('../src/worker/index.js', import.meta.url), 'utf8');
 
 test('APHORA desktop dashboard has a real sidebar and responsive dashboard columns', () => {
   assert.match(html, /class="desktop-sidebar"/);
@@ -40,4 +41,15 @@ test('resources panel exposes distinct, safe external reference links', () => {
 test('long live observation labels stay inside the mobile content width', () => {
   assert.match(css, /#nearby-evidence\s*\{\s*width:100%;grid-template-columns:minmax\(0,1fr\)\s*\}/);
   assert.match(css, /\.nearby-group-title small\s*\{\s*min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left\s*\}/);
+});
+
+test('stale river observations are never labelled as current', () => {
+  assert.match(app, /function riverObservationIsCurrent\(o\)\{return !!o&&Number\.isFinite\(Number\(o\.value\)\)&&o\.freshness==='FRESH'\}/);
+  assert.match(app, /Último dato desactualizado/);
+  assert.match(app, /Dato desactualizado/);
+  assert.match(html, /OpenStreetMap contributors/);
+});
+
+test('the live basemap host is explicitly allowlisted by CSP', () => {
+  assert.match(worker, /img-src 'self' data: https:\/\/wms\.ign\.gob\.ar https:\/\/ows\.terrestris\.de https:\/\/gibs\.earthdata\.nasa\.gov/);
 });

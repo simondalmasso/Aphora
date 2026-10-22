@@ -71,7 +71,7 @@ try{
     await page.waitForTimeout(300);if(key==='390x844'||key==='1440x900')await page.screenshot({path:`${OUT}/${key}-MAP.png`,fullPage:true});
     const beforeLayerGibs=network.filter(x=>x.url.includes('gibs.earthdata.nasa.gov')).length;
     assert(beforeLayerGibs===0,`${key}:GIBS_ONLY_AFTER_LAYER_SELECTION`,`before=${beforeLayerGibs}`);
-    assert(network.some(x=>x.url.includes('wms.ign.gob.ar')),`${key}:ARGENMAP_LAZY`);
+    assert(network.some(x=>x.url.includes('ows.terrestris.de')),`${key}:ARGENMAP_LAZY`);
     const riskBefore=network.filter(x=>x.url.includes('/geoserver/ign_riesgo/ows')).length;
     assert(riskBefore===0,`${key}:IGN_RISK_ONLY_AFTER_SELECTION`);
     await page.selectOption('#risk-layer-select','desinventar_hidrometeorologico_riesgo');
