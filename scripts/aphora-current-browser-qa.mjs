@@ -23,7 +23,7 @@ const observations=[
  {observationId:'obs:near',observationType:'RIVER_LEVEL',hazardType:'FLOOD',providerId:'ina',sourceOrganization:'Instituto Nacional del Agua',sourceRole:'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION',label:'Río de referencia',locationLabel:'Estación cercana de prueba',geometry:{type:'Point',coordinates:[-62.2,-33.0]},value:2.4,unit:'m',delta24h:0.03,trend:'RISING',observedAt:iso(now-3600000),fetchedAt:iso(now-30000),freshness:'FRESH',verificationState:'PUBLISHED_OPERATIONAL',ageMinutes:60},
  {observationId:'obs:regional',observationType:'RIVER_LEVEL',hazardType:'FLOOD',providerId:'ina',sourceOrganization:'Instituto Nacional del Agua',sourceRole:'OFFICIAL_LOCAL_OR_NATIONAL_OBSERVATION',label:'Río regional',locationLabel:'Estación regional de prueba',geometry:{type:'Point',coordinates:[-60.7,-31.63]},value:3.1,unit:'m',delta24h:null,trend:'UNKNOWN',observedAt:iso(now-3600000),fetchedAt:iso(now-30000),freshness:'FRESH',verificationState:'PUBLISHED_OPERATIONAL',ageMinutes:60}
 ];
-const viewports=[[320,568],[390,844],[768,1024],[1440,900]];
+const viewports=[[320,568],[390,844],[768,1024],[1024,768],[1440,900]];
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXECUTABLE||chromium.executablePath()});
 const results=[];
 try{
@@ -75,13 +75,19 @@ try{
   assert.equal(apiRequests.filter(x=>x.path.startsWith('/api/events?')).length,1,'one initial event request');
   assert.equal(apiRequests.filter(x=>x.path.startsWith('/api/observations?')).length,1,'one initial observation request');
   assert.equal(apiRequests.filter(x=>x.path.startsWith('/api/sources')).length,0,'source catalog is lazy, not fetched on initial overview');
-  assert.equal(await page.evaluate(()=>performance.getEntriesByType('resource').some(r=>/map-view\.js|zones-view\.js/.test(r.name))),false,'map and zones chunks are not downloaded on initial view');
+  if(width>=900){await page.waitForFunction(()=>performance.getEntriesByType('resource').some(r=>new URL(r.name).pathname==='/map-view.js'));await page.waitForFunction(()=>document.querySelector('#argenmap')?.getAttribute('src'));}
+  const initialChunkPaths=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
+  if(width>=900){assert.ok(initialChunkPaths.includes('/map-view.js'),'desktop home loads its visible map chunk');assert.ok(!initialChunkPaths.includes('/zones-view.js'),'zones chunk remains lazy on desktop');}
+  else assert.ok(!initialChunkPaths.includes('/map-view.js')&&!initialChunkPaths.includes('/zones-view.js'),'map and zones chunks remain lazy on mobile home');
+  const initialBaseMapCount=baseMapRequests.length;
+  assert.equal(initialBaseMapCount,width>=900?1:0,'base map only loads on desktop home or after mobile Map navigation');
+  async function clickView(view){if(width>=900){const action=({now:'home',map:'map',zones:'preparation',sources:'sources'})[view];await page.locator('.desktop-sidebar [data-sidebar-action="'+action+'"]').click()}else await page.locator('.bottom-nav button[data-view="'+view+'"]').click()}
   async function noOverflow(stage){const p=await page.evaluate(()=>({innerWidth:innerWidth,scrollWidth:document.documentElement.scrollWidth}));assert.ok(p.scrollWidth<=p.innerWidth+1,stage+' horizontal overflow: '+JSON.stringify(p))}
   async function noSeriousA11y(stage){const a=await new AxeBuilder({page}).analyze(),v=a.violations.filter(x=>x.impact==='serious'||x.impact==='critical');assert.equal(v.length,0,stage+' serious accessibility issues: '+v.map(x=>x.id).join(','))}
-  await page.locator('.bottom-nav button[data-view="map"]').click();
+  await clickView('map');
   await page.waitForFunction(()=>!document.querySelector('#map-view').hidden&&document.querySelector('#argenmap').getAttribute('src'));
   await page.waitForFunction(()=>document.querySelector('#argenmap').complete&&document.querySelector('#argenmap').naturalWidth>0);
-  assert.equal(baseMapRequests.length,1,'base map loads only when Map is opened');
+  assert.ok(baseMapRequests.length>=1&&baseMapRequests.length<=initialBaseMapCount+1,'base map is fetched only when the rendered map size changes');
   assert.ok(await page.evaluate(()=>performance.getEntriesByType('resource').some(r=>r.name.includes('map-view.js'))),'map chunk loaded on demand');
   await page.locator('[data-map-role="OFFICIAL_WARNING"]').click();
   assert.equal(baseMapRequests.length,1,'map role filter does not reload the base map');
@@ -107,7 +113,7 @@ try{
   }
   assert.equal(gibsMetadataRequests.length,gibsOptions.length,'map pan/zoom reuses metadata for each selected NASA product');
   const firstSourceResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/sources');
-  await page.locator('.bottom-nav button[data-view="sources"]').click();
+  await clickView('sources');
   const firstSourcePayload=await firstSourceResponse;sourcePayloadBytes.push((await firstSourcePayload.body()).length);
   await page.waitForSelector('#source-list .source-row');
   assert.equal(apiRequests.filter(x=>x.path.startsWith('/api/sources')).length,1,'source catalog fetched once on demand');
@@ -115,8 +121,8 @@ try{
   const sourceLink=page.locator('#source-list .source-row a').first();assert.equal(await sourceLink.getAttribute('href'),'https://alerta.ina.gob.ar/');assert.ok((await sourceLink.getAttribute('rel')).includes('noopener'));
   await noOverflow('sources');
   await noSeriousA11y('sources');
-  await page.locator('.bottom-nav button[data-view="now"]').click();
-  await page.locator('.bottom-nav button[data-view="sources"]').click();
+  await clickView('now');
+  await clickView('sources');
   assert.equal(apiRequests.filter(x=>x.path.startsWith('/api/sources')).length,1,'source catalog reused from in-memory cache');
   const refreshSourceResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/sources');
   await page.locator('#refresh').click();
@@ -124,7 +130,7 @@ try{
   assert.equal(apiRequests.filter(x=>x.path.startsWith('/api/sources')).length,2,'explicit refresh reloads compact source status once');
   const bboxCallsBeforeZones=apiRequests.filter(x=>x.path.startsWith('/api/events?')).length;
   const initialZoneBatch=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/events/batch');
-  await page.locator('.bottom-nav button[data-view="zones"]').click();
+  await clickView('zones');
   await initialZoneBatch;
   await page.waitForFunction(()=>document.querySelectorAll('#zone-list .zone-card').length===2);
   await page.waitForFunction(()=>[...document.querySelectorAll('.zone-state')].every(e=>!e.textContent.includes('Consultando')));
@@ -173,10 +179,21 @@ try{
     await page.locator(selector).selectOption('').catch(()=>{});
   }
   await noOverflow('after all controls');
+  let sidebarActionsTested=0,dashboardCardsTested=0;
+  if(width>=900){
+   const navChecks=[['home','now',null],['alerts','now','#events'],['rivers','now','#nearby-observations'],['earthquakes','now','#events'],['phenomena','now','#hazard-overview'],['preparation','zones','#preparedness-panel'],['resources','zones','#resources-panel'],['sources','sources','#source-list'],['map','map','#map-view']];
+   for(const [action,view,target] of navChecks){await page.locator('.desktop-sidebar [data-sidebar-action="'+action+'"]').click();await page.waitForFunction(v=>document.querySelector('#main').dataset.view===v,view);if(target)assert.ok(await page.locator(target).isVisible(),action+' navigation target is visible');sidebarActionsTested++;}
+   const resourceLinks=page.locator('#resources-panel .resource-links a');assert.equal(await resourceLinks.count(),5,'resources view exposes five external references');for(let i=0;i<await resourceLinks.count();i++){const link=resourceLinks.nth(i);assert.ok((await link.getAttribute('href')).startsWith('https://'),'resource link uses HTTPS');assert.ok((await link.getAttribute('rel')).includes('noopener'),'external resource link isolates opener');}
+    await noOverflow('desktop sidebar navigation');
+  }
+  if(width===390){
+   for(const action of ['rivers','alerts','earthquakes','events']){await page.locator('[data-dashboard-action="'+action+'"]').click();await page.waitForFunction(()=>document.querySelector('#main').dataset.view==='now');dashboardCardsTested++;}
+   await noOverflow('mobile dashboard cards');
+  }
   assert.deepEqual(weatherRequests,[],'no weather-provider calls after all interactions');
   assert.deepEqual(errors,[],'no browser console/page errors after interactions');
   assert.deepEqual(httpFailures,[],'no failed assets or requests after interactions');
-  results[results.length-1].lazyAssets=await page.evaluate(()=>performance.getEntriesByType('resource').filter(r=>/map-view\.js|zones-view\.js/.test(r.name)).map(r=>({name:new URL(r.name).pathname,transferSize:r.transferSize,decodedBodySize:r.decodedBodySize})));results[results.length-1].interactionTests={baseMapRequests:baseMapRequests.length,riskMapRequests:riskMapRequests.length,gibsMetadataRequests:gibsMetadataRequests.length,gibsOverlayRequests:gibsWmsRequests.length,compactSourceRequests:apiRequests.filter(x=>x.path.startsWith('/api/sources')).length,compactSourcePayloadBytes:sourcePayloadBytes,zoneBatchRequests:apiRequests.filter(x=>x.path==='/api/events/batch').length,georefRequests:apiRequests.filter(x=>x.path.startsWith('/api/georef/search?')).length,permissionRequests:await page.evaluate(()=>window.__permissionCalls),geolocationRequests:await page.evaluate(()=>window.__geoCalls),noOverflow:true,noSeriousA11y:true,pass:true};
+  results[results.length-1].lazyAssets=await page.evaluate(()=>performance.getEntriesByType('resource').filter(r=>/map-view\.js|zones-view\.js/.test(r.name)).map(r=>({name:new URL(r.name).pathname,transferSize:r.transferSize,decodedBodySize:r.decodedBodySize})));results[results.length-1].interactionTests={baseMapRequests:baseMapRequests.length,riskMapRequests:riskMapRequests.length,gibsMetadataRequests:gibsMetadataRequests.length,gibsOverlayRequests:gibsWmsRequests.length,compactSourceRequests:apiRequests.filter(x=>x.path.startsWith('/api/sources')).length,compactSourcePayloadBytes:sourcePayloadBytes,zoneBatchRequests:apiRequests.filter(x=>x.path==='/api/events/batch').length,georefRequests:apiRequests.filter(x=>x.path.startsWith('/api/georef/search?')).length,permissionRequests:await page.evaluate(()=>window.__permissionCalls),geolocationRequests:await page.evaluate(()=>window.__geoCalls),sidebarActionsTested,dashboardCardsTested,noOverflow:true,noSeriousA11y:true,pass:true};
   }
 
   await context.close();
