@@ -24,7 +24,7 @@ The before values are from the production browser/API baseline captured before t
 4. Added POST /api/events/batch for up to 12 saved zones. It reads the active event set once and groups results by each zone's bounding box. This removes per-zone request fan-out.
 5. Grouped the durable overview and event reads into D1 batches after the heartbeat check. Overview reads use one batch of three SELECT statements; event-list/detail reads use one batch for event data and verification. The SQL reads remain bounded; the improvement is fewer D1 round-trips, not fewer logical SELECTs.
 6. Cached NASA GIBS time metadata per selected product and avoid resetting unchanged map image URLs. Map role filters update markers without reloading unchanged base/risk/satellite images.
-7. Reduced Argenmap image request width to the rendered map size (capped at 900 px), added asynchronous image decoding, and declared the existing SVG icon as the favicon. No external web-font requests are introduced.
+7. Reduced base-map WMS image request width to the rendered map size (capped at 900 px), added asynchronous image decoding, and declared the existing SVG icon as the favicon. No external web-font requests are introduced.
 
 ## Verification
 
